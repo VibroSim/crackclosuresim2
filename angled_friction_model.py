@@ -8,6 +8,8 @@ from numpy.random import rand
 
 import crackclosuresim.crack_utils_1D as cu1
 
+doplots=True
+
 i=(0+1j) # imaginary number
 
 # pdf (need not be normalized) of surface orientation beta
@@ -22,9 +24,9 @@ friction_coefficient=0.3
 vibration_frequency=20e3  # (Hz)
 
 static_load=60e6  # tensile static load of 60MPa
-vib_normal_stress_ampl = 40e6  # vibrational normal stress amplitude. 
-vib_shear_stress_ampl = 20e6  # Assume shear amplitude peaks simultaneously with
-# normal stress.
+vib_normal_stress_ampl = 0e6  # vibrational normal stress amplitude. 
+vib_shear_stress_ampl = 40e6  # Assume shear amplitude peaks simultaneously with
+# normal stress. NOT CURRENTLY USED!!!
 # assume also that there is no synergy between heating from different modes. 
 
 # x is position along crack (currently no x dependence to beta 
@@ -36,6 +38,7 @@ beta_unnorm_pdf = lambda beta,x:  np.array([ (magnitude/np.sqrt(2*np.pi*sigma**2
 nu = 0.33
 E = 207.83e9 # Plane stress
 #E = 207.83e9/(1.0-nu**2.0) # Plane strain
+G=E/(2*(1+nu))
 width=25.4e-3
 
 
@@ -63,10 +66,11 @@ stress_field_spl_rightside=cu1.inverse_closure(reff_rightside,seff_rightside,cu1
 aleft=-np.max(reff_leftside)
 aright=np.max(reff_rightside)
 
-approximate_xstep=25e-6 # 25um
+#approximate_xstep=25e-6 # 25um
+approximate_xstep=75e-6 # 75um
 numsteps=int((aright-aleft)//approximate_xstep)
 xstep = (aright-aleft)/(numsteps-1.0)
-numdraws=20 # draws per step
+numdraws=30 # draws per step
 
 xrange = aleft + xstep*np.arange(numsteps)
 power_per_m2 = np.zeros(xrange.shape[0],dtype='d')
@@ -135,6 +139,32 @@ for xcnt in range(xrange.shape[0]):
 
     uyy_sub=2.0*cu1.uyy(r,np.max(reff),static_load-vib_normal_stress_ampl,stress_field_spl,cu1.weightfun_through,(width,),E,nu,configuration="PLANE_STRESS")
 
+
+    # shear displacement
+    # ***!!! is G the right modulus here or
+    # do we need some kind of effective modulus?
+    # assume effective length is closure_point_add
+    # Then we would get no motion for r > closure_point_add
+
+    # ***!!! Really our effective crack tip should go beyond closure_point_add
+    # to the point where the stick-slip behavior shifts to strictly stick
+    if r > closure_point_add:
+        K_II=0.0
+        utt=0.0
+        pass
+    else:
+        f_of_x_a = 1.0
+        
+        K_II = vib_shear_stress_ampl*np.sqrt(np.pi*closure_point_add)*f_of_x_a
+        # COD = K_II*
+        # Do we need a more suitable weight function for shear? 
+        #utt = (2.0/G)*scipy.integrate.quad(lambda x: cu1.weightfun_through(x,closure_point_add-r,width)*K_II,0,
+
+        # utt from Anderson, Fracture Mechanics 3rd edition, table 2.2, second row, second column theta=0
+        # G is shear modulus, nu is Poisson's ratio
+        utt = (K_II/(2.0*G))*np.sqrt((closure_point_add-r)/(2.0*np.pi))*(2.0-4.0*nu)
+        pass
+    
     # Got two closure stress values at this point:
     # closure_state_add_x and closure_state_sub_x
 
@@ -189,6 +219,11 @@ for xcnt in range(xrange.shape[0]):
     # Determine scaling factor for all draws to sum to desired value
     normal_force_factor=P_static_nominal/P_contributions
 
+    if not np.isfinite(normal_force_factor):
+        normal_force_factor=1.0  # in case P_contributions are 0 just set scaling factor to 1.0
+        pass
+    
+    
     # Evaluate P,Q, N, & T assuming this scaling factor
     #P_static = P_static_nominal*normal_force_factor
     #Q_static = Q_static_nominal*normal_force_factor
@@ -203,7 +238,13 @@ for xcnt in range(xrange.shape[0]):
 
     # P_dynamic per draw
     P_dynamic = (closure_state_add_x - closure_state_sub_x)* (xstep * np.pi*r/2.0)/(2.0*numdraws) # dynamic stress amplitude
-    Q_dynamic = 0.0 # Should be shear vibration amplitude
+
+    # For the moment, just make the shear correct near the surface
+    # because that's where we have data
+    #Q_dynamic = 0.0 # Should be shear vibration amplitude
+    # Per number of draws because we assume that the stress
+    # is distributed over the asperities.
+    Q_dynamic = vib_shear_stress_ampl*xstep*np.pi*r/(2.0*numdraws)
 
     N_dynamic = P_dynamic*np.cos(beta_draws)+Q_dynamic*np.sin(beta_draws)
     T_dynamic = -P_dynamic*np.sin(beta_draws)+Q_dynamic*np.cos(beta_draws)
@@ -232,9 +273,10 @@ for xcnt in range(xrange.shape[0]):
     
     PP_vibration_y=uyy_add-uyy_sub
     vibration_ampl[xcnt]=PP_vibration_y/2.0
-    tangential_vibration_ampl=np.abs(vibration_ampl[xcnt] * np.sin(beta_draws))*slip
+    #PP_vibration_t=utt*2.0
+    tangential_vibration_ampl=np.abs(vibration_ampl[xcnt] * np.sin(beta_draws) + utt*np.cos(beta_draws))*slip
     tangential_vibration_velocity_ampl = 2*np.pi*vibration_frequency*tangential_vibration_ampl
-
+    
     # Power = (1/2)Fampl*vampl
     # where Fampl = mu*Normal force
     # Q: Are force and velocity always in-phase (probably not)
@@ -250,7 +292,13 @@ for xcnt in range(xrange.shape[0]):
     # P=uNv = u(Nstatic+Ndynamic)v=u(Cn1 + Cn2v)v
 
     # (Note: N_static term was missing from original calculation)
-    Power = 0.5 * (friction_coefficient*(np.abs(N_static)+np.abs(N_dynamic)))*tangential_vibration_velocity_ampl
+    if r >= closure_point_sub:
+        Power = 0.5 * (friction_coefficient*(np.abs(N_static)+np.abs(N_dynamic)))*tangential_vibration_velocity_ampl
+        pass
+    else:
+        Power=0.0
+        pass
+    
     TotPower = np.sum(Power)
 
     power_per_m2[xcnt] = TotPower/(xstep*np.pi*r/2.0)
@@ -259,19 +307,22 @@ for xcnt in range(xrange.shape[0]):
     
     pass
 
-betarange=np.linspace(-np.pi,np.pi,800)
-pl.figure(1)
-pl.clf()
-pl.plot(betarange*180.0/np.pi,beta_pdf(betarange),'-')
-pl.xlabel('Facet orientation (degrees from flat)')
-pl.ylabel('Probability density (/rad)')
-pl.savefig('/tmp/facet_pdf.png',dpi=300)
-
-
-pl.figure(2)
-pl.clf()
-pl.plot(xrange*1e3,power_per_m2/1.e3)
-pl.xlabel('Position (mm)')
-pl.ylabel('Heating power (kW/m^2)')
-pl.savefig('/tmp/frictional_heating.png',dpi=300)
-pl.show()
+if (doplots):
+    betarange=np.linspace(-np.pi,np.pi,800)
+    pl.figure(1)
+    pl.clf()
+    pl.plot(betarange*180.0/np.pi,beta_pdf(betarange),'-')
+    pl.xlabel('Facet orientation (degrees from flat)')
+    pl.ylabel('Probability density (/rad)')
+    pl.savefig('/tmp/facet_pdf.png',dpi=300)
+    
+    
+    pl.figure(2)
+    pl.clf()
+    pl.plot(xrange*1e3,power_per_m2/1.e3)
+    pl.xlabel('Position (mm)')
+    pl.ylabel('Heating power (kW/m^2)')
+    pl.title('sigma = %.1f deg' % (beta_components[0][2]*180.0/np.pi))
+    pl.savefig('/tmp/frictional_heating.png',dpi=300)
+    pl.show()
+    pass
