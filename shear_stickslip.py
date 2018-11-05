@@ -403,10 +403,10 @@ E = 200e9    #Plane stress Modulus of Elasticity
 
 nu = 0.33    #Poisson's Ratio
 
-#Initialize the applied dynamic shear stress starting at zero
-tau_external = 0.0
+#Initialize the external applied dynamic shear stress starting at zero
+tauext = 0.0
 
-tau_external_max = 20e6 # Pa
+tauext_max = 20e6 # Pa
 
 a=2.0e-3  # half-crack length (m)
 xmax = 5e-3 # as far out in x as we are calculating (m)
@@ -431,10 +431,10 @@ sigma_closure = 5e6/cos(x/a) # Pa
 #####MAIN SUPERPOSITION LOOP
 
 #Initialize shear stress field (function of x)
-shear_stress_total = np.zeros(x.shape,dtype='d')
+tau = np.zeros(x.shape,dtype='d')
 
 #Initialized the Displacement state as zero
-displacement_state = np.zeros(x.shape,dtype='d')
+shear_displ = np.zeros(x.shape,dtype='d')
 
 
 
@@ -445,17 +445,17 @@ done=False
 
 while not done: 
     
-    (use_xt2,tau_external, shear_stress_total, displacement_state) = solve_incremental_shearstress(x,x_bnd,shear_stress_total,sigma_closure,displacement_state,xt_idx,dx,tau_external,tau_external_max,a,mu,E,nu)
+    (use_xt2,tauext, tau, shear_displ) = solve_incremental_shearstress(x,x_bnd,tau,sigma_closure,shear_displ,xt_idx,dx,tauext,tauext_max,a,mu,E,nu)
 
 
-    if use_xt2 < x_bnd[xt_idx+1] or tau_external==tau_external_max or use_xt2 >= a:
+    if use_xt2 < x_bnd[xt_idx+1] or tauext==tauext_max or use_xt2 >= a:
         # Used up all of our applied load or all of our crack... Done!
         done=True
         pass
     
     #Print what is happening in the loop
-    print("Step: %d @ x=%f mm: %f MPa of shear held" % (xt_idx,x[xt_idx]*1e3,tau_external/1e6))
-    print("Shear displacement @ x=%f mm: %f nm" % (x[0]*1e3, displacement_state[0]*1e9))
+    print("Step: %d @ x=%f mm: %f MPa of shear held" % (xt_idx,x[xt_idx]*1e3,tauext/1e6))
+    print("Shear displacement @ x=%f mm: %f nm" % (x[0]*1e3, shear_displ[0]*1e9))
     
     xt_idx+=1
     
