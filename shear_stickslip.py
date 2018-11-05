@@ -341,9 +341,23 @@ def solve_incremental_shearstress(x,x_bnd,tau,sigma_closure,shear_displ,xt_idx,d
         # Bound it by 0  and the F that will give the maximum
         # contribution of tau_increment: (tauext_max-tauext1)/(xt2-xt1)
         Fbnd = (tauext_max - tauext)/(next_bound-x[xt_idx])
+
+        if obj_fcn(Fbnd) < 0.0:
+            # Maximum value of objective is < 0... This means that
+            # with the steepest tau vs. xt slope possible (given
+            # the total shear load we are applying) we still
+            # can't get tau+tau_increment to match mu*sigma_closure.
+            # ... We will have to make do with tau+tau_increment
+            #  < sigma_closure
+            # So our best result is just Fbnd
+            F=Fbnd
+            pass
+        else:
+            # brentq requires function to be different signs
+            # at 0.0 (negative) and Fbnd (positive) 
+            F = scipy.optimize.brentq(obj_fcn,0.0,Fbnd,disp=True)
+            pass
         
-        F = scipy.optimize.brentq(obj_fcn,0.0,Fbnd,disp=True)
-    
         (use_xt2,tauext2,tau_increment)=integral_shearstress_growing_effective_crack_length_byxt(tauext,tauext_max,F,x_bnd[xt_idx],next_bound)
 
         # For displacement calculate at x centers... use average of left and right boundaries, except for (perhaps) last point where instead of the right boundary we use the actual tip.
@@ -437,13 +451,40 @@ def solve_shearstress(x,x_bnd,sigma_closure,dx,tauext_max,a,mu,E,nu,tau_yield,ve
     #Initialized the Displacement state as zero
     shear_displ = np.zeros(x.shape,dtype='d')
 
-
-
     #Initialize x step counter
     xt_idx = 0
+
+    # Before initial slip, tau just increases uniformly
+    # (Note: stress distribution may not be very accurate if
+    # initial slip does not occur @ x=0)
+    argmin_sigma_closure = np.argmin(sigma_closure[x < a])
+    min_sigma_closure=sigma_closure[x < a][argmin_sigma_closure]
+    if min_sigma_closure > 0:
+        # We can hold a stress of mu*min_sigma_closure
+        # without any slip at all.
+
+        uniform_shear = np.min((mu*min_sigma_closure,tauext_max))
+        
+        tau += uniform_shear
+        tauext += uniform_shear
+
+        # assume anything to the left of the
+        # sigma_closure minimum is free to move
+        # once we get to this point
+        xt_idx=argmin_sigma_closure
+        use_xt2=0
+        pass
+
+    
+
     
     done=False
-    
+
+    if tauext==tauext_max:
+        # Used up all of our applied load...  Done!
+        done=True
+        pass
+
     while not done: 
         
         (use_xt2,tauext, tau, shear_displ) = solve_incremental_shearstress(x,x_bnd,tau,sigma_closure,shear_displ,xt_idx,dx,tauext,tauext_max,a,mu,E,nu)
@@ -548,7 +589,7 @@ if __name__=="__main__":
     (fig,ax1) = pl.subplots()
     (pl1,pl2,pl3)=ax1.plot(x*1e3,sigma_closure/1e6,'-',
                            x*1e3,tau/1e6,'-',
-                           x*1e3,(tau-mu*sigma_closure)/1e6,'-')
+                           x*1e3,(tau-mu*(sigma_closure*(sigma_closure > 0)))/1e6,'-')
     ax1.set_xlabel('Position (mm)')
     ax1.set_ylabel('Stress (MPa)')
 
