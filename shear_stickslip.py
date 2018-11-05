@@ -8,9 +8,14 @@ Created on Sat Nov 03 2018
 import sys
 import numpy as np
 from numpy import sqrt,log,pi,cos,arctan
-
-#import matplotlib.pyplot as pl
 import scipy.optimize
+
+if __name__=="__main__":
+    from matplotlib import pyplot as pl
+    pl.rc('text', usetex=True) # Support greek letters in plot legend
+    pass
+
+
 
 
 def indef_integral_of_squareroot_quotients_old(a,b,c,x):
@@ -330,10 +335,14 @@ def solve_incremental_shearstress(x,x_bnd,tau,sigma_closure,shear_displ,xt_idx,d
 
     # F measures the closure gradient in (Pascals external shear stress / meters of tip motion)
 
-    # Bound it by 1000*tauext_max/a and 1e-3*tauext_max/a
     if sigma_closure[xt_idx] >= 0.0 and tau[xt_idx] < mu*sigma_closure[xt_idx]:
         # There is a closure stress here but not the full tau it can support
-        F = scipy.optimize.brentq(obj_fcn,1e-3*tauext_max/a,1e3*tauext_max/a,disp=True)
+
+        # Bound it by 0  and the F that will give the maximum
+        # contribution of tau_increment: (tauext_max-tauext1)/(xt2-xt1)
+        Fbnd = (tauext_max - tauext)/(next_bound-x[xt_idx])
+        
+        F = scipy.optimize.brentq(obj_fcn,0.0,Fbnd,disp=True)
     
         (use_xt2,tauext2,tau_increment)=integral_shearstress_growing_effective_crack_length_byxt(tauext,tauext_max,F,x_bnd[xt_idx],next_bound)
 
@@ -413,104 +422,145 @@ def shear_displacement(tau_applied,x,xt,E,nu):
     (((2.0*Kappa+3.0)*(np.sin(theta/2.0)))+(np.sin(3.0*theta/2.0))))
 
 
-
-#####INPUT VALUES
-E = 200e9    #Plane stress Modulus of Elasticity
-sigma_yield = 400e6
-tau_yield = sigma_yield/2.0 # limits stress concentration around singularity
-nu = 0.33    #Poisson's Ratio
-
-#Initialize the external applied dynamic shear stress starting at zero
-tauext = 0.0
-
-tauext_max = 20e6 # Pa
-
-a=2.0e-3  # half-crack length (m)
-xmax = 5e-3 # as far out in x as we are calculating (m)
-xsteps = 200
-
-
-# x_bnd represents x coordinates of the boundaries of
-# each mesh element 
-x_bnd=np.linspace(0,xmax,xsteps,dtype='d')
-dx=x_bnd[1]-x_bnd[0]
-x = (x_bnd[1:]+x_bnd[:-1])/2.0  # x represents x coordinates of the centers of each mesh element
-
-
-#Friction coefficient
-mu = 0.33
-
-# Closure state (function of position; positive compression)
-sigma_closure = 5e6/cos(x/a) -6e6 # Pa
-sigma_closure[x > a]=0.0
-
-
-#####MAIN SUPERPOSITION LOOP
-
-#Initialize shear stress field (function of x)
-tau = np.zeros(x.shape,dtype='d')
-
-#Initialized the Displacement state as zero
-shear_displ = np.zeros(x.shape,dtype='d')
-
-
-
-#Initialize x step counter
-xt_idx = 0
-
-done=False
-
-while not done: 
+def solve_shearstress(x,x_bnd,sigma_closure,dx,tauext_max,a,mu,E,nu,tau_yield,verbose=False):
+    #Initialize the external applied dynamic shear stress starting at zero
     
-    (use_xt2,tauext, tau, shear_displ) = solve_incremental_shearstress(x,x_bnd,tau,sigma_closure,shear_displ,xt_idx,dx,tauext,tauext_max,a,mu,E,nu)
+    tauext = 0.0 # External shear load in this step (Pa)
+    
 
 
-    if use_xt2 < x_bnd[xt_idx+1] or tauext==tauext_max or use_xt2 >= a:
-        # Used up all of our applied load or all of our crack... Done!
-        done=True
+    #####MAIN SUPERPOSITION LOOP
+
+    #Initialize shear stress field (function of x)
+    tau = np.zeros(x.shape,dtype='d')
+    
+    #Initialized the Displacement state as zero
+    shear_displ = np.zeros(x.shape,dtype='d')
+
+
+
+    #Initialize x step counter
+    xt_idx = 0
+    
+    done=False
+    
+    while not done: 
+        
+        (use_xt2,tauext, tau, shear_displ) = solve_incremental_shearstress(x,x_bnd,tau,sigma_closure,shear_displ,xt_idx,dx,tauext,tauext_max,a,mu,E,nu)
+        
+    
+        if use_xt2 < x_bnd[xt_idx+1] or tauext==tauext_max or use_xt2 >= a:
+            # Used up all of our applied load or all of our crack... Done!
+            done=True
+            pass
+
+        if verbose: 
+            #Print what is happening in the loop
+            print("Step: %d @ x=%f mm: %f MPa of shear held" % (xt_idx,x[xt_idx]*1e3,tauext/1e6))
+            print("Shear displacement @ x=%f mm: %f nm" % (x[0]*1e3, shear_displ[0]*1e9))
+            pass
+        
+        xt_idx+=1
+        
+        
+        pass
+
+    if tauext < tauext_max:
+        # We opened the crack to the tips without providing
+        # the full external load.
+        # Now the effective tip is the physical tip (at a)
+        #
+        # ... Apply the remaining load increment
+        assert(use_xt2 == a)
+        
+        tau_increment = np.zeros(x.shape[0],dtype='d')
+        ti_nodivzero_nonegsqrt = x-a > 1e-10*a
+        ti_divzero = (x-a >= 0) & ~ti_nodivzero_nonegsqrt
+        
+        #tau_increment = tauII_theta0_times_rootx_over_sqrt_a_over_tauext*(tauext_max-tauext)*sqrt(a)/sqrt(x-a)
+        tau_increment[ti_nodivzero_nonegsqrt] = tauII_theta0_times_rootx_over_sqrt_a_over_tauext*(tauext_max-tauext)*sqrt(a)/sqrt(x[ti_nodivzero_nonegsqrt]-a)
+        tau_increment[ti_divzero]=np.inf
+
+        # Limit shear stresses at physical tip (and elsewhere) to yield
+        tau_increment[tau + tau_increment > tau_yield] = tau_yield-tau[tau+tau_increment > tau_yield]
+        
+        # accumulate stresses onto tau
+        tau += tau_increment
+
+        # record increment in displacement
+        left_of_effective_tip = x < a
+        shear_displ[left_of_effective_tip] += shear_displacement(tauext_max-tauext,x[left_of_effective_tip],a,E,nu)
+        
+        # Record increment in tauext
+        tauext = tauext_max
+
+        if verbose:
+            print("Step: Open to tips @ x=%f mm: %f MPa of shear held" % (a*1e3,tauext/1e6))
+            print("Shear displacement @ x=%f mm: %f nm" % (x[0]*1e3, shear_displ[0]*1e9))
+            pass
         pass
     
-    #Print what is happening in the loop
-    print("Step: %d @ x=%f mm: %f MPa of shear held" % (xt_idx,x[xt_idx]*1e3,tauext/1e6))
-    print("Shear displacement @ x=%f mm: %f nm" % (x[0]*1e3, shear_displ[0]*1e9))
+    return (use_xt2, tau, shear_displ)
+
+
+# align_yaxis from https://stackoverflow.com/questions/10481990/matplotlib-axis-with-two-scales-shared-origin
+def align_yaxis(ax1, v1, ax2, v2):
+    """adjust ax2 ylimit so that v2 in ax2 is aligned to v1 in ax1"""
+    _, y1 = ax1.transData.transform((0, v1))
+    _, y2 = ax2.transData.transform((0, v2))
+    inv = ax2.transData.inverted()
+    _, dy = inv.transform((0, 0)) - inv.transform((0, y1-y2))
+    miny, maxy = ax2.get_ylim()
+    ax2.set_ylim(miny+dy, maxy+dy)
+
+
+if __name__=="__main__":
+    #####INPUT VALUES
+    E = 200e9    #Plane stress Modulus of Elasticity
+    sigma_yield = 400e6
+    tau_yield = sigma_yield/2.0 # limits stress concentration around singularity
+    nu = 0.33    #Poisson's Ratio
     
-    xt_idx+=1
+    tauext_max = 20e6 # external shear load, Pa
+    
+    a=2.0e-3  # half-crack length (m)
+    xmax = 5e-3 # as far out in x as we are calculating (m)
+    xsteps = 200
+
+
+    # x_bnd represents x coordinates of the boundaries of
+    # each mesh element 
+    x_bnd=np.linspace(0,xmax,xsteps,dtype='d')
+    dx=x_bnd[1]-x_bnd[0]
+    x = (x_bnd[1:]+x_bnd[:-1])/2.0  # x represents x coordinates of the centers of each mesh element
     
     
+    #Friction coefficient
+    mu = 0.33
+    
+    # Closure state (function of position; positive compression)
+    sigma_closure = 80e6/cos(x/a) -70e6 # Pa
+    sigma_closure[x > a]=0.0
+
+
+    (effective_length, tau, shear_displ) = solve_shearstress(x,x_bnd,sigma_closure,dx,tauext_max,a,mu,E,nu,tau_yield,verbose=True)
+
+    (fig,ax1) = pl.subplots()
+    (pl1,pl2,pl3)=ax1.plot(x*1e3,sigma_closure/1e6,'-',
+                           x*1e3,tau/1e6,'-',
+                           x*1e3,(tau-mu*sigma_closure)/1e6,'-')
+    ax1.set_xlabel('Position (mm)')
+    ax1.set_ylabel('Stress (MPa)')
+
+
+    ax2=ax1.twinx()
+    (pl4,)=ax2.plot(x*1e3,shear_displ*1e9,'-k')
+    align_yaxis(ax1,0,ax2,0)
+    ax2.set_ylabel('Shear displacement (nm)')
+    pl.legend((pl1,pl2,pl3,pl4),('Closure stress','Shear stress','$ \\tau - \\mu \\sigma_{\\mbox{\\tiny closure}}$','Shear displacement'))
+    #fig.tight_layout()
+    pl.show()
     pass
-
-if tauext < tauext_max:
-    # We opened the crack to the tips without providing
-    # the full external load.
-    # Now the effective tip is the physical tip (at a)
-    #
-    # ... Apply the remaining load increment
-    assert(use_xt2 == a)
-
-    tau_increment = np.zeros(x.shape[0],dtype='d')
-    ti_nodivzero_nonegsqrt = x-a > 1e-10*a
-    ti_divzero = (x-a >= 0) & ~ti_nodivzero_nonegsqrt
-    
-    #tau_increment = tauII_theta0_times_rootx_over_sqrt_a_over_tauext*(tauext_max-tauext)*sqrt(a)/sqrt(x-a)
-    tau_increment[ti_nodivzero_nonegsqrt] = tauII_theta0_times_rootx_over_sqrt_a_over_tauext*(tauext_max-tauext)*sqrt(a)/sqrt(x[ti_nodivzero_nonegsqrt]-a)
-    tau_increment[ti_divzero]=np.inf
-
-    # Limit shear stresses at physical tip (and elsewhere) to yield
-    tau_increment[tau + tau_increment > tau_yield] = tau_yield-tau[tau+tau_increment > tau_yield]
-
-    # accumulate stresses onto tau
-    tau += tau_increment
-
-    # record increment in displacement
-    left_of_effective_tip = x < a
-    shear_displ[left_of_effective_tip] += shear_displacement(tauext_max-tauext,x[left_of_effective_tip],a,E,nu)
-    
-    # Record increment in tauext
-    tauext = tauext_max
-    print("Step: Open to tips @ x=%f mm: %f MPa of shear held" % (a*1e3,tauext/1e6))
-    print("Shear displacement @ x=%f mm: %f nm" % (x[0]*1e3, shear_displ[0]*1e9))
-    pass
-
 
     
     
