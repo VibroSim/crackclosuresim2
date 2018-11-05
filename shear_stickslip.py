@@ -43,6 +43,14 @@ def indef_integral_of_simple_squareroot_quotients(a,u):
     integral[divzero] = np.pi*a[divzero]/2.0
     return integral
 
+# For a shear crack with the tip at the origin, intact material
+# to the right (x > 0), broken material to the left (x < 0)
+# The shear stress @ theta=0 multiplied by sqrt(x)/(sqrt(a)*tauext)
+# where x ( > 0) is the position where the stress is measured,
+# a is the (half) length of the crack, and tauext
+# is the external shear load
+tauII_theta0_times_rootx_over_sqrt_a_over_tauext = 1.0/sqrt(2.0)  # Per Suresh (9.47a) and Anderson (table 2.1)
+
 
 def integral_shearstress_growing_effective_crack_length_bytau_old(tauext1,tauext2,xtp,D):
     """ OBSOLETE Evaluate the incremental shear stress field on a shear crack
@@ -118,13 +126,6 @@ def integral_shearstress_growing_effective_crack_length_bytau_old(tauext1,tauext
 
     """
     
-    # For a shear crack with the tip at the origin, intact material
-    # to the right (x > 0), broken material to the left (x < 0)
-    # The shear stress @ theta=0 multiplied by sqrt(x)/(sqrt(a)*tauext)
-    # where x ( > 0) is the position where the stress is measured,
-    # a is the (half) length of the crack, and tauext
-    # is the external shear load
-    tauII_theta0_times_rootx_over_sqrt_a_over_tauext = 1.0/sqrt(2.0)  # Per Suresh (9.47a) and Anderson (table 2.1)
 
     a = xtp-D*tauext1
     c = x-xtp-D*tauext1
@@ -400,7 +401,8 @@ def shear_displacement(tau_applied,x,xt,E,nu):
 
 #####INPUT VALUES
 E = 200e9    #Plane stress Modulus of Elasticity
-
+sigma_yield = 400e6
+tau_yield = sigma_yield/2.0 # limits stress concentration around singularity
 nu = 0.33    #Poisson's Ratio
 
 #Initialize the external applied dynamic shear stress starting at zero
@@ -462,9 +464,37 @@ while not done:
     
     pass
 
+if tauext < tauext_max:
+    # We opened the crack to the tips without providing
+    # the full external load.
+    # Now the effective tip is the physical tip (at a)
+    #
+    # ... Apply the remaining load increment
+    assert(use_xt2 == a)
 
- 
+    tau_increment = np.zeros(x.shape[0],dtype='d')
+    ti_nodivzero_nonegsqrt = x-a > 1e-10*a
+    ti_divzero = (x-a >= 0) & ~ti_nodivzero_nonegsqrt
+    
+    #tau_increment = tauII_theta0_times_rootx_over_sqrt_a_over_tauext*(tauext_max-tauext)*sqrt(a)/sqrt(x-a)
+    tau_increment[ti_nodivzero_nonegsqrt] = tauII_theta0_times_rootx_over_sqrt_a_over_tauext*(tauext_max-tauext)*sqrt(a)/sqrt(x[ti_nodivzero_nonegsqrt]-a)
+    tau_increment[ti_divzero]=np.inf
 
+    # Limit shear stresses at physical tip (and elsewhere) to yield
+    tau_increment[tau + tau_increment > tau_yield] = tau_yield-tau[tau+tau_increment > tau_yield]
+
+    # accumulate stresses onto tau
+    tau += tau_increment
+
+    # record increment in displacement
+    left_of_effective_tip = x < a
+    shear_displ[left_of_effective_tip] += shear_displacement(tauext_max-tauext,x[left_of_effective_tip],a,E,nu)
+    
+    # Record increment in tauext
+    tauext = tauext_max
+    print("Step: Open to tips @ x=%f mm: %f MPa of shear held" % (a*1e3,tauext/1e6))
+    print("Shear displacement @ x=%f mm: %f nm" % (x[0]*1e3, shear_displ[0]*1e9))
+    pass
 
 
     
