@@ -257,7 +257,13 @@ def integral_shearstress_growing_effective_crack_length_byxt(tauext1,tauext_max,
     use_xt2 = xt2
     if tauext2 > tauext_max:
         # bound tauext by tauext_max... by limiting xt2
-        use_xt2 = xt1 + (tauext_max-tauext1)/F
+        if F > 0:
+            use_xt2 = xt1 + (tauext_max-tauext1)/F
+            pass
+        if F==0 or use_xt2 > xt2:
+            use_xt2 = xt2
+            pass
+        
         tauext2 = tauext_max
         pass
     
@@ -286,10 +292,10 @@ def solve_incremental_shearstress(x,x_bnd,tau,sigma_closure,shear_displ,xt_idx,d
     """The overall frictional slip constraint is that
     F <= mu*N
     For a through-crack of thickness h, short segment of width dx
-    tau*h*dx <= mu*h*dx*sigma_closure
+    tau*h*dx <= mu*h*dx*sigma_closure (where sigma_closure is positive (i.e. compressive)
 
     or equivalently 
-    tau <= mu*sigma_closure
+    tau <= mu*sigma_closure (where sigma_closure is positive (i.e. compressive))
 
     Consider an increment in position dx. 
     Assume from previous steps we have a superimposed 
@@ -325,18 +331,27 @@ def solve_incremental_shearstress(x,x_bnd,tau,sigma_closure,shear_displ,xt_idx,d
     # F measures the closure gradient in (Pascals external shear stress / meters of tip motion)
 
     # Bound it by 1000*tauext_max/a and 1e-3*tauext_max/a
-    F = scipy.optimize.brentq(obj_fcn,1e-3*tauext_max/a,1e3*tauext_max/a,disp=True)
+    if sigma_closure[xt_idx] >= 0.0 and tau[xt_idx] < mu*sigma_closure[xt_idx]:
+        # There is a closure stress here but not the full tau it can support
+        F = scipy.optimize.brentq(obj_fcn,1e-3*tauext_max/a,1e3*tauext_max/a,disp=True)
     
-    (use_xt2,tauext2,tau_increment)=integral_shearstress_growing_effective_crack_length_byxt(tauext,tauext_max,F,x_bnd[xt_idx],next_bound)
+        (use_xt2,tauext2,tau_increment)=integral_shearstress_growing_effective_crack_length_byxt(tauext,tauext_max,F,x_bnd[xt_idx],next_bound)
 
-    # For displacement calculate at x centers... use average of left and right boundaries, except for (perhaps) last point where instead of the right boundary we use the actual tip.
-    incremental_displacement = np.zeros(x.shape[0],dtype='d')
-    xt = (x_bnd[xt_idx]+use_xt2)/2.0
-    left_of_effective_tip = (x < xt)
-    incremental_displacement[left_of_effective_tip] = shear_displacement(tauext2-tauext,x[left_of_effective_tip],xt,E,nu)
-
-    
-    
+        # For displacement calculate at x centers... use average of left and right boundaries, except for (perhaps) last point where instead of the right boundary we use the actual tip.
+        incremental_displacement = np.zeros(x.shape[0],dtype='d')
+        xt = (x_bnd[xt_idx]+use_xt2)/2.0
+        left_of_effective_tip = (x < xt)
+        incremental_displacement[left_of_effective_tip] = shear_displacement(tauext2-tauext,x[left_of_effective_tip],xt,E,nu)
+        pass
+    else:
+        # No closure stress at this point, or tau is already at the limit
+        # of what can be supported here
+        
+        use_xt2 = x_bnd[xt_idx+1]
+        tauext2 = tauext
+        tau_increment = np.zeros(x.shape[0],dtype='d')
+        incremental_displacement = np.zeros(x.shape[0],dtype='d')
+        
     return (use_xt2,tauext2, tau+tau_increment, shear_displ+incremental_displacement)
     
     
@@ -425,9 +440,9 @@ x = (x_bnd[1:]+x_bnd[:-1])/2.0  # x represents x coordinates of the centers of e
 #Friction coefficient
 mu = 0.33
 
-# Closure state (function of position)
-sigma_closure = 5e6/cos(x/a) # Pa
-
+# Closure state (function of position; positive compression)
+sigma_closure = 5e6/cos(x/a) -6e6 # Pa
+sigma_closure[x > a]=0.0
 
 
 #####MAIN SUPERPOSITION LOOP
