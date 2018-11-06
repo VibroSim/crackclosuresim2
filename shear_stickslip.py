@@ -454,6 +454,8 @@ def solve_shearstress(x,x_bnd,sigma_closure,dx,tauext_max,a,mu,E,nu,tau_yield,ve
     #Initialize x step counter
     xt_idx = 0
 
+    use_xt2=0
+
     # Before initial slip, tau just increases uniformly
     # (Note: stress distribution may not be very accurate if
     # initial slip does not occur @ x=0)
