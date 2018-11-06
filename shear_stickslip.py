@@ -255,7 +255,7 @@ def integral_shearstress_growing_effective_crack_length_byxt(x,tauext1,tauext_ma
     # where x ( > 0) is the position where the stress is measured,
     # a is the (half) length of the crack, and tauext
     # is the external shear load
-    tauII_theta0_times_rootx_over_sqrt_a_over_tauext = 1.0/sqrt(2.0)  # Per Suresh (9.47a) and Anderson (table 2.1)
+    # tauII_theta0_times_rootx_over_sqrt_a_over_tauext = 1.0/sqrt(2.0)  # Per Suresh (9.47a) and Anderson (table 2.1) (now a global)
 
     tauext2 = tauext1 + (xt2-xt1)*F
 
@@ -600,6 +600,64 @@ if __name__=="__main__":
     ax2.set_ylabel('Shear displacement (nm)')
     pl.legend((pl1,pl2,pl3,pl4),('Closure stress','Shear stress','$ \\tau - \\mu \\sigma_{\\mbox{\\tiny closure}}$','Shear displacement'))
     #fig.tight_layout()
+    pl.title('Closed crack')
+    pl.savefig('/tmp/shear_stickslip_closedcrack.png',dpi=300)
+
+
+    # Alternate closure state (function of position; positive compression)
+    sigma_closure2 = 80e6/cos(x/a) -20e6 # Pa
+    sigma_closure2[x > a]=0.0
+
+
+    
+    (effective_length2, tau2, shear_displ2) = solve_shearstress(x,x_bnd,sigma_closure2,dx,tauext_max,a,mu,E,nu,tau_yield,verbose=True)
+
+    (fig2,ax21) = pl.subplots()
+    (pl21,pl22,pl23)=ax21.plot(x*1e3,sigma_closure2/1e6,'-',
+                           x*1e3,tau2/1e6,'-',
+                           x*1e3,(tau2-mu*(sigma_closure2*(sigma_closure2 > 0)))/1e6,'-')
+    ax21.set_xlabel('Position (mm)')
+    ax21.set_ylabel('Stress (MPa)')
+    
+
+    ax22=ax21.twinx()
+    (pl24,)=ax22.plot(x*1e3,shear_displ2*1e9,'-k')
+    align_yaxis(ax21,0,ax22,0)
+    ax22.set_ylabel('Shear displacement (nm)')
+    pl.legend((pl21,pl22,pl23,pl24),('Closure stress','Shear stress','$ \\tau - \\mu \\sigma_{\\mbox{\\tiny closure}}$','Shear displacement'))
+    #fig.tight_layout()
+    pl.title('Tight crack')
+    pl.savefig('/tmp/shear_stickslip_tightcrack.png',dpi=300)
+
+
+    # Alternate closure state (function of position; positive compression)
+    sigma_closure3 = 80e6/cos(x/a) -90e6 # Pa
+    sigma_closure3[x > a]=0.0
+
+
+    
+    (effective_length3, tau3, shear_displ3) = solve_shearstress(x,x_bnd,sigma_closure3,dx,tauext_max,a,mu,E,nu,tau_yield,verbose=True)
+
+    (fig3,ax31) = pl.subplots()
+    (pl31,pl32,pl33)=ax31.plot(x*1e3,sigma_closure3/1e6,'-',
+                           x*1e3,tau3/1e6,'-',
+                           x*1e3,(tau3-mu*(sigma_closure3*(sigma_closure3 > 0)))/1e6,'-')
+    ax31.set_xlabel('Position (mm)')
+    ax31.set_ylabel('Stress (MPa)')
+    
+
+    ax32=ax31.twinx()
+    (pl34,)=ax32.plot(x*1e3,shear_displ3*1e9,'-k')
+    align_yaxis(ax31,0,ax32,0)
+    ax32.set_ylabel('Shear displacement (nm)')
+    pl.legend((pl31,pl32,pl33,pl34),('Closure stress','Shear stress','$ \\tau - \\mu \\sigma_{\\mbox{\\tiny closure}}$','Shear displacement'))
+    #fig.tight_layout()
+    pl.title('Partially open crack')
+    pl.savefig('/tmp/shear_stickslip_opencrack.png',dpi=300)
+
+
+    
+    
     pl.show()
     pass
 
