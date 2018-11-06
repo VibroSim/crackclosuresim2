@@ -8,6 +8,8 @@ from numpy.random import rand
 
 import crackclosuresim.crack_utils_1D as cu1
 
+from shear_stickslip import solve_shearstress
+
 doplots=True
 
 i=(0+1j) # imaginary number
@@ -37,6 +39,8 @@ beta_unnorm_pdf = lambda beta,x:  np.array([ (magnitude/np.sqrt(2*np.pi*sigma**2
 #E = 109e9
 nu = 0.33
 E = 207.83e9 # Plane stress
+sigma_yield=600e6 # CHECK THIS NUMBER
+tau_yield=sigma_yield/2.0
 #E = 207.83e9/(1.0-nu**2.0) # Plane strain
 G=E/(2*(1+nu))
 width=25.4e-3
@@ -98,11 +102,25 @@ for xcnt in range(xrange.shape[0]):
         stress_field_spl=stress_field_spl_leftside
         r=-x
         reff=reff_leftside
+        a_crack=-aleft
+
+        first_xidx = np.where(xrange <= 0)[0][-1]
+        ss_x = -xrange[first_xidx::-1]
+        ss_xbnd = np.concatenate((ss_x-xstep/2.0,np.array((ss_x[-1]+xstep,))))
+        ss_xidx = first_xidx-xcnt 
+
         pass
     else: 
         stress_field_spl=stress_field_spl_rightside
         r=x
         reff=reff_rightside
+        a_crack=aright
+
+        first_xidx = np.where(xrange >= 0)[0][0]
+        ss_x = xrange[first_xidx:]
+        ss_xbnd = np.concatenate((ss_x-xstep/2,np.array((ss_x[-1]+xstep,))))
+        ss_xidx = xcnt-first_xidx
+        
         pass
 
     closure_state_x = splev(r,stress_field_spl,ext=1) 
@@ -140,30 +158,25 @@ for xcnt in range(xrange.shape[0]):
     uyy_sub=2.0*cu1.uyy(r,np.max(reff),static_load-vib_normal_stress_ampl,stress_field_spl,cu1.weightfun_through,(width,),E,nu,configuration="PLANE_STRESS")
 
 
-    # shear displacement
-    # ***!!! is G the right modulus here or
-    # do we need some kind of effective modulus?
-    # assume effective length is closure_point_add
-    # Then we would get no motion for r > closure_point_add
+    # ss variables are for shear_stickslip calculations
 
-    # ***!!! Really our effective crack tip should go beyond closure_point_add
-    # to the point where the stick-slip behavior shifts to strictly stick
-    if r > closure_point_add:
-        K_II=0.0
-        utt=0.0
-        pass
-    else:
-        f_of_x_a = 1.0
-        
-        K_II = vib_shear_stress_ampl*np.sqrt(np.pi*closure_point_add)*f_of_x_a
-        # COD = K_II*
-        # Do we need a more suitable weight function for shear? 
-        #utt = (2.0/G)*scipy.integrate.quad(lambda x: cu1.weightfun_through(x,closure_point_add-r,width)*K_II,0,
+    ss_sigma_closure_sub = np.zeros(ss_x.shape[0],dtype='d')
+    # note minus sign because compression positive for shear_stickslip.py
+    ss_sigma_closure_sub[ss_x > closure_state_sub_a[0]] = -scipy.interpolate.interp1d(closure_state_sub_a,closure_state_sub,fill_value="extrapolate")(ss_x[ss_x > closure_state_sub_a[0]])
 
-        # utt from Anderson, Fracture Mechanics 3rd edition, table 2.2, second row, second column theta=0
-        # G is shear modulus, nu is Poisson's ratio
-        utt = (K_II/(2.0*G))*np.sqrt((closure_point_add-r)/(2.0*np.pi))*(2.0-4.0*nu)
-        pass
+    ss_sigma_closure_add = np.zeros(ss_x.shape[0],dtype='d')
+    # note minus sign because compression positive for shear_stickslip.py
+    ss_sigma_closure_add[ss_x > closure_state_add_a[0]] = -scipy.interpolate.interp1d(closure_state_add_a,closure_state_add,fill_value="extrapolate")(ss_x[ss_x > closure_state_add_a[0]])
+
+    (effective_length_sub, tau_sub, shear_displ_sub) = solve_shearstress(ss_x,ss_xbnd,ss_sigma_closure_sub,xstep,vib_shear_stress_ampl,a_crack,friction_coefficient,E,nu,tau_yield
+)
+    
+    (effective_length_add, tau_add, shear_displ_add) = solve_shearstress(ss_x,ss_xbnd,ss_sigma_closure_add,xstep,vib_shear_stress_ampl,a_crack,friction_coefficient,E,nu,tau_yield)
+
+    
+    # Warning: We are not requiring shear continuity between left and right
+    # sides of the crack (!) 
+    
     
     # Got two closure stress values at this point:
     # closure_state_add_x and closure_state_sub_x
@@ -244,8 +257,9 @@ for xcnt in range(xrange.shape[0]):
     #Q_dynamic = 0.0 # Should be shear vibration amplitude
     # Per number of draws because we assume that the stress
     # is distributed over the asperities.
-    Q_dynamic = vib_shear_stress_ampl*xstep*np.pi*r/(2.0*numdraws)
-
+    #Q_dynamic = vib_shear_stress_ampl*xstep*np.pi*r/(2.0*numdraws)
+    Q_dynamic = ((tau_add[ss_xidx]+tau_sub[ss_xidx])/2.0)*xstep*np.pi*r/(2.0*numdraws)
+    
     N_dynamic = P_dynamic*np.cos(beta_draws)+Q_dynamic*np.sin(beta_draws)
     T_dynamic = -P_dynamic*np.sin(beta_draws)+Q_dynamic*np.cos(beta_draws)
 
@@ -270,7 +284,7 @@ for xcnt in range(xrange.shape[0]):
     #        ((ang < 0) & (ang > np.arctan(1/friction_coefficient)-np.pi)))
     slip=np.abs(T_dynamic) >=  -friction_coefficient*(N_static-np.abs(N_dynamic))
 
-    
+    utt = (shear_displ_add[ss_xidx] + shear_displ_sub[ss_xidx])/2.0
     PP_vibration_y=uyy_add-uyy_sub
     vibration_ampl[xcnt]=PP_vibration_y/2.0
     #PP_vibration_t=utt*2.0

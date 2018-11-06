@@ -147,7 +147,7 @@ def integral_shearstress_growing_effective_crack_length_bytau_old(tauext1,tauext
     return tauII_theta0_times_rootx_over_sqrt_a_over_tauext*(indef_integral_of_squareroot_quotients_old(a,D,c,use_tauext2) - indef_integral_of_squareroot_quotients_old(a,D,c,tauext1))
 
 
-def integral_shearstress_growing_effective_crack_length_byxt(tauext1,tauext_max,F,xt1,xt2):
+def integral_shearstress_growing_effective_crack_length_byxt(x,tauext1,tauext_max,F,xt1,xt2):
     """ Evaluate the incremental shear stress field on a shear crack
     that is growing in effective length from xt1 to xt2 due to an external 
     load (previous value tauextp, limiting value tauext_max)
@@ -316,7 +316,7 @@ def solve_incremental_shearstress(x,x_bnd,tau,sigma_closure,shear_displ,xt_idx,d
     
     We can evaluate the increment in tau from: 
 
-    (use_xt2,tauext2,tau_increment)=integral_shearstress_growing_effective_crack_length_byxt(tauext,tauext_max,F,x[xt_idx],x[xt_idx+1])
+    (use_xt2,tauext2,tau_increment)=integral_shearstress_growing_effective_crack_length_byxt(x,tauext,tauext_max,F,x[xt_idx],x[xt_idx+1])
 
     But to do this we need to solve for F. 
 
@@ -330,7 +330,7 @@ def solve_incremental_shearstress(x,x_bnd,tau,sigma_closure,shear_displ,xt_idx,d
         pass
     
     def obj_fcn(F):
-        (use_xt2,tauext2,tau_increment)=integral_shearstress_growing_effective_crack_length_byxt(tauext,tauext_max,F,x_bnd[xt_idx],next_bound)
+        (use_xt2,tauext2,tau_increment)=integral_shearstress_growing_effective_crack_length_byxt(x,tauext,tauext_max,F,x_bnd[xt_idx],next_bound)
         return (tau+tau_increment - mu*sigma_closure)[xt_idx]
 
     # F measures the closure gradient in (Pascals external shear stress / meters of tip motion)
@@ -339,8 +339,8 @@ def solve_incremental_shearstress(x,x_bnd,tau,sigma_closure,shear_displ,xt_idx,d
         # There is a closure stress here but not the full tau it can support
 
         # Bound it by 0  and the F that will give the maximum
-        # contribution of tau_increment: (tauext_max-tauext1)/(xt2-xt1)
-        Fbnd = (tauext_max - tauext)/(next_bound-x[xt_idx])
+        # contribution of tau_increment: 2.0*(tauext_max-tauext1)/(xt2-xt1)
+        Fbnd = 2.0*(tauext_max - tauext)/(next_bound-x_bnd[xt_idx])
 
         if obj_fcn(Fbnd) < 0.0:
             # Maximum value of objective is < 0... This means that
@@ -358,7 +358,7 @@ def solve_incremental_shearstress(x,x_bnd,tau,sigma_closure,shear_displ,xt_idx,d
             F = scipy.optimize.brentq(obj_fcn,0.0,Fbnd,disp=True)
             pass
         
-        (use_xt2,tauext2,tau_increment)=integral_shearstress_growing_effective_crack_length_byxt(tauext,tauext_max,F,x_bnd[xt_idx],next_bound)
+        (use_xt2,tauext2,tau_increment)=integral_shearstress_growing_effective_crack_length_byxt(x,tauext,tauext_max,F,x_bnd[xt_idx],next_bound)
 
         # For displacement calculate at x centers... use average of left and right boundaries, except for (perhaps) last point where instead of the right boundary we use the actual tip.
         incremental_displacement = np.zeros(x.shape[0],dtype='d')
