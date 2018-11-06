@@ -19,7 +19,7 @@ i=(0+1j) # imaginary number
 # to pi (backwards trajectory, infinitesimally upward)
 
 # note: our beta is 90deg - evans and hutchinson beta
-beta_components = ( (2.0,0.0,np.pi/4.0), )  # Each entry: component magnitude, gaussian mean, Gaussian sigma
+beta_components = ( (2.0,0.0,28*np.pi/180.0), )  # Each entry: component magnitude, gaussian mean, Gaussian sigma
 
 friction_coefficient=0.3
 
@@ -249,6 +249,13 @@ for xcnt in range(xrange.shape[0]):
     P_static = N_static*np.cos(beta_draws) - T_static*np.sin(beta_draws)
     Q_static = N_static*np.sin(beta_draws) + T_static*np.cos(beta_draws)
 
+
+    # NOTE:
+    # N_static, T_static, P_static, and Q_static
+    # are total for the entire band.
+    # P_dynamic, Q_dynamic N_dynamic, and T_dynamic
+    # will be __per_draw__
+    
     # P_dynamic per draw
     P_dynamic = (closure_state_add_x - closure_state_sub_x)* (xstep * np.pi*r/2.0)/(2.0*numdraws) # dynamic stress amplitude
 
@@ -282,7 +289,12 @@ for xcnt in range(xrange.shape[0]):
     #ang=np.angle((Q + i*P)*np.exp(i*beta_draws))
     #slip = (((ang > 0) & (ang  > np.arctan(1/friction_coefficient))) |
     #        ((ang < 0) & (ang > np.arctan(1/friction_coefficient)-np.pi)))
-    slip=np.abs(T_dynamic) >=  -friction_coefficient*(N_static-np.abs(N_dynamic))
+    # sdh 11/6/18 .... change N_static-abs(N_dynamic) to N_static + abs(N_dynamic)
+    # because slip occurs in easier case where compressive (negative) N_static
+    # is opposed by N_dynamic
+    # sdh 11/6/18 N_static is total load... must be divided by numdraws
+    # to be comparable to N_dynamic and or T_dynamic
+    slip=np.abs(T_dynamic) >=  -friction_coefficient*(N_static/numdraws+np.abs(N_dynamic))
 
     utt = (shear_displ_add[ss_xidx] + shear_displ_sub[ss_xidx])/2.0
     PP_vibration_y=uyy_add-uyy_sub
@@ -306,8 +318,10 @@ for xcnt in range(xrange.shape[0]):
     # P=uNv = u(Nstatic+Ndynamic)v=u(Cn1 + Cn2v)v
 
     # (Note: N_static term was missing from original calculation)
+    # sdh 11/6/18 N_static is total load... must be divided by numdraws
+    # to be comparable to N_dynamic and or T_dynamic
     if r >= closure_point_sub:
-        Power = 0.5 * (friction_coefficient*(np.abs(N_static)+np.abs(N_dynamic)))*tangential_vibration_velocity_ampl
+        Power = 0.5 * (friction_coefficient*(np.abs(N_static)/numdraws+np.abs(N_dynamic)))*tangential_vibration_velocity_ampl
         pass
     else:
         Power=0.0
