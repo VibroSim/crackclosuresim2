@@ -426,7 +426,7 @@ def tau_integral_old(D,x,xtp,Text,Textp):
 def shear_displacement(tau_applied,x,xt,E,nu):
     #plane stress is considered
     Kappa = (3.0-nu)/(1.0+nu)
-    KII = tau_applied*np.sqrt(np.pi*(xt-x))
+    KII = tau_applied*np.sqrt(np.pi*(xt))
     if (xt-x < 0).any():
         #sys.modules["__main__"].__dict__.update(globals())
         #sys.modules["__main__"].__dict__.update(locals())
