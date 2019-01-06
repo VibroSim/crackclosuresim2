@@ -3,6 +3,9 @@ import sys
 import numpy as np
 from numpy import sqrt,log,pi,cos,arctan
 import scipy.optimize
+import scipy as sp
+import scipy.interpolate
+
 
 if __name__=="__main__":
     from matplotlib import pyplot as pl
@@ -238,7 +241,7 @@ def integral_tensilestress_growing_effective_crack_length_byxt(x,sigmaext1,sigma
     return (use_xt2,sigmaext2,res,sigmaI_theta0_times_rootr_over_sqrt_a_over_sigmaext)
 
 
-def solve_incremental_tensilestress(x,x_bnd,sigma,sigma_closure,tensile_displ,xt_idx,dx,sigmaext,sigmaext_max,a,E,nu,weightfun_times_sqrt_aminx,weightfun_epsx):
+def solve_incremental_tensilestress(x,x_bnd,sigma,sigma_closure,tensile_displ,xt_idx,dx,sigmaext,sigmaext_max,a,E,nu,weightfun_times_sqrt_aminx,weightfun_epsx,K_I_ov_sigma_ext_vect):
     """The overall crack opening constraint is that
     (tensile load on crack surface) > 0 to open
     For a through-crack of thickness h, short segment of width dx
@@ -312,7 +315,7 @@ def solve_incremental_tensilestress(x,x_bnd,sigma,sigma_closure,tensile_displ,xt
         incremental_displacement = np.zeros(x.shape[0],dtype='d')
         xt = (x_bnd[xt_idx]+use_xt2)/2.0
         left_of_effective_tip = (x < xt)
-        incremental_displacement[left_of_effective_tip] = tensile_displacement(sigmaext2-sigmaext,x[left_of_effective_tip],xt,E,nu,weightfun_times_sqrt_aminx,weightfun_epsx)
+        incremental_displacement[left_of_effective_tip] = tensile_displacement(sigmaext2-sigmaext,x[left_of_effective_tip],xt,E,nu,weightfun_times_sqrt_aminx,weightfun_epsx,K_I_ov_sigma_ext_vect)
         pass
     else:
         # No closure stress at this point, or sigma is already at the limit
@@ -336,7 +339,7 @@ def solve_incremental_tensilestress(x,x_bnd,sigma,sigma_closure,tensile_displ,xt
 #NOTE: This function will always produce uy=0 for theta equals 0. 
 #This is because sin(0)=0 and the function is multiplied completely
 #by this. 
-def tensile_displacement(sigma_applied,x,xt,E,nu,weightfun_times_sqrt_aminx,weightfun_epsx):
+def tensile_displacement(sigma_applied,x,xt,E,nu,weightfun_times_sqrt_aminx,weightfun_epsx,K_I_ov_sigma_ext_vect):
     ##plane stress is considered
     #Kappa = (3.0-nu)/(1.0+nu)
     #
@@ -365,10 +368,8 @@ def tensile_displacement(sigma_applied,x,xt,E,nu,weightfun_times_sqrt_aminx,weig
     # u = (1.0/E') * [ K_I(x) M(x,x) 2*sqrt(epsilon)  + integral_(x+epsilon)..a K_I(a) M(x,a)/sqrt(a-x) da ]
     #
 
-    K_I_ov_sigma_ext = lambda a : scipy.integrate.quad(lambda u : weightfun_times_sqrt_aminx(u,a)/np.sqrt(a-u),0,a-weightfun_epsx)[0] + weightfun_times_sqrt_aminx(a,a)*2.0*sqrt(weightfun_epsx)
-    K_I_ov_sigma_ext_vect = np.vectorize(K_I_ov_sigma_ext)
 
-    right_integral = lambda _x : scipy.integrate.quad(lambda a: K_I_ov_sigma_ext(a)*weightfun_times_sqrt_aminx(_x,a)/np.sqrt(a-_x),_x+weightfun_epsx,xt)[0]
+    right_integral = lambda _x : scipy.integrate.quad(lambda a: K_I_ov_sigma_ext_vect(a)*weightfun_times_sqrt_aminx(_x,a)/np.sqrt(a-_x),_x+weightfun_epsx,xt)[0]
 
     right_integral_vect = np.vectorize(right_integral)
     
@@ -378,10 +379,38 @@ def tensile_displacement(sigma_applied,x,xt,E,nu,weightfun_times_sqrt_aminx,weig
     return u
 
 
-def solve_normalstress(x,x_bnd,sigma_closure,dx,sigmaext_max,a,E,nu,sigma_yield,weightfun_times_sqrt_aminx,weightfun_epsx,verbose=False):
+def solve_normalstress(x,x_bnd,sigma_closure,dx,sigmaext_max,a,E,nu,sigma_yield,weightfun_times_sqrt_aminx,weightfun_epsx,use_surrogate,verbose=False, diag_plots=False):
     #Initialize the external applied tensile stress starting at zero
     
     sigmaext = 0.0 # External tensile load in this step (Pa)
+    
+    # Create K_I_ov_sigma_ext_vec and its surrogate
+    K_I_ov_sigma_ext = lambda a : scipy.integrate.quad(lambda u : weightfun_times_sqrt_aminx(u,a)/np.sqrt(a-u),0,a-weightfun_epsx)[0] + weightfun_times_sqrt_aminx(a,a)*2.0*sqrt(weightfun_epsx)
+    K_I_ov_sigma_ext_vect = np.vectorize(K_I_ov_sigma_ext)
+    K_I_ov_sigma_ext_eval=K_I_ov_sigma_ext_vect(x)
+    
+    # simple splrep surrogate
+    (t1,c1,k1) = sp.interpolate.splrep(x,K_I_ov_sigma_ext_eval)
+
+    
+    K_I_ov_sigma_ext_surrogate = lambda a: sp.interpolate.splev(a,(t1,c1,k1),ext=2)
+
+    x_fine=np.linspace(x[0],x[-1],x.shape[0]*4)
+    
+    if diag_plots:
+        pl.figure()
+        pl.plot(x_fine,K_I_ov_sigma_ext_vect(x_fine),'-',
+                x_fine,K_I_ov_sigma_ext_surrogate(x_fine),'-')
+        pl.title("K$_I$ over sigma$_{ext}$")
+        pl.legend(("Direct","Surrogate"))
+        pass
+
+    if use_surrogate:
+        K_I_ov_sigma_ext_use = K_I_ov_sigma_ext_surrogate
+        pass
+    else:
+        K_I_ov_sigma_ext_use = K_I_ov_sigma_ext_vect
+        pass
     
     
 
@@ -431,7 +460,7 @@ def solve_normalstress(x,x_bnd,sigma_closure,dx,sigmaext_max,a,E,nu,sigma_yield,
     
     while not done: 
         
-        (use_xt2,sigmaext, sigma, tensile_displ) = solve_incremental_tensilestress(x,x_bnd,sigma,sigma_closure,tensile_displ,xt_idx,dx,sigmaext,sigmaext_max,a,E,nu,weightfun_times_sqrt_aminx,weightfun_epsx)
+        (use_xt2,sigmaext, sigma, tensile_displ) = solve_incremental_tensilestress(x,x_bnd,sigma,sigma_closure,tensile_displ,xt_idx,dx,sigmaext,sigmaext_max,a,E,nu,weightfun_times_sqrt_aminx,weightfun_epsx,K_I_ov_sigma_ext_use)
         
         
         if use_xt2 < x_bnd[xt_idx+1] or sigmaext==sigmaext_max or use_xt2 >= a:
@@ -477,7 +506,7 @@ def solve_normalstress(x,x_bnd,sigma_closure,dx,sigmaext_max,a,E,nu,sigma_yield,
 
         # record increment in displacement
         left_of_effective_tip = x < a
-        tensile_displ[left_of_effective_tip] += tensile_displacement(sigmaext_max-sigmaext,x[left_of_effective_tip],a,E,nu,weightfun_times_sqrt_aminx,weightfun_epsx)
+        tensile_displ[left_of_effective_tip] += tensile_displacement(sigmaext_max-sigmaext,x[left_of_effective_tip],a,E,nu,weightfun_times_sqrt_aminx,weightfun_epsx,K_I_ov_sigma_ext_use)
         
         # Record increment in sigmaext
         sigmaext = sigmaext_max
@@ -513,6 +542,10 @@ def weightfun_through_times_sqrt_aminx(x, a, w):
 
     return (2.0/np.sqrt(2*np.pi))*(1.0+M1*scipy.sqrt(1.0-x/a)+M2*(1.0-x/a)+M3*(1.0-x/a)**1.5)
 
+# Basic weight function from Fett & Munz Stress Intensity Factors and Weight Functions eq. 1.2.5
+def weightfun_basic_times_sqrt_aminx(x,a):
+    return np.sqrt(1.0/(np.pi*a))*np.sqrt((a+x))
+
 
 if __name__=="__main__":
     
@@ -530,7 +563,8 @@ if __name__=="__main__":
     xmax = 5e-3 # as far out in x as we are calculating (m)
     xsteps = 200
 
-    weightfun_times_sqrt_aminx = lambda x,a : weightfun_through_times_sqrt_aminx(x,a,specimen_width)
+    #weightfun_times_sqrt_aminx = lambda x,a : weightfun_through_times_sqrt_aminx(x,a,specimen_width)
+    weightfun_times_sqrt_aminx = lambda x,a : weightfun_basic_times_sqrt_aminx(x,a)
     
 
     # x_bnd represents x coordinates of the boundaries of
@@ -571,7 +605,7 @@ if __name__=="__main__":
         
         pass
     
-    (effective_length, sigma, tensile_displ) = solve_normalstress(x,x_bnd,sigma_closure,dx,sigmaext_max,a,E,nu,sigma_yield,weightfun_times_sqrt_aminx,weightfun_epsx,verbose=True)
+    (effective_length, sigma, tensile_displ) = solve_normalstress(x,x_bnd,sigma_closure,dx,sigmaext_max,a,E,nu,sigma_yield,weightfun_times_sqrt_aminx,weightfun_epsx,True,verbose=True,diag_plots=True)
     
     (fig,ax1) = pl.subplots()
     legax=[]
@@ -627,7 +661,7 @@ if __name__=="__main__":
         pass
 
     
-    (effective_length2, sigma2, tensile_displ2) = solve_normalstress(x,x_bnd,sigma_closure2,dx,sigmaext_max,a,E,nu,sigma_yield,weightfun_times_sqrt_aminx,weightfun_epsx,verbose=True)
+    (effective_length2, sigma2, tensile_displ2) = solve_normalstress(x,x_bnd,sigma_closure2,dx,sigmaext_max,a,E,nu,sigma_yield,weightfun_times_sqrt_aminx,weightfun_epsx,True,verbose=True)
 
     (fig2,ax21) = pl.subplots()
     legax=[]
@@ -683,7 +717,7 @@ if __name__=="__main__":
         pass
     
     
-    (effective_length3, sigma3, tensile_displ3) = solve_normalstress(x,x_bnd,sigma_closure3,dx,sigmaext_max,a,E,nu,sigma_yield,weightfun_times_sqrt_aminx,weightfun_epsx,verbose=True)
+    (effective_length3, sigma3, tensile_displ3) = solve_normalstress(x,x_bnd,sigma_closure3,dx,sigmaext_max,a,E,nu,sigma_yield,weightfun_times_sqrt_aminx,weightfun_epsx,True,verbose=True)
 
     (fig3,ax31) = pl.subplots()
     legax=[]
