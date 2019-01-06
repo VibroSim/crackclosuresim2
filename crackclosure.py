@@ -128,7 +128,7 @@ def integral_tensilestress_growing_effective_crack_length_byxt(x,sigmaext1,sigma
     beyond the tip) and divided by sqrt(cracklength) and also by 
     sigmaext. 
 
-    So sigmaI_theta0_times_rootr_over_sqrt_a_over_sigmaext = ([ integral_0^(a-epsilon) M(x,a)/sqrt(a-x) dx + M(a,a)*2sqrt(epsilon) ] / sqrt(2*pi))
+    So sigmaI_theta0_times_rootr_over_sqrt_a_over_sigmaext = ([ integral_0^(a-epsilon) M(x,a)/sqrt(a-x) dx + M(a,a)*2sqrt(epsilon) ] / (sqrt(2*pi*a)))
 
     Then we can rewrite the incremental normal stress as: 
     integral_sigmaext1^sigmaext2 of 1.0 + sigmaI_theta0_times_rootr_over_sqrt_a_over_sigmaext*sqrt(xt)/sqrt(x-xt) dsigmaext
@@ -232,10 +232,31 @@ def integral_tensilestress_growing_effective_crack_length_byxt(x,sigmaext1,sigma
     xtavg = (xt1+use_xt2)/2.0
     
     # sigmaI_theta0_times_rootr_over_sqrt_a_over_sigmaext = ([ integral_0^(a-epsilon) M(x,a)/sqrt(a-x) dx + M(a,a)*2sqrt(epsilon) ] / sqrt(2*pi))
-    sigmaI_theta0_times_rootr_over_sqrt_a_over_sigmaext = (scipy.integrate.quad(lambda x: weightfun_times_sqrt_aminx(x,a)/np.sqrt(a-x),0,xtavg-weightfun_epsx)[0] + weightfun_times_sqrt_aminx(a,a)*2.0*np.sqrt(weightfun_epsx)) / np.sqrt(2*pi)
-    
-    res[nonzero] = F*(upper_bound[nonzero]-xt1)  +  (sigmaI_theta0_times_rootr_over_sqrt_a_over_sigmaext*F) * (indef_integral_of_simple_squareroot_quotients(x[nonzero],upper_bound[nonzero]) - indef_integral_of_simple_squareroot_quotients(x[nonzero],xt1))
+    sigmaI_theta0_times_rootr_over_sqrt_a_over_sigmaext = (scipy.integrate.quad(lambda x: weightfun_times_sqrt_aminx(x,xtavg)/np.sqrt(xtavg-x),0,xtavg-weightfun_epsx)[0] + weightfun_times_sqrt_aminx(xtavg,xtavg)*2.0*np.sqrt(weightfun_epsx)) / (np.sqrt(2*pi*xtavg))
+    # unit check: (should be unitless)
+    # Integral of stress*weight function*dx = SIF (i.e. stress*sqrt(meters))
+    # units of weight function = 1/sqrt(meters)
+    # units of weightfun_times_sqrt_aminx = unitless
 
+    # Units of sigmaI_theta0_times_rootr_over_sqrta_over_sigmaext:
+    #   ((1/sqrt(meters))*meters + sqrt(meters) ) / sqrt(meters)
+    #   = unitless (check)
+
+    # sigmaI_theta0_times_rootr_over_sqrt_a_over_sigmaext
+    # evaluated via simple weightfunction comes out to ~0.58
+    # whereas from simple formula had constant of 1/sqrt(2) = .707 (!) 
+
+    # This is the (integral of the weightfunction from 0..a)/sqrt(2*pi*a)
+    # For basic weightfunction: sqrt(1/(pi*a)) * sqrt(a+x)/sqrt(a-x)
+    #   This would be: (1/(a*pi*sqrt(2))) integral_0^a sqrt(a+x)/sqrt(a-x) dx
+    # let u = x/a; du = dx/a -> dx=a*du
+    #   This would be: (1/(a*pi*sqrt(2))) integral_0^1 sqrt(a+au)/sqrt(a-au) a*du
+    #   This would be: (1/(pi*sqrt(2))) integral_0^1 sqrt(1+u)/sqrt(1-u) du
+    #  ... = (2+pi)/(2*pi*sqrt(2))... = .578 by wolfram alpha
+    #  ... or a factor of (2+pi)/(2*pi)=.818 smaller than the .707
+    # of the simple formula
+    res[nonzero] = F*(upper_bound[nonzero]-xt1)  +  (sigmaI_theta0_times_rootr_over_sqrt_a_over_sigmaext*F) * (indef_integral_of_simple_squareroot_quotients(x[nonzero],upper_bound[nonzero]) - indef_integral_of_simple_squareroot_quotients(x[nonzero],xt1))
+    
     
 
     return (use_xt2,sigmaext2,res,sigmaI_theta0_times_rootr_over_sqrt_a_over_sigmaext)
@@ -493,9 +514,9 @@ def solve_normalstress(x,x_bnd,sigma_closure,dx,sigmaext_max,a,E,nu,sigma_yield,
         
         #sigma_increment = sigmaI_theta0_times_rootx_over_sqrt_a_over_sigmaext*(sigmaext_max-sigmaext)*sqrt(a)/sqrt(x-a)
 
-        sigmaI_theta0_times_rootr_over_sqrt_a_over_sigmaext = (scipy.integrate.quad(lambda x: weightfun_times_sqrt_aminx(x,a)/np.sqrt(a-x),0,a-weightfun_epsx)[0] + weightfun_times_sqrt_aminx(a,a)*2.0*np.sqrt(weightfun_epsx)) / np.sqrt(2*pi)
+        sigmaI_theta0_times_rootr_over_sqrt_a_over_sigmaext = (scipy.integrate.quad(lambda x: weightfun_times_sqrt_aminx(x,a)/np.sqrt(a-x),0,a-weightfun_epsx)[0] + weightfun_times_sqrt_aminx(a,a)*2.0*np.sqrt(weightfun_epsx)) / np.sqrt(2*pi*a)
     
-        sigma_increment[ti_nodivzero_nonegsqrt] = sigmaI_theta0_times_rootr_over_sqrt_a_over_sigmaext*(sigmaext_max-sigmaext)*sqrt(a)/sqrt(x[si_nodivzero_nonegsqrt]-a)
+        sigma_increment[si_nodivzero_nonegsqrt] = sigmaI_theta0_times_rootr_over_sqrt_a_over_sigmaext*(sigmaext_max-sigmaext)*sqrt(a)/sqrt(x[si_nodivzero_nonegsqrt]-a)
         sigma_increment[si_divzero]=np.inf
         
         # Limit tensile stresses at physical tip (and elsewhere) to yield
