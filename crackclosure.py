@@ -698,7 +698,7 @@ if __name__=="__main__":
 
 
     # Alternate closure state (function of position; positive compression)
-    sigma_closure3 = 80e6/cos(x/a) -90e6 # Pa
+    sigma_closure3 = 80e6/cos(x/a) -79e6 # Pa
     sigma_closure3[x > a]=0.0
 
     if use_crackclosuresim:
