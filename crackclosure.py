@@ -102,7 +102,7 @@ def integral_tensilestress_growing_effective_crack_length_byxt(x,sigmaext1,sigma
     here on (except when multiplying it in at the final step). 
     
     So our incremental tension is
-    integral_sigmaext1^sigmaext2 sqrt(xt)/sqrt(x-xt) dsigmaext
+    integral_sigmaext1^sigmaext2 (1.0 + sqrt(xt)/sqrt(x-xt)) dsigmaext  (the new 1.0 term represents that beyond the effective tip the external load directly increments the stress state, in addition to the stress concentration caused by the presence of the open region)
     where we ignore any contributions corresponding to (x-xt) <= 0
     
     Perform change of integration variable sigmaext -> xt: 
@@ -112,13 +112,13 @@ def integral_tensilestress_growing_effective_crack_length_byxt(x,sigmaext1,sigma
 
 
     So the  incremental normal stress we are solving for is
-    integral_xt1^xt2 sqrt(xt)*F/sqrt(x-xt)  dxt
+    (sigmaext2-sigmaext1) + integral_xt1^xt2 sqrt(xt)*F/sqrt(x-xt)  dxt
     where we ignore any contributions corresponding to (x-xt) <= 0
 
     and sigmaext2 = sigmaext1 + (xt2-xt1)*F 
  
     F is a constant so have 
-    F * integral_xt1^xt2 sqrt(xt)/(sqrt(x-xt))  dxt
+    F * (xt2-xt1)  + F * integral_xt1^xt2 sqrt(xt)/(sqrt(x-xt))  dxt
 
 
     This is then the integral of (sqrt(u)/sqrt(a-bu)) du
@@ -144,7 +144,7 @@ def integral_tensilestress_growing_effective_crack_length_byxt(x,sigmaext1,sigma
     0 where x < xt1 
     otherwise: 
     upper_bound = min(x, xt2) 
-    (sigmaI_theta0_times_rootx_over_sqrt_a_over_sigmaext*F)*(indef_integral_of_simple_squareroot_quotients(x,upper_bound) - indef_integral_of_simple_squareroot_quotients(x,xt1))
+    F*(upper_bound-xt1) + (sigmaI_theta0_times_rootx_over_sqrt_a_over_sigmaext*F)*(indef_integral_of_simple_squareroot_quotients(x,upper_bound) - indef_integral_of_simple_squareroot_quotients(x,xt1))
 
     """
     
@@ -185,7 +185,7 @@ def integral_tensilestress_growing_effective_crack_length_byxt(x,sigmaext1,sigma
     
     
     
-    res[nonzero] = (sigmaI_theta0_times_rootx_over_sqrt_a_over_sigmaext*F) * (indef_integral_of_simple_squareroot_quotients(x[nonzero],upper_bound[nonzero]) - indef_integral_of_simple_squareroot_quotients(x[nonzero],xt1))
+    res[nonzero] = F*(upper_bound[nonzero]-xt1) + (sigmaI_theta0_times_rootx_over_sqrt_a_over_sigmaext*F) * (indef_integral_of_simple_squareroot_quotients(x[nonzero],upper_bound[nonzero]) - indef_integral_of_simple_squareroot_quotients(x[nonzero],xt1))
 
     
 
@@ -388,7 +388,7 @@ def solve_normalstress(x,x_bnd,sigma_closure,dx,sigmaext_max,a,E,nu,sigma_yield,
         si_divzero = (x-a >= 0) & ~si_nodivzero_nonegsqrt
         
         #sigma_increment = sigmaI_theta0_times_rootx_over_sqrt_a_over_sigmaext*(sigmaext_max-sigmaext)*sqrt(a)/sqrt(x-a)
-        sigma_increment[ti_nodivzero_nonegsqrt] = sigmaI_theta0_times_rootx_over_sqrt_a_over_sigmaext*(sigmaext_max-sigmaext)*sqrt(a)/sqrt(x[si_nodivzero_nonegsqrt]-a)
+        sigma_increment[si_nodivzero_nonegsqrt] = sigmaI_theta0_times_rootx_over_sqrt_a_over_sigmaext*(sigmaext_max-sigmaext)*sqrt(a)/sqrt(x[si_nodivzero_nonegsqrt]-a)
         sigma_increment[si_divzero]=np.inf
         
         # Limit tensile stresses at physical tip (and elsewhere) to yield
@@ -454,7 +454,7 @@ if __name__=="__main__":
     sigma_closure = 80e6/cos(x/a) -70e6 # Pa
     sigma_closure[x > a]=0.0
     
-    use_crackclosuresim=True
+    use_crackclosuresim=False
     if use_crackclosuresim:
         from scipy.interpolate import splrep
         import crackclosuresim.crack_utils_1D as cu1
