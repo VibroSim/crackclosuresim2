@@ -74,7 +74,7 @@ xmax = 2e-3
 assert(xmax > aleft)
 assert(xmax > aright)
 
-approximate_xstep=25e-6 # 25um
+approximate_xstep=125e-6 # 25um
 num_boundary_steps=int((xmax)//approximate_xstep)
 numsteps = num_boundary_steps-1
 xstep = (xmax)/(numsteps)
@@ -115,9 +115,7 @@ for side_idx in range(2):
     if side==-1:
         stress_field_spl=stress_field_spl_leftside
         reff=reff_leftside
-        a_crack=-aleft
-
-        first_xidx = np.where(xrange <= 0)[0][-1]
+        a_crack=aleft
 
         pass
     else: 
@@ -125,8 +123,6 @@ for side_idx in range(2):
         reff=reff_rightside
         a_crack=aright
 
-        first_xidx = np.where(xrange >= 0)[0][0]
-        
         pass
 
     closure_state_x = splev(x,stress_field_spl,ext=1) 
@@ -170,7 +166,7 @@ for side_idx in range(2):
     # note minus sign because compression positive for shear_stickslip.py
     ss_sigma_closure_sub[xrange > closure_state_sub_a[0]] = -scipy.interpolate.interp1d(closure_state_sub_a,closure_state_sub,fill_value="extrapolate")(xrange[xrange > closure_state_sub_a[0]])
 
-    ss_sigma_closure_add = np.zeros(numsteps.shape[0],dtype='d')
+    ss_sigma_closure_add = np.zeros(numsteps,dtype='d')
     # note minus sign because compression positive for shear_stickslip.py
     ss_sigma_closure_add[xrange > closure_state_add_a[0]] = -scipy.interpolate.interp1d(closure_state_add_a,closure_state_add,fill_value="extrapolate")(xrange[xrange > closure_state_add_a[0]])
 
