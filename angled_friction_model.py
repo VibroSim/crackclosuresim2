@@ -74,7 +74,7 @@ xmax = 2e-3
 assert(xmax > aleft)
 assert(xmax > aright)
 
-approximate_xstep=125e-6 # 25um
+approximate_xstep=25e-6 # 25um
 num_boundary_steps=int((xmax)//approximate_xstep)
 numsteps = num_boundary_steps-1
 xstep = (xmax)/(numsteps)
