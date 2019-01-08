@@ -60,27 +60,42 @@ stress_field_spl_rightside=cu1.inverse_closure(reff_rightside,seff_rightside,cu1
 
 
 
-aleft=-np.max(reff_leftside)
+aleft=np.max(reff_leftside) # NOTE CHANGED SIGN OF aleft
 aright=np.max(reff_rightside)
 
+xmax = 2e-3
+assert(xmax > aleft)
+assert(xmax > aright)
+
 approximate_xstep=25e-6 # 25um
-numsteps=int((aright-aleft)//approximate_xstep)
-xstep = (aright-aleft)/(numsteps-1.0)
+num_boundary_steps=int((xmax)//approximate_xstep)
+numsteps = num_boundary_steps-1
+xstep = (xmax)/(numsteps)
 numdraws=20 # draws per step
 
-xrange = aleft + xstep*np.arange(numsteps)
-power_per_m2 = np.zeros(xrange.shape[0],dtype='d')
-vibration_ampl = np.zeros(xrange.shape[0],dtype='d')
+x_bnd = xstep*np.arange(num_boundary_steps) # 
+xrange = (x_bnd[1:] + x_bnd[:-1])/2.0
 
-for xcnt in range(xrange.shape[0]):
+power_per_m2 = np.zeros((2,xrange.shape[0]),dtype='d')
+vibration_ampl = np.zeros((2,xrange.shape[0]),dtype='d')
+
+
+for side_idx in range(2):
+  side=[ -1, 1][side_idx]
+  for xcnt in range(numsteps):
     x=xrange[xcnt]
 
+    print("side=%d; x=%f um" % (side,x*1e6))
+    xleft=x_bnd[xcnt]
+    xright=x_bnd[xcnt+1]
+    
+    xsigned = x*side
     # determine normalization factor for pdf at this x position
-    beta_unnorm_int=quad(lambda beta: beta_unnorm_pdf(beta,x),-np.pi,np.pi)[0]
-
+    beta_unnorm_int=quad(lambda beta: beta_unnorm_pdf(beta,xsigned),-np.pi,np.pi)[0]
+    
     # normalized pdf
-    beta_pdf = lambda beta: beta_unnorm_pdf(beta,x)/beta_unnorm_int    
-
+    beta_pdf = lambda beta: beta_unnorm_pdf(beta,xsigned)/beta_unnorm_int    
+    
     # cdf 
     beta_cdf = lambda beta: quad(beta_pdf,-np.pi,beta)[0]
     
@@ -88,20 +103,18 @@ for xcnt in range(xrange.shape[0]):
     beta_cdf_inverse = lambda prob: newton(lambda beta: beta_cdf(beta)-prob,0.0)
     
     beta_draws = np.vectorize(beta_cdf_inverse)(rand(numdraws))
-
-
-    if x < 0.0:
+    
+    
+    if side==-1:
         stress_field_spl=stress_field_spl_leftside
-        r=-x
         reff=reff_leftside
         pass
     else: 
         stress_field_spl=stress_field_spl_rightside
-        r=x
         reff=reff_rightside
         pass
 
-    closure_state_x = splev(r,stress_field_spl,ext=1) 
+    closure_state_x = splev(x,stress_field_spl,ext=1) 
     
     # Evaluate closure state on both sides of static load
     closure_point_sub=cu1.find_length(static_load-vib_normal_stress_ampl,stress_field_spl,np.max(reff),cu1.weightfun_through,(width,))
@@ -110,51 +123,51 @@ for xcnt in range(xrange.shape[0]):
 
     closure_point_add=cu1.find_length(static_load+vib_normal_stress_ampl,stress_field_spl,np.max(reff),cu1.weightfun_through,(width,))
     (closure_state_add_a,closure_state_add)=cu1.effective_stresses_full(reff,np.max(reff),static_load+vib_normal_stress_ampl,stress_field_spl,cu1.weightfun_through,(width,))
-
+    
     # ***!!!! bug: closure state from effective_stresses_full appears to drop to zero at physical crack tip.
-
-
+    
+    
     # Evaluate at x
-    if r <= closure_state_sub_a[0]:
+    if x <= closure_state_sub_a[0]:
         closure_state_sub_x=0.0
         pass
     else:
-        closure_state_sub_x=scipy.interpolate.interp1d(closure_state_sub_a,closure_state_sub,fill_value="extrapolate")(r)
+        closure_state_sub_x=scipy.interpolate.interp1d(closure_state_sub_a,closure_state_sub,fill_value="extrapolate")(x)
         pass
-
-    if r <= closure_state_add_a[0]:
+    
+    if x <= closure_state_add_a[0]:
         closure_state_add_x=0.0
         pass
     else:
-        closure_state_add_x=scipy.interpolate.interp1d(closure_state_add_a,closure_state_add,fill_value="extrapolate")(r)
+        closure_state_add_x=scipy.interpolate.interp1d(closure_state_add_a,closure_state_add,fill_value="extrapolate")(x)
         pass
-
-
+    
+    
     # uyy is double calculated value because each side moves by this much
-    uyy_add=2.0*cu1.uyy(r,np.max(reff),static_load+vib_normal_stress_ampl,stress_field_spl,cu1.weightfun_through,(width,),E,nu,configuration="PLANE_STRESS")
-
-    uyy_sub=2.0*cu1.uyy(r,np.max(reff),static_load-vib_normal_stress_ampl,stress_field_spl,cu1.weightfun_through,(width,),E,nu,configuration="PLANE_STRESS")
-
+    uyy_add=2.0*cu1.uyy(x,np.max(reff),static_load+vib_normal_stress_ampl,stress_field_spl,cu1.weightfun_through,(width,),E,nu,configuration="PLANE_STRESS")
+    
+    uyy_sub=2.0*cu1.uyy(x,np.max(reff),static_load-vib_normal_stress_ampl,stress_field_spl,cu1.weightfun_through,(width,),E,nu,configuration="PLANE_STRESS")
+    
     # Got two closure stress values at this point:
     # closure_state_add_x and closure_state_sub_x
-
+    
     # and corresponding displacements uyy_add and uyy_sub
-
+    
     # For the moment, treat global shear stress and
     # global shear displacement as zero. 
-
-
+    
+    
     # for each beta draw, evaluate local stress field
     # on the angled asperity
-
+    
     # Model: normal stress sinusodially varies with closure_ampl around closure_state_ref
     # shear stress sinusoidally varies also in phase
     # (vib_shear_stress_ampl)
-
+    
     # now consider our draws...
     # We can consider each corresponds to xstep/numdraws units of horizontal
     # distance (but we don't anymore) 
-
+    
     # represent stress field along crack as a complex number,
     # real part is shear, imaginary part is normal stress (following
     # Evans and Hutchinson Q+iP) except in our case these represent
@@ -163,17 +176,17 @@ for xcnt in range(xrange.shape[0]):
     #
     # Throughout each vibration cycle,
     # stresses cycle between  closure_state_add and closure_state_sub
-
+    
     # So based on temporary limitation above
     # (no external shear loading applied), Q=0
     # P and Q are FORCES... treat them as acting on quarter-annulus
-
+    
     # Nominal P and Q are the external loading on this xstep unit
     # that we are trying to match
     # ... We match P (normal)  and don't worry too much about Q (shear)
     Q_static_nominal=0.0
-    P_static_nominal=closure_state_x * xstep * np.pi*r/2.0 # A force, total for all of the little contributions from each of the draws
-
+    P_static_nominal=closure_state_x * xstep * np.pi*x/2.0 # A force, total for all of the little contributions from each of the draws
+    
     # For each draw, transform nominal Q and P to 
     # Normal and shear forces on the sliding point.
     N_static_nominal=P_static_nominal*np.cos(beta_draws)+Q_static_nominal*np.sin(beta_draws)
@@ -181,40 +194,40 @@ for xcnt in range(xrange.shape[0]):
     # Set T_static_nominal to zero because we don't expect any long-term
     # static shear on the asperity contacts
     T_static_nominal=0.0
-
+    
     # Transform back to P and Q... sum contributions from all draws
     P_contributions=np.sum(N_static_nominal*np.cos(beta_draws) - T_static_nominal*np.sin(beta_draws))
     #Q_contributions=np.sum(N_static_nominal*np.sin(beta_draws) + T_static_nominal*np.cos(beta_draws))
-
+    
     # Determine scaling factor for all draws to sum to desired value
     normal_force_factor=P_static_nominal/P_contributions
-
+    
     # Evaluate P,Q, N, & T assuming this scaling factor
     #P_static = P_static_nominal*normal_force_factor
     #Q_static = Q_static_nominal*normal_force_factor
-
+    
     #N_static = P_static*np.cos(beta_draws)+Q_static*np.sin(beta_draws)
     #T_static = -P_static*np.sin(beta_draws)+Q_static*np.cos(beta_draws)
     N_static = N_static_nominal*normal_force_factor
     T_static = T_static_nominal*normal_force_factor  # 0
-
+    
     P_static = N_static*np.cos(beta_draws) - T_static*np.sin(beta_draws)
     Q_static = N_static*np.sin(beta_draws) + T_static*np.cos(beta_draws)
-
+    
     # P_dynamic per draw
-    P_dynamic = (closure_state_add_x - closure_state_sub_x)* (xstep * np.pi*r/2.0)/(2.0*numdraws) # dynamic stress amplitude
+    P_dynamic = (closure_state_add_x - closure_state_sub_x)* (xstep * np.pi*x/2.0)/(2.0*numdraws) # dynamic stress amplitude
     Q_dynamic = 0.0 # Should be shear vibration amplitude
-
+    
     N_dynamic = P_dynamic*np.cos(beta_draws)+Q_dynamic*np.sin(beta_draws)
     T_dynamic = -P_dynamic*np.sin(beta_draws)+Q_dynamic*np.cos(beta_draws)
-
+    
     
     # exp( iBeta) = cos(beta)+i*sin(Beta)
     # (Q+iP)*exp(iBeta) = Qcos(beta)-Psin(Beta) + i(Qsin(beta) + Pcos(beta))
     # N =Im( (Q+iP)exp(iBeta) )
     # T =Re( (Q+iP)exp(iBeta) )
     # omega=(np.pi/2-beta_draws)-atan(friction_coefficient)
-
+    
     # Locking condition: T < mu*N...  here T=T_dynamic, N=N_static-N-dynamic
     ## i.e. Re( (Q+iP)*exp(iBeta)) < mu*Im( (Q+iP)*exp(iBeta))
     ## i.e. Re( (Q+iP)*exp(iBeta))/Im( (Q+iP)*exp(iBeta)) < mu
@@ -223,18 +236,18 @@ for xcnt in range(xrange.shape[0]):
     ## OR acot(cot(angle((Q+iP)*exp(iBeta)))) > acot(mu)-pi
     ## i.e. angle((Q+iP)*exp(iBeta)) > acot(mu) > 0
     ##  OR 0 > angle((Q+iP)*exp(iBeta)) > acot(mu)-pi
-
+    
     #ang=np.angle((Q + i*P)*np.exp(i*beta_draws))
     #slip = (((ang > 0) & (ang  > np.arctan(1/friction_coefficient))) |
     #        ((ang < 0) & (ang > np.arctan(1/friction_coefficient)-np.pi)))
     slip=np.abs(T_dynamic) >=  -friction_coefficient*(N_static-np.abs(N_dynamic))
-
+    
     
     PP_vibration_y=uyy_add-uyy_sub
-    vibration_ampl[xcnt]=PP_vibration_y/2.0
-    tangential_vibration_ampl=np.abs(vibration_ampl[xcnt] * np.sin(beta_draws))*slip
+    vibration_ampl[side_idx,xcnt]=PP_vibration_y/2.0
+    tangential_vibration_ampl=np.abs(vibration_ampl[side_idx,xcnt] * np.sin(beta_draws))*slip
     tangential_vibration_velocity_ampl = 2*np.pi*vibration_frequency*tangential_vibration_ampl
-
+    
     # Power = (1/2)Fampl*vampl
     # where Fampl = mu*Normal force
     # Q: Are force and velocity always in-phase (probably not)
@@ -243,21 +256,21 @@ for xcnt in range(xrange.shape[0]):
     # would put dynamic stresses out of phase with velocity....
     # What effect would that have on power? Should the N_dynamic term
     # drop out?
-
+    
     # Problem: Experimental observation suggests heating
     # is between linear and quadratic in vibration amplitude.
     # Quadratic would require N to have vibration dependence.
     # P=uNv = u(Nstatic+Ndynamic)v=u(Cn1 + Cn2v)v
-
+    
     # (Note: N_static term was missing from original calculation)
     Power = 0.5 * (friction_coefficient*(np.abs(N_static)+np.abs(N_dynamic)))*tangential_vibration_velocity_ampl
     TotPower = np.sum(Power)
-
-    power_per_m2[xcnt] = TotPower/(xstep*np.pi*r/2.0)
     
-
-    
+    power_per_m2[side_idx,xcnt] = TotPower/(xstep*np.pi*x/2.0)
+      
     pass
+  pass
+
 
 betarange=np.linspace(-np.pi,np.pi,800)
 pl.figure(1)
@@ -270,7 +283,8 @@ pl.savefig('/tmp/facet_pdf.png',dpi=300)
 
 pl.figure(2)
 pl.clf()
-pl.plot(xrange*1e3,power_per_m2/1.e3)
+pl.plot(xrange*1e3,power_per_m2[0,:]/1.e3,'-',
+        xrange*1e3,power_per_m2[1,:]/1.e3,'-')
 pl.xlabel('Position (mm)')
 pl.ylabel('Heating power (kW/m^2)')
 pl.savefig('/tmp/frictional_heating.png',dpi=300)
