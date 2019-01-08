@@ -267,7 +267,7 @@ for side_idx in range(2):
     # Per number of draws because we assume that the stress
     # is distributed over the asperities.
     #Q_dynamic = vib_shear_stress_ampl*xstep*np.pi*r/(2.0*numdraws)
-    Q_dynamic = ((tau_add[ss_xidx]+tau_sub[ss_xidx])/2.0)*xstep*np.pi*x/(2.0*numdraws)
+    Q_dynamic = ((tau_add[xcnt]+tau_sub[xcnt])/2.0)*xstep*np.pi*x/(2.0*numdraws)
     
     N_dynamic = P_dynamic*np.cos(beta_draws)+Q_dynamic*np.sin(beta_draws)
     T_dynamic = -P_dynamic*np.sin(beta_draws)+Q_dynamic*np.cos(beta_draws)
@@ -298,7 +298,7 @@ for side_idx in range(2):
     # to be comparable to N_dynamic and or T_dynamic
     slip=np.abs(T_dynamic) >=  -friction_coefficient*(N_static/numdraws+np.abs(N_dynamic))
 
-    utt = (shear_displ_add[ss_xidx] + shear_displ_sub[ss_xidx])/2.0
+    utt = (shear_displ_add[xcnt] + shear_displ_sub[xcnt])/2.0
     PP_vibration_y=uyy_add-uyy_sub
     vibration_ampl[side_idx,xcnt]=PP_vibration_y/2.0
     #PP_vibration_t=utt*2.0
