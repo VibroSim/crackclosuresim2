@@ -1,9 +1,3 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Sat Nov 03 2018
-
-@author: Hank
-"""
 
 import sys
 import numpy as np
@@ -17,11 +11,6 @@ if __name__=="__main__":
 
 
 
-
-def indef_integral_of_squareroot_quotients_old(a,b,c,x):
-    # From Wolfram Alpha: integral of (sqrt(a+bx)/sqrt(c-bx)) dx
-    # OBSOLETE (not used anymore)
-    return (-2.0*np.sqrt(a+b*x)*np.sqrt(c-b*x)  +  (1.0j)*(a + c)*log(2.0*sqrt(a+b*x)*sqrt(c-b*x)-(1.0j)*(a + 2*b*x -c)))/(2.0*b)
 
 
 def indef_integral_of_simple_squareroot_quotients(a,u):
@@ -48,103 +37,8 @@ def indef_integral_of_simple_squareroot_quotients(a,u):
     integral[divzero] = np.pi*a[divzero]/2.0
     return integral
 
-# For a shear crack with the tip at the origin, intact material
-# to the right (x > 0), broken material to the left (x < 0)
-# The shear stress @ theta=0 multiplied by sqrt(x)/(sqrt(a)*tauext)
-# where x ( > 0) is the position where the stress is measured,
-# a is the (half) length of the crack, and tauext
-# is the external shear load
-tauII_theta0_times_rootx_over_sqrt_a_over_tauext = 1.0/sqrt(2.0)  # Per Suresh (9.47a) and Anderson (table 2.1)
 
 
-def integral_shearstress_growing_effective_crack_length_bytau_old(tauext1,tauext2,xtp,D):
-    """ OBSOLETE Evaluate the incremental shear stress field on a shear crack
-    that is growing in effective length the external load
-    increases from tauext1 to tauext2.
-    
-    It is assumed that the effective tip moves linearly with 
-    applied external shear stress, with rate given by D (meters of
-    tip motion / Pascals of external shear stress)
-
-    Let tauII(r,K) be the mode II shear stress formula divided by 
-    the external load, where the K dependence is presumed to be 
-    strictly multiplicative. Let K_over_tauext = K/tauext
-
-    Let xt be the position of the effective tip at external load
-    tauext
-
-    The incremental shear stress field would be
-    integral_tauext1^tauext2 of tauII(x-xt,K_over_tauext) dtauext
-    (note that K and xt are dependent on tauext)
-   
-
-    The variable tauII_theta0_times_rootx_over_sqrt_a_over_tauext
-    represents the value of tauII(x,K) with tauext*sqrt(pi*a) 
-    substituted for K, evaluated for horizontal axis beyond the 
-    tip (i.e. theta=0) and then multiplied by sqrt(x) (sqrt(position
-    beyond the tip) and divided by sqrt(cracklength) and also by 
-    tauext. 
-
-    Then we can rewrite the incremental shear stress as: 
-    integral_tauext1^tauext2 of tauII_theta0_times_rootx_over_sqrt_a_over_tauext*sqrt(xt)/sqrt(x-xt) dtauext
-    Here, xt is still dependent on tauext... this will give shear stress
-    as a function of position (x). 
-
-    We assume xt is linearly dependent on shear stress:
-    xt = xtp + D*(tauext-tauext1)
-    where xtp is the final xt from the previous step. 
-
-    tauII_theta0_times_rootx_over_sqrt_a_over_tauext is a constant, 
-    so it will just be a leading coefficient that we will ignore from 
-    here on (except when multiplying it in at the final step). 
-
-    So our incremental shear is
-    integral_tauext1^tauext2 sqrt(xt)/sqrt(x-xt) dtauext
-    where we ignore any contributions corresponding to (x-xt) <= 0
-
-    ... Substitute for xt:
-    integral_tauext1^tauext2 sqrt(xtp+D*tauext-D*tauext1)/sqrt(x-xtp-D*tauext-D*tauext1) dtauext
-
-    ... Substitute a = xtp-D*tauext1, c=x-xtp-D*tauext1
-    integral_tauext1^tauext2 sqrt(a + D*tauext)/sqrt(c - D*tauext) dtauext
-
-    This is then the integral of (sqrt(a+bx)/sqrt(c-bx)) dx
-       where x = tauext, and b=D
-    with solution given by
-       indef_integral_of_squareroot_quotients(a,D,c,tauext2) - indef_integral_of_squareroot_quotients(a,D,c,tauext1)
-
-    Well almost. We only consider the region of this integral where 
-    x-xt > 0. This can be accomplished by shifting the bounds when 
-    needed. 
-
-    Substitute for xt: 
-    x - xtp - D*tauext + D*tauext1 > 0
-    x - xtp + D*tauext1 > D*tauext
-    D assumed positive
-    tauext < (x - xtp)/D + tauext1
-    
-    So use_tauext2 = min( tauext2, (x - xtp)/D + tauext1 )
-    
-    
-    So our actual solution putting everything together is:
-    tauII_theta0_times_rootx_over_sqrt_a_over_tauext*(indef_integral_of_squareroot_quotients(a,D,c,use_tauext2) - indef_integral_of_squareroot_quotients(a,D,c,tauext1))
-
-    """
-    
-
-    a = xtp-D*tauext1
-    c = x-xtp-D*tauext1
-    
-    use_tauext2 = tauext2*np.ones(x.shape,dtype='d')
-
-    # alternate tauext2:
-    alt_tauext2 = (x - xtp)/D + tauext1
-
-    use_alternate = alt_tauext2 < use_tauext2
-    use_tauext2[use_alternate] = alt_tauext2[use_alternate]
-
-    
-    return tauII_theta0_times_rootx_over_sqrt_a_over_tauext*(indef_integral_of_squareroot_quotients_old(a,D,c,use_tauext2) - indef_integral_of_squareroot_quotients_old(a,D,c,tauext1))
 
 
 def integral_shearstress_growing_effective_crack_length_byxt(x,tauext1,tauext_max,F,xt1,xt2):
@@ -170,6 +64,20 @@ def integral_shearstress_growing_effective_crack_length_byxt(x,tauext1,tauext_ma
 
     Rationale: 
 
+     The mode II normal stress formula is:
+      sigma_xy_crack = (K_II / sqrt(2*pi*r))  (Suresh, Eq. 9.47a at theta=0)
+
+    ... we choose to add in the external field not being held by the crack
+      sigma_xy_total = (K_II / sqrt(2*pi*r)) + sigma_ext
+
+    The variable tauII_theta0_times_rootr_over_sqrt_a_over_sigmaext
+    represents the value of sigmaxy_crack(x,K) with the above formula 
+    for K_II (the simple K_II=tau_ext*sqrt(pi*a)) )
+    substituted for K, evaluated for horizontal axis beyond the 
+    tip (i.e. theta=0) and then multiplied by sqrt(r) (sqrt(position
+    beyond the tip) and divided by sqrt(cracklength) and also by 
+    tauext. 
+
     Let tauII(r,K) be the mode II shear stress formula divided by 
     the external load, where the K dependence is presumed to be 
     strictly multiplicative. Let K_over_tauext = K/tauext
@@ -178,19 +86,19 @@ def integral_shearstress_growing_effective_crack_length_byxt(x,tauext1,tauext_ma
     tauext
 
     The incremental shear stress field would be
-    integral_tauext1^tauext2 of tauII(x-xt,K_over_tauext) dtauext
+    integral_tauext1^tauext2 of 1.0 + tauII(x-xt,K_over_tauext) dtauext
     (note that K and xt are dependent on tauext)
    
 
-    The variable tauII_theta0_times_rootx_over_sqrt_a_over_tauext
+    The variable tauII_theta0_times_rootr_over_sqrt_a_over_tauext
     represents the value of tauII(x,K) with tauext*sqrt(pi*a) 
     substituted for K, evaluated for horizontal axis beyond the 
-    tip (i.e. theta=0) and then multiplied by sqrt(x) (sqrt(position
+    tip (i.e. theta=0) and then multiplied by sqrt(r) (sqrt(position
     beyond the tip) and divided by sqrt(cracklength) and also by 
     tauext. 
 
     Then we can rewrite the incremental shear stress as: 
-    integral_tauext1^tauext2 of tauII_theta0_times_rootx_over_sqrt_a_over_tauext*sqrt(xt)/sqrt(x-xt) dtauext
+    integral_tauext1^tauext2 of 1.0 + tauII_theta0_times_rootr_over_sqrt_a_over_tauext*sqrt(xt)/sqrt(x-xt) dtauext
     Here, xt is still dependent on tauext... this will give shear stress
     as a function of position (x). 
 
@@ -198,13 +106,19 @@ def integral_shearstress_growing_effective_crack_length_byxt(x,tauext1,tauext_ma
     xt = xtp + (1/F)*(tauext-tauext1)
     where xtp is the final xt from the previous step. 
 
-    tauII_theta0_times_rootx_over_sqrt_a_over_tauext is a constant, 
-    so it will just be a leading coefficient that we will ignore from 
-    here on (except when multiplying it in at the final step). 
+    tauII_theta0_times_rootr_over_sqrt_a_over_tauext is a constant 
 
     So our incremental shear is
-    integral_tauext1^tauext2 sqrt(xt)/sqrt(x-xt) dtauext
+    integral_tauext1^tauext2 (1.0 + tauII_theta0_times_rootr_over_sqrt_a_over_tauext sqrt(xt)/sqrt(x-xt) dtauext
     where we ignore any contributions corresponding to (x-xt) <= 0
+
+    (the new 1.0 term represents that beyond the effective tip the external 
+    load directly increments the stress state, in addition to the stress 
+    concentration caused by the presence of the open region)    
+
+    pull out constant term
+
+    (tauext2-tauext1) + integral_tauext1^tauext2 tauII_theta0_times_rootr_over_sqrt_a_over_tauext sqrt(xt)/sqrt(x-xt) dtauext
 
     Perform change of integration variable tauext -> xt: 
        Derivative of xt:
@@ -212,14 +126,14 @@ def integral_shearstress_growing_effective_crack_length_byxt(x,tauext1,tauext_ma
        dtauext = F*dxt
 
 
-    So the  incremental shear we are solving for is
-    integral_xt1^xt2 sqrt(xt)*F/sqrt(x-xt)  dxt
+    So the  incremental shear stress we are solving for is
+    (tauext2-tauext1) + integral_xt1^xt2 tauII_theta0_times_rootr_over_sqrt_a_over_tauext sqrt(xt)*F/sqrt(x-xt)  dxt
     where we ignore any contributions corresponding to (x-xt) <= 0
 
     and tauext2 = tauext1 + (xt2-xt1)*F 
  
     F is a constant so have 
-    F * integral_xt1^xt2 sqrt(xt)/(sqrt(x-xt))  dxt
+    F*(xt2-xt1) +  F * tauII_theta0_times_rootr_over_sqrt_a_over_tauext * integral_xt1^xt2 sqrt(xt)/(sqrt(x-xt))  dxt
 
 
     This is then the integral of (sqrt(u)/sqrt(a-bu)) du
@@ -245,7 +159,7 @@ def integral_shearstress_growing_effective_crack_length_byxt(x,tauext1,tauext_ma
     0 where x < xt1 
     otherwise: 
     upper_bound = min(x, xt2) 
-    (tauII_theta0_times_rootx_over_sqrt_a_over_tauext*F)*(indef_integral_of_simple_squareroot_quotients(x,upper_bound) - indef_integral_of_simple_squareroot_quotients(x,xt1))
+    F*(upper_bound-xt1) + (tauII_theta0_times_rootr_over_sqrt_a_over_tauext*F)*(indef_integral_of_simple_squareroot_quotients(x,upper_bound) - indef_integral_of_simple_squareroot_quotients(x,xt1))
 
     """
     
@@ -255,7 +169,8 @@ def integral_shearstress_growing_effective_crack_length_byxt(x,tauext1,tauext_ma
     # where x ( > 0) is the position where the stress is measured,
     # a is the (half) length of the crack, and tauext
     # is the external shear load
-    # tauII_theta0_times_rootx_over_sqrt_a_over_tauext = 1.0/sqrt(2.0)  # Per Suresh (9.47a) and Anderson (table 2.1) (now a global)
+
+    tauII_theta0_times_rootr_over_sqrt_a_over_tauext = 1.0/sqrt(2.0)  # Per Suresh (9.47a) and Anderson (table 2.1)
 
     tauext2 = tauext1 + (xt2-xt1)*F
 
@@ -286,7 +201,7 @@ def integral_shearstress_growing_effective_crack_length_byxt(x,tauext1,tauext_ma
 
     
     
-    res[nonzero] = (tauII_theta0_times_rootx_over_sqrt_a_over_tauext*F) * (indef_integral_of_simple_squareroot_quotients(x[nonzero],upper_bound[nonzero]) - indef_integral_of_simple_squareroot_quotients(x[nonzero],xt1))
+    res[nonzero] = F*(upper_bound[nonzero]-xt1) + (tauII_theta0_times_rootr_over_sqrt_a_over_tauext*F) * (indef_integral_of_simple_squareroot_quotients(x[nonzero],upper_bound[nonzero]) - indef_integral_of_simple_squareroot_quotients(x[nonzero],xt1))
 
     
     
@@ -378,32 +293,6 @@ def solve_incremental_shearstress(x,x_bnd,tau,sigma_closure,shear_displ,xt_idx,d
     return (use_xt2,tauext2, tau+tau_increment, shear_displ+incremental_displacement)
     
     
-#####INTEGRAL OF SHEAR FUNCTION
-#Define a function for the integral of the shear function
-#Determined from Wolfram Alpha, 
-#(integral   sqrt(a+(b*x))/sqrt(c-(b*x))  dx)
-#The previously derived integral had four constants, a,b,c,and q
-#It was determined that b and q would always equal so it was re-
-#calculated to have a slightly nicer integral
-#NOTE: I had to use np.lib.scimath.sqrt in all but one constant
-#case to allow complex square roots to be calculated
-def tau_integral_old(D,x,xtp,Text,Textp):
-    # OBSOLETE
-    #D = a constant D that is unknown?
-    #x = a constant
-    #xtp = the crack length from the previous step
-    #Text = the external load and the varible integrated w.r.t.
-    #Textp = the previous external load step
-    #The first term (1/np.sqrt(2)) is a constant that was pulled
-    #before integration 
-    i = 1j
-    return (1/np.sqrt(2))*(((-2*(np.lib.scimath.sqrt((xtp-D*Textp)+ \
-    (D*Text)))*(np.lib.scimath.sqrt((x-(xtp-D*Textp))-(D*Text))))/(2*D))+ \
-    ((i*((xtp-D*Textp)+(x-(xtp-D*Textp)))* \
-    np.log((2*(np.lib.scimath.sqrt((xtp-D*Textp)+(D*Text)))* \
-    (np.lib.scimath.sqrt((x-(xtp-D*Textp))-(D*Text))))- \
-    (i*((xtp-D*Text)+(2*D*Text)-(x-(xtp-D*Text))))))/(2*D)))
-
 
 
 #####SHEAR DISPLACEMENT FUNCTION 
@@ -520,8 +409,11 @@ def solve_shearstress(x,x_bnd,sigma_closure,dx,tauext_max,a,mu,E,nu,tau_yield,ve
         ti_nodivzero_nonegsqrt = x-a > 1e-10*a
         ti_divzero = (x-a >= 0) & ~ti_nodivzero_nonegsqrt
         
-        #tau_increment = tauII_theta0_times_rootx_over_sqrt_a_over_tauext*(tauext_max-tauext)*sqrt(a)/sqrt(x-a)
-        tau_increment[ti_nodivzero_nonegsqrt] = tauII_theta0_times_rootx_over_sqrt_a_over_tauext*(tauext_max-tauext)*sqrt(a)/sqrt(x[ti_nodivzero_nonegsqrt]-a)
+        tauII_theta0_times_rootr_over_sqrt_a_over_tauext = 1.0/sqrt(2.0)  # Per Suresh (9.47a) and Anderson (table 2.1)
+
+        #tau_increment = tauII_theta0_times_rootr_over_sqrt_a_over_tauext*(tauext_max-tauext)*sqrt(a)/sqrt(x-a)
+        # New (sigmaext_max - sigmaext) term is the incremental external  stress field beyond the tips added in addition to the stress contcentration effect
+        tau_increment[ti_nodivzero_nonegsqrt] = (tauext_max-tauext) + tauII_theta0_times_rootr_over_sqrt_a_over_tauext*(tauext_max-tauext)*sqrt(a)/sqrt(x[ti_nodivzero_nonegsqrt]-a)
         tau_increment[ti_divzero]=np.inf
 
         # Limit shear stresses at physical tip (and elsewhere) to yield
