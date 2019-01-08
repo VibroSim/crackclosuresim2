@@ -110,6 +110,7 @@ def integral_tensilestress_growing_effective_crack_length_byxt(x,sigmaext1,sigma
  
     From above.  sigma_yy_crack = (K_I / sqrt(2*pi*r)) ... Call sigma_yy_crack/sigmaext now sigmaI and make it a function of r=x-xt and K_I/sigmaext
 
+
     So sigmaI(r,K_I/sigmaext) = K_over_sigmaext / sqrt(2*pi*(x-xt))
 
       
@@ -558,8 +559,9 @@ def solve_normalstress(x,x_bnd,sigma_closure,dx,sigmaext_max,a,E,nu,sigma_yield,
             sigmaI_theta0_times_rootx_over_sqrt_a_over_sigmaext = 1.0/sqrt(2.0)  # Per Suresh (9.43 and 9.44a) and Anderson (table 2.1)
 
             pass
-    
-        sigma_increment[si_nodivzero_nonegsqrt] = sigmaI_theta0_times_rootr_over_sqrt_a_over_sigmaext*(sigmaext_max-sigmaext)*sqrt(a)/sqrt(x[si_nodivzero_nonegsqrt]-a)
+
+        # New (sigmaext_max - sigmaext) term is the incremental external  stress field beyond the tips added in addition to the stress contcentration effect
+        sigma_increment[si_nodivzero_nonegsqrt] = (sigmaext_max - sigmaext) + sigmaI_theta0_times_rootr_over_sqrt_a_over_sigmaext*(sigmaext_max-sigmaext)*sqrt(a)/sqrt(x[si_nodivzero_nonegsqrt]-a)
         sigma_increment[si_divzero]=np.inf
         
         # Limit tensile stresses at physical tip (and elsewhere) to yield
