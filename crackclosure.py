@@ -3,7 +3,7 @@ import sys
 import numpy as np
 from numpy import sqrt,log,pi,cos,arctan
 import scipy.optimize
-nimport scipy as sp
+import scipy as sp
 import scipy.interpolate
 
 
@@ -628,8 +628,8 @@ if __name__=="__main__":
     xsteps = 200
 
     weightfun_times_sqrt_aminx = lambda x,a : weightfun_through_times_sqrt_aminx(x,a,specimen_width)
-    #weightfun_times_sqrt_aminx = lambda x,a : weightfun_basic_times_sqrt_aminx(x,a)
-    # weightfun_times_sqrt_aminx = None # (simple K_I and displacement formulas)
+    #weightfun_times_sqrt_aminx = lambda x,a : weightfun_basic_times_sqrt_aminx(x,a)   # WARNING: weightfun_basic seems to be incorrect (?)
+    #weightfun_times_sqrt_aminx = None # (simple K_I and displacement formulas)
 
     # x_bnd represents x coordinates of the boundaries of
     # each mesh element 
