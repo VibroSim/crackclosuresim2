@@ -3,7 +3,7 @@ import sys
 import numpy as np
 from numpy import sqrt,log,pi,cos,arctan
 import scipy.optimize
-import scipy as sp
+nimport scipy as sp
 import scipy.interpolate
 
 
@@ -123,6 +123,7 @@ def integral_tensilestress_growing_effective_crack_length_byxt(x,sigmaext1,sigma
 
     The variable sigmaI_theta0_times_rootr_over_sqrt_a_over_sigmaext
     represents the value of sigmayy_crack(x,K) with the above formula for K_I 
+    (either from the weight function or the simple K_I=sigma_ext*sqrt(pi*a))
     substituted for K, evaluated for horizontal axis beyond the 
     tip (i.e. theta=0) and then multiplied by sqrt(r) (sqrt(position
     beyond the tip) and divided by sqrt(cracklength) and also by 
@@ -143,11 +144,16 @@ def integral_tensilestress_growing_effective_crack_length_byxt(x,sigmaext1,sigma
     where xtp is the final xt from the previous step. 
     
     sigmaI_theta0_times_rootr_over_sqrt_a_over_sigmaext is treated as constant, 
+    between xt1 and xt2
     
     So our incremental tension is
     integral_sigmaext1^sigmaext2 (1.0 + sigmaI_theta0_times_rootr_over_sqrt_a_over_sigmaext sqrt(xt)/sqrt(x-xt)) dsigmaext
     where we ignore any contributions corresponding to (x-xt) <= 0
-    
+
+    (the new 1.0 term represents that beyond the effective tip the external 
+    load directly increments the stress state, in addition to the stress 
+    concentration caused by the presence of the open region)    
+
     pull out constant term
 
     (sigmaext2-sigmaext1) + integral_sigmaext1^sigmaext2 sigmaI_theta0_times_rootr_over_sqrt_a_over_sigmaext sqrt(xt)/sqrt(x-xt) dsigmaext
@@ -165,7 +171,7 @@ def integral_tensilestress_growing_effective_crack_length_byxt(x,sigmaext1,sigma
     and sigmaext2 = sigmaext1 + (xt2-xt1)*F 
  
     F is a constant and sigmaI_theta0_times_rootr_over_sqrt_a_over_sigmaext is treated as constant so have 
-    F*dxt  +  F * sigmaI_theta0_times_rootr_over_sqrt_a_over_sigmaext * integral_xt1^xt2 sqrt(xt)/(sqrt(x-xt))  dxt
+    F*(xt2-xt1)  +  F * sigmaI_theta0_times_rootr_over_sqrt_a_over_sigmaext * integral_xt1^xt2 sqrt(xt)/(sqrt(x-xt))  dxt
 
 
     This is then the integral of (sqrt(u)/sqrt(a-bu)) du
@@ -191,7 +197,7 @@ def integral_tensilestress_growing_effective_crack_length_byxt(x,sigmaext1,sigma
     0 where x < xt1 
     otherwise: 
     upper_bound = min(x, xt2) 
-    F*(upper_bound-xt1) + (sigmaI_theta0_times_rootx_over_sqrt_r_over_sigmaext*F)*(indef_integral_of_simple_squareroot_quotients(x,upper_bound) - indef_integral_of_simple_squareroot_quotients(x,xt1))
+    F*(upper_bound-xt1) + (sigmaI_theta0_times_rootr_over_sqrt_a_over_sigmaext*F)*(indef_integral_of_simple_squareroot_quotients(x,upper_bound) - indef_integral_of_simple_squareroot_quotients(x,xt1))
 
     """
     
@@ -230,21 +236,34 @@ def integral_tensilestress_growing_effective_crack_length_byxt(x,sigmaext1,sigma
     nonzero = x > xt1
 
     xtavg = (xt1+use_xt2)/2.0
-    
-    # sigmaI_theta0_times_rootr_over_sqrt_a_over_sigmaext = ([ integral_0^(a-epsilon) M(x,a)/sqrt(a-x) dx + M(a,a)*2sqrt(epsilon) ] / sqrt(2*pi))
-    sigmaI_theta0_times_rootr_over_sqrt_a_over_sigmaext = (scipy.integrate.quad(lambda x: weightfun_times_sqrt_aminx(x,xtavg)/np.sqrt(xtavg-x),0,xtavg-weightfun_epsx)[0] + weightfun_times_sqrt_aminx(xtavg,xtavg)*2.0*np.sqrt(weightfun_epsx)) / (np.sqrt(2*pi*xtavg))
-    # unit check: (should be unitless)
-    # Integral of stress*weight function*dx = SIF (i.e. stress*sqrt(meters))
-    # units of weight function = 1/sqrt(meters)
-    # units of weightfun_times_sqrt_aminx = unitless
 
-    # Units of sigmaI_theta0_times_rootr_over_sqrta_over_sigmaext:
-    #   ((1/sqrt(meters))*meters + sqrt(meters) ) / sqrt(meters)
-    #   = unitless (check)
 
+    if weightfun_times_sqrt_aminx is not None:    
+        # sigmaI_theta0_times_rootr_over_sqrt_a_over_sigmaext = ([ integral_0^(a-epsilon) M(x,a)/sqrt(a-x) dx + M(a,a)*2sqrt(epsilon) ] / sqrt(2*pi)) # Per Suresh (9.43 and 9.44a) and Anderson (table 2.1)
+        sigmaI_theta0_times_rootr_over_sqrt_a_over_sigmaext = (scipy.integrate.quad(lambda x: weightfun_times_sqrt_aminx(x,xtavg)/np.sqrt(xtavg-x),0,xtavg-weightfun_epsx)[0] + weightfun_times_sqrt_aminx(xtavg,xtavg)*2.0*np.sqrt(weightfun_epsx)) / (np.sqrt(2*pi*xtavg))
+        # unit check: (should be unitless)
+        # Integral of stress*weight function*dx = SIF (i.e. stress*sqrt(meters))
+        # units of weight function = 1/sqrt(meters)
+        # units of weightfun_times_sqrt_aminx = unitless
+        
+        # Units of sigmaI_theta0_times_rootr_over_sqrta_over_sigmaext:
+        #   ((1/sqrt(meters))*meters + sqrt(meters) ) / sqrt(meters)
+        #   = unitless (check)
+        pass
+    else:
+        # For a mode I crack with the tip at the origin, intact material
+        # to the right (x > 0), broken material to the left (x < 0)
+        # The tensile stress @ theta=0 multiplied by sqrt(x)/(sqrt(a)*sigmaext)
+        # where x ( > 0) is the position where the stress is measured,
+        # a is the (half) length of the crack, and sigmaext
+        # is the external tensile load
+        sigmaI_theta0_times_rootr_over_sqrt_a_over_sigmaext = 1.0/sqrt(2.0)  # Per Suresh (9.43 and 9.44a) and Anderson (table 2.1)
+
+        pass
     # sigmaI_theta0_times_rootr_over_sqrt_a_over_sigmaext
-    # evaluated via simple weightfunction comes out to ~0.58
-    # whereas from simple formula had constant of 1/sqrt(2) = .707 (!) 
+    # evaluated via basic weightfunction comes out to ~0.58
+    # whereas from simple formula had constant of 1/sqrt(2) = .707 (!)
+    #  Conclusion: basic weightfunction from Fett & Munz may be off (?)
 
     # This is the (integral of the weightfunction from 0..a)/sqrt(2*pi*a)
     # For basic weightfunction: sqrt(1/(pi*a)) * sqrt(a+x)/sqrt(a-x)
@@ -259,7 +278,7 @@ def integral_tensilestress_growing_effective_crack_length_byxt(x,sigmaext1,sigma
     
     
 
-    return (use_xt2,sigmaext2,res,sigmaI_theta0_times_rootr_over_sqrt_a_over_sigmaext)
+    return (use_xt2,sigmaext2,res)
 
 
 def solve_incremental_tensilestress(x,x_bnd,sigma,sigma_closure,tensile_displ,xt_idx,dx,sigmaext,sigmaext_max,a,E,nu,weightfun_times_sqrt_aminx,weightfun_epsx,K_I_ov_sigma_ext_vect):
@@ -288,7 +307,7 @@ def solve_incremental_tensilestress(x,x_bnd,sigma,sigma_closure,tensile_displ,xt
     
     We can evaluate the increment in sigma from: 
 
-    (use_xt2,sigmaext2,sigma_increment)=integral_tensilestress_growing_effective_crack_length_byxt(x,sigmaext,sigmaext_max,F,x[xt_idx],x[xt_idx+1],weightfun_times_sqrt_aminx)
+    (use_xt2,sigmaext2,sigma_increment)=integral_tensilestress_growing_effective_crack_length_byxt(x,sigmaext,sigmaext_max,F,x[xt_idx],x[xt_idx+1],weightfun_times_sqrt_aminx,weightfun_epsx)
 
     But to do this we need to solve for F. 
 
@@ -302,7 +321,7 @@ def solve_incremental_tensilestress(x,x_bnd,sigma,sigma_closure,tensile_displ,xt
         pass
     
     def obj_fcn(F):
-        (use_xt2,sigmaext2,sigma_increment,sigmaI_theta0_times_rootr_over_sqrt_a_over_sigmaext)=integral_tensilestress_growing_effective_crack_length_byxt(x,sigmaext,sigmaext_max,F,x_bnd[xt_idx],next_bound,weightfun_times_sqrt_aminx,weightfun_epsx)
+        (use_xt2,sigmaext2,sigma_increment)=integral_tensilestress_growing_effective_crack_length_byxt(x,sigmaext,sigmaext_max,F,x_bnd[xt_idx],next_bound,weightfun_times_sqrt_aminx,weightfun_epsx)
         return (sigma+sigma_increment - sigma_closure)[xt_idx]
     
     # F measures the closure gradient in (Pascals external tensile stress / meters of tip motion)
@@ -330,7 +349,7 @@ def solve_incremental_tensilestress(x,x_bnd,sigma,sigma_closure,tensile_displ,xt
             F = scipy.optimize.brentq(obj_fcn,0.0,Fbnd,disp=True)
             pass
         
-        (use_xt2,sigmaext2,sigma_increment,sigmaI_theta0_times_rootr_over_sqrt_a_over_sigmaext)=integral_tensilestress_growing_effective_crack_length_byxt(x,sigmaext,sigmaext_max,F,x_bnd[xt_idx],next_bound,weightfun_times_sqrt_aminx,weightfun_epsx)
+        (use_xt2,sigmaext2,sigma_increment)=integral_tensilestress_growing_effective_crack_length_byxt(x,sigmaext,sigmaext_max,F,x_bnd[xt_idx],next_bound,weightfun_times_sqrt_aminx,weightfun_epsx)
         
         # For displacement calculate at x centers... use average of left and right boundaries, except for (perhaps) last point where instead of the right boundary we use the actual tip.
         incremental_displacement = np.zeros(x.shape[0],dtype='d')
@@ -362,48 +381,50 @@ def solve_incremental_tensilestress(x,x_bnd,sigma,sigma_closure,tensile_displ,xt
 #by this. 
 def tensile_displacement(sigma_applied,x,xt,E,nu,weightfun_times_sqrt_aminx,weightfun_epsx,K_I_ov_sigma_ext_vect):
     ##plane stress is considered
-    #Kappa = (3.0-nu)/(1.0+nu)
-    #
-    ## KI = integral_0^a (sigma_
-    #KI = sigma_applied*np.sqrt(np.pi*(xt))
-    #if (xt-x < 0).any():
-    #    #sys.modules["__main__"].__dict__.update(globals())
-    #    #sys.modules["__main__"].__dict__.update(locals())
-    #    raise ValueError("tensile displacement to right of crack tip")
-    #theta = np.pi
-    #return (KI/(2.0*E))*(np.sqrt((xt-x)/(2.0*np.pi)))*((1.0+nu)* 
-    #(((2.0*Kappa+1.0)*(np.sin(theta/2.0)))-np.sin(3.0*theta/2.0)))
 
-    # New implementation with weight functions:
-    # m = (E'/K) du/da
-    # u = integral_x..xt  (K/E') m(x,a) da 
-    # u = integral_x..xt  (K/E') M(x,a)/sqrt(a-x) da 
+    if weightfun_times_sqrt_aminx is not None:
+        # we are using weightfunctions
 
-    # need K... well from above         K_I(a) = sigma_ext * [ integral_0^(a-epsilon) M(u,a)/sqrt(a-u) du + M(a,a)*2sqrt(epsilon) ]
-    # u = (1.0/E') * integral_x..xt  K_I(a) M(x,a)/sqrt(a-x) da 
-    # u = (1.0/E') * [ integral_x..(x+epsilon)  K_I(a) M(x,a)/sqrt(a-x) da  + integral_(x+epsilon)..xt K_I(a) M(x,a)/sqrt(a-x) da ]
-    # u = (1.0/E') * [ K_I(x) M(x,x) integral_x..(x+epsilon) 1.0/sqrt(a-x) da  + integral_(x+epsilon)..xt K_I(a) M(x,a)/sqrt(a-x) da ]
-    #
-    # as above we can evaluate the left hand integral to be 2*sqrt(epsilon)
-    # so 
-    # u = (1.0/E') * [ K_I(x) M(x,x) 2*sqrt(epsilon)  + integral_(x+epsilon)..a K_I(a) M(x,a)/sqrt(a-x) da ]
-    #
-    # NOTE: POSSIBLE PROBLEM... Should be dependent on nu? (Poisson's ratio?) 
+        # New implementation with weight functions:
+        # m = (E'/K) du/da
+        # u = integral_x..xt  (K/E') m(x,a) da 
+        # u = integral_x..xt  (K/E') M(x,a)/sqrt(a-x) da 
+        
+        # need K... well from above         K_I(a) = sigma_ext * [ integral_0^(a-epsilon) M(u,a)/sqrt(a-u) du + M(a,a)*2sqrt(epsilon) ]
+        # u = (1.0/E') * integral_x..xt  K_I(a) M(x,a)/sqrt(a-x) da 
+        # u = (1.0/E') * [ integral_x..(x+epsilon)  K_I(a) M(x,a)/sqrt(a-x) da  + integral_(x+epsilon)..xt K_I(a) M(x,a)/sqrt(a-x) da ]
+        # u = (1.0/E') * [ K_I(x) M(x,x) integral_x..(x+epsilon) 1.0/sqrt(a-x) da  + integral_(x+epsilon)..xt K_I(a) M(x,a)/sqrt(a-x) da ]
+        #
+        # as above we can evaluate the left hand integral to be 2*sqrt(epsilon)
+        # so 
+        # u = (1.0/E') * [ K_I(x) M(x,x) 2*sqrt(epsilon)  + integral_(x+epsilon)..a K_I(a) M(x,a)/sqrt(a-x) da ]
+        #
+        # NOTE: POSSIBLE PROBLEM... Should be dependent on nu? (Poisson's ratio?) 
+        
+        
+        right_integral = lambda _x : scipy.integrate.quad(lambda a: K_I_ov_sigma_ext_vect(a)*weightfun_times_sqrt_aminx(_x,a)/np.sqrt(a-_x),_x+weightfun_epsx,xt)[0]
 
+        right_integral_vect = np.vectorize(right_integral)
+        
+        # !!!*** NOTE: Need to replace Eff by E/(1-nu^2) for plane strain case  (Eeff is just E for plane stress)
+        Eeff = E
+        u = (sigma_applied/Eeff) * ( K_I_ov_sigma_ext_vect(x)*weightfun_times_sqrt_aminx(x,x)*2.0*np.sqrt(weightfun_epsx) + right_integral_vect(x))
+        
 
-    right_integral = lambda _x : scipy.integrate.quad(lambda a: K_I_ov_sigma_ext_vect(a)*weightfun_times_sqrt_aminx(_x,a)/np.sqrt(a-_x),_x+weightfun_epsx,xt)[0]
-
-    right_integral_vect = np.vectorize(right_integral)
+        pass
+    else: 
+        Kappa = (3.0-nu)/(1.0+nu)
+        
+        KI = sigma_applied*np.sqrt(np.pi*(xt))
+        theta = np.pi
+        u = (KI/(2.0*E))*(np.sqrt((xt-x)/(2.0*np.pi)))*((1.0+nu)* 
+                                                        (((2.0*Kappa+1.0)*(np.sin(theta/2.0)))-np.sin(3.0*theta/2.0)))
+        pass
     
-    # !!!*** NOTE: Need to replace Eff by E/(1-nu^2) for plane strain case  (Eeff is just E for plane stress)
-    Eeff = E
-    u = (sigma_applied/Eeff) * ( K_I_ov_sigma_ext_vect(x)*weightfun_times_sqrt_aminx(x,x)*2.0*np.sqrt(weightfun_epsx) + right_integral_vect(x))
-
     #if (xt > 1e-3):
     #    sys.modules["__main__"].__dict__.update(globals())
     #    sys.modules["__main__"].__dict__.update(locals())
     #    raise ValueError("xt exceeds 1mm")
-
     
     return u
 
@@ -412,33 +433,39 @@ def solve_normalstress(x,x_bnd,sigma_closure,dx,sigmaext_max,a,E,nu,sigma_yield,
     #Initialize the external applied tensile stress starting at zero
     
     sigmaext = 0.0 # External tensile load in this step (Pa)
-    
-    # Create K_I_ov_sigma_ext_vec and its surrogate
-    K_I_ov_sigma_ext = lambda a : scipy.integrate.quad(lambda u : weightfun_times_sqrt_aminx(u,a)/np.sqrt(a-u),0,a-weightfun_epsx)[0] + weightfun_times_sqrt_aminx(a,a)*2.0*sqrt(weightfun_epsx)
-    K_I_ov_sigma_ext_vect = np.vectorize(K_I_ov_sigma_ext)
-    K_I_ov_sigma_ext_eval=K_I_ov_sigma_ext_vect(x)
-    
-    # simple splrep surrogate
-    (t1,c1,k1) = sp.interpolate.splrep(x,K_I_ov_sigma_ext_eval)
 
+    if weightfun_times_sqrt_aminx is not None: 
+        # Create K_I_ov_sigma_ext_vec and its surrogate
+        K_I_ov_sigma_ext = lambda a : scipy.integrate.quad(lambda u : weightfun_times_sqrt_aminx(u,a)/np.sqrt(a-u),0,a-weightfun_epsx)[0] + weightfun_times_sqrt_aminx(a,a)*2.0*sqrt(weightfun_epsx)
+        K_I_ov_sigma_ext_vect = np.vectorize(K_I_ov_sigma_ext)
+        K_I_ov_sigma_ext_eval=K_I_ov_sigma_ext_vect(x)
     
-    K_I_ov_sigma_ext_surrogate = lambda a: sp.interpolate.splev(a,(t1,c1,k1),ext=2)
+        # simple splrep surrogate
+        (t1,c1,k1) = sp.interpolate.splrep(x,K_I_ov_sigma_ext_eval)
 
-    x_fine=np.linspace(x[0],x[-1],x.shape[0]*4)
+        
+        K_I_ov_sigma_ext_surrogate = lambda a: sp.interpolate.splev(a,(t1,c1,k1),ext=2)
+        
+        x_fine=np.linspace(x[0],x[-1],x.shape[0]*4)
     
-    if diag_plots:
-        pl.figure()
-        pl.plot(x_fine,K_I_ov_sigma_ext_vect(x_fine),'-',
-                x_fine,K_I_ov_sigma_ext_surrogate(x_fine),'-')
-        pl.title("K$_I$ over sigma$_{ext}$")
-        pl.legend(("Direct","Surrogate"))
-        pass
-
-    if use_surrogate:
-        K_I_ov_sigma_ext_use = K_I_ov_sigma_ext_surrogate
+        if diag_plots:
+            pl.figure()
+            pl.plot(x_fine,K_I_ov_sigma_ext_vect(x_fine),'-',
+                    x_fine,K_I_ov_sigma_ext_surrogate(x_fine),'-')
+            pl.title("K$_I$ over sigma$_{ext}$")
+            pl.legend(("Direct","Surrogate"))
+            pass
+        
+        if use_surrogate:
+            K_I_ov_sigma_ext_use = K_I_ov_sigma_ext_surrogate
+            pass
+        else:
+            K_I_ov_sigma_ext_use = K_I_ov_sigma_ext_vect
+            pass
         pass
     else:
-        K_I_ov_sigma_ext_use = K_I_ov_sigma_ext_vect
+        # No weightfun
+        K_I_ov_sigma_ext_use = None
         pass
     
     
@@ -520,9 +547,17 @@ def solve_normalstress(x,x_bnd,sigma_closure,dx,sigmaext_max,a,E,nu,sigma_yield,
         si_nodivzero_nonegsqrt = x-a > 1e-10*a
         si_divzero = (x-a >= 0) & ~si_nodivzero_nonegsqrt
         
-        #sigma_increment = sigmaI_theta0_times_rootx_over_sqrt_a_over_sigmaext*(sigmaext_max-sigmaext)*sqrt(a)/sqrt(x-a)
+        #sigma_increment = sigmaI_theta0_times_rootr_over_sqrt_a_over_sigmaext*(sigmaext_max-sigmaext)*sqrt(a)/sqrt(x-a)
 
-        sigmaI_theta0_times_rootr_over_sqrt_a_over_sigmaext = (scipy.integrate.quad(lambda x: weightfun_times_sqrt_aminx(x,a)/np.sqrt(a-x),0,a-weightfun_epsx)[0] + weightfun_times_sqrt_aminx(a,a)*2.0*np.sqrt(weightfun_epsx)) / np.sqrt(2*pi*a)
+        if weightfun_times_sqrt_aminx is not None:
+            # Weight function
+            sigmaI_theta0_times_rootr_over_sqrt_a_over_sigmaext = (scipy.integrate.quad(lambda x: weightfun_times_sqrt_aminx(x,a)/np.sqrt(a-x),0,a-weightfun_epsx)[0] + weightfun_times_sqrt_aminx(a,a)*2.0*np.sqrt(weightfun_epsx)) / np.sqrt(2*pi*a)
+            pass
+        else:
+            # Simple formulas
+            sigmaI_theta0_times_rootx_over_sqrt_a_over_sigmaext = 1.0/sqrt(2.0)  # Per Suresh (9.43 and 9.44a) and Anderson (table 2.1)
+
+            pass
     
         sigma_increment[si_nodivzero_nonegsqrt] = sigmaI_theta0_times_rootr_over_sqrt_a_over_sigmaext*(sigmaext_max-sigmaext)*sqrt(a)/sqrt(x[si_nodivzero_nonegsqrt]-a)
         sigma_increment[si_divzero]=np.inf
@@ -594,7 +629,7 @@ if __name__=="__main__":
 
     weightfun_times_sqrt_aminx = lambda x,a : weightfun_through_times_sqrt_aminx(x,a,specimen_width)
     #weightfun_times_sqrt_aminx = lambda x,a : weightfun_basic_times_sqrt_aminx(x,a)
-    
+    # weightfun_times_sqrt_aminx = None # (simple K_I and displacement formulas)
 
     # x_bnd represents x coordinates of the boundaries of
     # each mesh element 
