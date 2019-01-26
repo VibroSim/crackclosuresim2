@@ -637,10 +637,14 @@ def weightfun_through_times_sqrt_aminx(x, a, w):
 # the center of the crack. Let x' = x-a -> x=x'+a
 # Now h(x') = \pm (1/sqrt(pi*a)) * sqrt((x'+a)/(2a-x'-a))
 #     h(x') = \pm (1/sqrt(pi*a)) * sqrt((x'+a)/(a-x'))
+#
+#def weightfun_basic_times_sqrt_aminx(x,a):
+#    return np.sqrt(1.0/(np.pi*a))*np.sqrt((a+x))
 
+# Corrected basic weight function.
+# See corrected_tunnelcrack_weightfun.pdf
 def weightfun_basic_times_sqrt_aminx(x,a):
-    return np.sqrt(1.0/(np.pi*a))*np.sqrt((a+x))
-
+    return (1.0/np.sqrt(np.pi))*np.sqrt(a)/np.sqrt(a+x)
 
 
 if __name__=="__main__":
