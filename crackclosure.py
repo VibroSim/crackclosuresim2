@@ -387,18 +387,18 @@ def tensile_displacement(sigma_applied,x,xt,E,nu,weightfun_times_sqrt_aminx,weig
         # we are using weightfunctions
 
         # New implementation with weight functions:
-        # m = (E'/K) du/da
-        # u = integral_x..xt  (K/E') m(x,a) da 
-        # u = integral_x..xt  (K/E') M(x,a)/sqrt(a-x) da 
+        # m = (E'/2K) du/da   (Anderson, Fracture Mechanics, eq. 2.50 and Rice (1972) eq. 13
+        # u = integral_x..xt  (2K/E') m(x,a) da 
+        # u = integral_x..xt  (2K/E') M(x,a)/sqrt(a-x) da 
         
         # need K... well from above         K_I(a) = sigma_ext * [ integral_0^(a-epsilon) M(u,a)/sqrt(a-u) du + M(a,a)*2sqrt(epsilon) ]
-        # u = (1.0/E') * integral_x..xt  K_I(a) M(x,a)/sqrt(a-x) da 
-        # u = (1.0/E') * [ integral_x..(x+epsilon)  K_I(a) M(x,a)/sqrt(a-x) da  + integral_(x+epsilon)..xt K_I(a) M(x,a)/sqrt(a-x) da ]
-        # u = (1.0/E') * [ K_I(x) M(x,x) integral_x..(x+epsilon) 1.0/sqrt(a-x) da  + integral_(x+epsilon)..xt K_I(a) M(x,a)/sqrt(a-x) da ]
+        # u = (2.0/E') * integral_x..xt  K_I(a) M(x,a)/sqrt(a-x) da 
+        # u = (2.0/E') * [ integral_x..(x+epsilon)  K_I(a) M(x,a)/sqrt(a-x) da  + integral_(x+epsilon)..xt K_I(a) M(x,a)/sqrt(a-x) da ]
+        # u = (2.0/E') * [ K_I(x) M(x,x) integral_x..(x+epsilon) 1.0/sqrt(a-x) da  + integral_(x+epsilon)..xt K_I(a) M(x,a)/sqrt(a-x) da ]
         #
         # as above we can evaluate the left hand integral to be 2*sqrt(epsilon)
         # so 
-        # u = (1.0/E') * [ K_I(x) M(x,x) 2*sqrt(epsilon)  + integral_(x+epsilon)..a K_I(a) M(x,a)/sqrt(a-x) da ]
+        # u = (2.0/E') * [ K_I(x) M(x,x) 2*sqrt(epsilon)  + integral_(x+epsilon)..a K_I(a) M(x,a)/sqrt(a-x) da ]
         #
         # NOTE: POSSIBLE PROBLEM... Should be dependent on nu? (Poisson's ratio?) 
         
@@ -407,9 +407,9 @@ def tensile_displacement(sigma_applied,x,xt,E,nu,weightfun_times_sqrt_aminx,weig
 
         right_integral_vect = np.vectorize(right_integral)
         
-        # !!!*** NOTE: Need to replace Eff by E/(1-nu^2) for plane strain case  (Eeff is just E for plane stress)
+        # !!!*** NOTE: Need to replace Eeff by E/(1-nu^2) for plane strain case  (Eeff is just E for plane stress)?
         Eeff = E
-        u = (sigma_applied/Eeff) * ( K_I_ov_sigma_ext_vect(x)*weightfun_times_sqrt_aminx(x,x)*2.0*np.sqrt(weightfun_epsx) + right_integral_vect(x))
+        u = (2.0*sigma_applied/Eeff) * ( K_I_ov_sigma_ext_vect(x)*weightfun_times_sqrt_aminx(x,x)*2.0*np.sqrt(weightfun_epsx) + right_integral_vect(x))
         
 
         pass
@@ -608,12 +608,29 @@ def weightfun_through_times_sqrt_aminx(x, a, w):
 
     return (2.0/np.sqrt(2*np.pi))*(1.0+M1*scipy.sqrt(1.0-x/a)+M2*(1.0-x/a)+M3*(1.0-x/a)**1.5)
 
-# Basic weight function from Fett & Munz Stress Intensity Factors and Weight Functions eq. 1.2.5
+## Basic weight function from Fett & Munz Stress Intensity Factors and Weight Functions eq. 1.2.5
+# Equivalent to
+# Basic weight function from Anderson, Fracture Mechanics, Example 2.6 (page 57)
+# Weight function given as h(x) = \pm (1/sqrt(pi*a)) * sqrt(x/(2a-x))
+# ... But the coordinate frame is weird. From Fig 2.27 on page 58,
+# x=0 is at the other end of the crack (!) versus our origin is
+# the center of the crack. Let x' = x-a -> x=x'+a
+# Now h(x') = \pm (1/sqrt(pi*a)) * sqrt((x'+a)/(2a-x'-a))
+#     h(x') = \pm (1/sqrt(pi*a)) * sqrt((x'+a)/(a-x'))
+
 def weightfun_basic_times_sqrt_aminx(x,a):
     return np.sqrt(1.0/(np.pi*a))*np.sqrt((a+x))
 
 
+
 if __name__=="__main__":
+    # IDEA:
+    #   * Verify that with singularities factored out
+    #     Simple eulerian integration is accurate
+    #   * Do multi-dimensional integration by Eulerian
+    #     method
+    #  ... OR
+    #   * Create surrogates for inner integrals.
     
     
     #####INPUT VALUES
@@ -629,9 +646,9 @@ if __name__=="__main__":
     xmax = 5e-3 # as far out in x as we are calculating (m)
     xsteps = 200
 
-    weightfun_times_sqrt_aminx = lambda x,a : weightfun_through_times_sqrt_aminx(x,a,specimen_width)
+    #weightfun_times_sqrt_aminx = lambda x,a : weightfun_through_times_sqrt_aminx(x,a,specimen_width)
     #weightfun_times_sqrt_aminx = lambda x,a : weightfun_basic_times_sqrt_aminx(x,a)   # WARNING: weightfun_basic seems to be incorrect (?)
-    #weightfun_times_sqrt_aminx = None # (simple K_I and displacement formulas)
+    weightfun_times_sqrt_aminx = None # (simple K_I and displacement formulas)
 
     # x_bnd represents x coordinates of the boundaries of
     # each mesh element 
@@ -648,7 +665,7 @@ if __name__=="__main__":
     sigma_closure = 80e6/cos(x/a) -70e6 # Pa
     sigma_closure[x > a]=0.0
     
-    use_crackclosuresim=False
+    use_crackclosuresim=True
     if use_crackclosuresim:
         from scipy.interpolate import splrep
         import crackclosuresim.crack_utils_1D as cu1
