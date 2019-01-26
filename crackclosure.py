@@ -295,7 +295,7 @@ def integral_tensilestress_growing_effective_crack_length_byxt(x,sigmaext1,sigma
     return (use_xt2,sigmaext2,res)
 
 
-def solve_incremental_tensilestress(x,x_bnd,sigma,sigma_closure,tensile_displ,xt_idx,dx,sigmaext,sigmaext_max,a,E,nu,weightfun_times_sqrt_aminx,weightfun_epsx,K_I_ov_sigma_ext_vect):
+def solve_incremental_tensilestress(x,x_bnd,sigma,sigma_closure,tensile_displ,xt_idx,dx,sigmaext,sigmaext_max,a,Eeff,nu,weightfun_times_sqrt_aminx,weightfun_epsx,K_I_ov_sigma_ext_vect):
     """The overall crack opening constraint is that
     (tensile load on crack surface) > 0 to open
     For a through-crack of thickness h, short segment of width dx
@@ -369,7 +369,7 @@ def solve_incremental_tensilestress(x,x_bnd,sigma,sigma_closure,tensile_displ,xt
         incremental_displacement = np.zeros(x.shape[0],dtype='d')
         xt = (x_bnd[xt_idx]+use_xt2)/2.0
         left_of_effective_tip = (x < xt)
-        incremental_displacement[left_of_effective_tip] = tensile_displacement(sigmaext2-sigmaext,x[left_of_effective_tip],xt,E,nu,weightfun_times_sqrt_aminx,weightfun_epsx,K_I_ov_sigma_ext_vect)
+        incremental_displacement[left_of_effective_tip] = tensile_displacement(sigmaext2-sigmaext,x[left_of_effective_tip],xt,Eeff,nu,weightfun_times_sqrt_aminx,weightfun_epsx,K_I_ov_sigma_ext_vect)
         pass
     else:
         # No closure stress at this point, or sigma is already at the limit
@@ -387,7 +387,7 @@ def solve_incremental_tensilestress(x,x_bnd,sigma,sigma_closure,tensile_displ,xt
 
 #####TENSILE DISPLACEMENT FUNCTION
 
-def tensile_displacement(sigma_applied,x,xt,E,nu,weightfun_times_sqrt_aminx,weightfun_epsx,K_I_ov_sigma_ext_vect):
+def tensile_displacement(sigma_applied,x,xt,Eeff,nu,weightfun_times_sqrt_aminx,weightfun_epsx,K_I_ov_sigma_ext_vect):
     ##plane stress is considered
 
     if weightfun_times_sqrt_aminx is not None:
@@ -415,7 +415,7 @@ def tensile_displacement(sigma_applied,x,xt,E,nu,weightfun_times_sqrt_aminx,weig
         right_integral_vect = np.vectorize(right_integral)
         
         # !!!*** NOTE: Need to replace Eeff by E/(1-nu^2) for plane strain case  (Eeff is just E for plane stress)?
-        Eeff = E
+        #Eeff = E
         u = (2.0*sigma_applied/Eeff) * ( K_I_ov_sigma_ext_vect(x)*weightfun_times_sqrt_aminx(x,x)*2.0*np.sqrt(weightfun_epsx) + right_integral_vect(x))
         
 
@@ -437,7 +437,7 @@ def tensile_displacement(sigma_applied,x,xt,E,nu,weightfun_times_sqrt_aminx,weig
         # uy = 2(sigma/Eeff)*sqrt(a^2-x^2)
         # uy = 2(sigma/Eeff)*sqrt((a+x)(a-x))
         
-        Eeff = E
+        #Eeff = E
         u = (2*sigma_applied/Eeff)*np.sqrt((xt+x)*(xt-x))
         
         pass
@@ -450,7 +450,7 @@ def tensile_displacement(sigma_applied,x,xt,E,nu,weightfun_times_sqrt_aminx,weig
     return u
 
 
-def solve_normalstress(x,x_bnd,sigma_closure,dx,sigmaext_max,a,E,nu,sigma_yield,weightfun_times_sqrt_aminx,weightfun_epsx,use_surrogate,verbose=False, diag_plots=False):
+def solve_normalstress(x,x_bnd,sigma_closure,dx,sigmaext_max,a,Eeff,nu,sigma_yield,weightfun_times_sqrt_aminx,weightfun_epsx,use_surrogate,verbose=False, diag_plots=False):
     #Initialize the external applied tensile stress starting at zero
     
     sigmaext = 0.0 # External tensile load in this step (Pa)
@@ -537,7 +537,7 @@ def solve_normalstress(x,x_bnd,sigma_closure,dx,sigmaext_max,a,E,nu,sigma_yield,
     
     while not done: 
         
-        (use_xt2,sigmaext, sigma, tensile_displ) = solve_incremental_tensilestress(x,x_bnd,sigma,sigma_closure,tensile_displ,xt_idx,dx,sigmaext,sigmaext_max,a,E,nu,weightfun_times_sqrt_aminx,weightfun_epsx,K_I_ov_sigma_ext_use)
+        (use_xt2,sigmaext, sigma, tensile_displ) = solve_incremental_tensilestress(x,x_bnd,sigma,sigma_closure,tensile_displ,xt_idx,dx,sigmaext,sigmaext_max,a,Eeff,nu,weightfun_times_sqrt_aminx,weightfun_epsx,K_I_ov_sigma_ext_use)
         
         
         if use_xt2 < x_bnd[xt_idx+1] or sigmaext==sigmaext_max or use_xt2 >= a:
@@ -592,7 +592,7 @@ def solve_normalstress(x,x_bnd,sigma_closure,dx,sigmaext_max,a,E,nu,sigma_yield,
 
         # record increment in displacement
         left_of_effective_tip = x < a
-        tensile_displ[left_of_effective_tip] += tensile_displacement(sigmaext_max-sigmaext,x[left_of_effective_tip],a,E,nu,weightfun_times_sqrt_aminx,weightfun_epsx,K_I_ov_sigma_ext_use)
+        tensile_displ[left_of_effective_tip] += tensile_displacement(sigmaext_max-sigmaext,x[left_of_effective_tip],a,Eeff,nu,weightfun_times_sqrt_aminx,weightfun_epsx,K_I_ov_sigma_ext_use)
         
         # Record increment in sigmaext
         sigmaext = sigmaext_max
@@ -659,6 +659,7 @@ if __name__=="__main__":
     
     #####INPUT VALUES
     E = 200e9    #Plane stress Modulus of Elasticity
+    Eeff=E
     sigma_yield = 400e6
     tau_yield = sigma_yield/2.0 # limits stress concentration around singularity
     nu = 0.33    #Poisson's Ratio
@@ -712,7 +713,7 @@ if __name__=="__main__":
         
         pass
     
-    (effective_length, sigma, tensile_displ) = solve_normalstress(x,x_bnd,sigma_closure,dx,sigmaext_max,a,E,nu,sigma_yield,weightfun_times_sqrt_aminx,weightfun_epsx,True,verbose=True,diag_plots=True)
+    (effective_length, sigma, tensile_displ) = solve_normalstress(x,x_bnd,sigma_closure,dx,sigmaext_max,a,Eeff,nu,sigma_yield,weightfun_times_sqrt_aminx,weightfun_epsx,True,verbose=True,diag_plots=True)
     
     (fig,ax1) = pl.subplots()
     legax=[]
@@ -768,7 +769,7 @@ if __name__=="__main__":
         pass
 
     
-    (effective_length2, sigma2, tensile_displ2) = solve_normalstress(x,x_bnd,sigma_closure2,dx,sigmaext_max,a,E,nu,sigma_yield,weightfun_times_sqrt_aminx,weightfun_epsx,True,verbose=True)
+    (effective_length2, sigma2, tensile_displ2) = solve_normalstress(x,x_bnd,sigma_closure2,dx,sigmaext_max,a,Eeff,nu,sigma_yield,weightfun_times_sqrt_aminx,weightfun_epsx,True,verbose=True)
 
     (fig2,ax21) = pl.subplots()
     legax=[]
@@ -824,7 +825,7 @@ if __name__=="__main__":
         pass
     
     
-    (effective_length3, sigma3, tensile_displ3) = solve_normalstress(x,x_bnd,sigma_closure3,dx,sigmaext_max,a,E,nu,sigma_yield,weightfun_times_sqrt_aminx,weightfun_epsx,True,verbose=True)
+    (effective_length3, sigma3, tensile_displ3) = solve_normalstress(x,x_bnd,sigma_closure3,dx,sigmaext_max,a,Eeff,nu,sigma_yield,weightfun_times_sqrt_aminx,weightfun_epsx,True,verbose=True)
 
     (fig3,ax31) = pl.subplots()
     legax=[]
