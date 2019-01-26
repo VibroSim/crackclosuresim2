@@ -240,8 +240,8 @@ def integral_tensilestress_growing_effective_crack_length_byxt(x,sigmaext1,sigma
 
 
     if weightfun_times_sqrt_aminx is not None:    
-        # sigmaI_theta0_times_rootr_over_sqrt_a_over_sigmaext = ([ integral_0^(a-epsilon) M(x,a)/sqrt(a-x) dx + M(a,a)*2sqrt(epsilon) ] / sqrt(2*pi)) # Per Suresh (9.43 and 9.44a) and Anderson (table 2.1)
-        sigmaI_theta0_times_rootr_over_sqrt_a_over_sigmaext = (scipy.integrate.quad(lambda x: weightfun_times_sqrt_aminx(x,xtavg)/np.sqrt(xtavg-x),0,xtavg-weightfun_epsx)[0] + weightfun_times_sqrt_aminx(xtavg,xtavg)*2.0*np.sqrt(weightfun_epsx)) / (np.sqrt(2*pi*xtavg))
+        # sigmaI_theta0_times_rootr_over_sqrt_a_over_sigmaext = ([ integral_-a^(a-epsilon) M(x,a)/sqrt(a-x) dx + M(a,a)*2sqrt(epsilon) ] / sqrt(2*pi)) 
+        sigmaI_theta0_times_rootr_over_sqrt_a_over_sigmaext = (scipy.integrate.quad(lambda x: weightfun_times_sqrt_aminx(x,xtavg)/np.sqrt(xtavg-x),-xtavg,xtavg-weightfun_epsx)[0] + weightfun_times_sqrt_aminx(xtavg,xtavg)*2.0*np.sqrt(weightfun_epsx)) / (np.sqrt(2*pi*xtavg))
         # unit check: (should be unitless)
         # Integral of stress*weight function*dx = SIF (i.e. stress*sqrt(meters))
         # units of weight function = 1/sqrt(meters)
@@ -261,10 +261,23 @@ def integral_tensilestress_growing_effective_crack_length_byxt(x,sigmaext1,sigma
         sigmaI_theta0_times_rootr_over_sqrt_a_over_sigmaext = 1.0/sqrt(2.0)  # Per Suresh (9.43 and 9.44a) and Anderson (table 2.1)
 
         pass
-    # sigmaI_theta0_times_rootr_over_sqrt_a_over_sigmaext
-    # evaluated via basic weightfunction comes out to ~0.58
-    # whereas from simple formula had constant of 1/sqrt(2) = .707 (!)
-    #  Conclusion: basic weightfunction from Fett & Munz may be off (?)
+    # KI/(sigma_ext*sqrt(a))    
+    # evaluated from basic formula: 
+    #  KI = sigma_ext * sqrt(pi*a)   from Suresh
+    #  KI/(sigma_ext*sqrt(a)) = sqrt(pi) = 1.77
+
+    # KI/(sigma_ext*sqrt(a))    
+    # evaluated via basic weightfunction:
+    # KI/(sigma_ext*sqrt(a)) = (integral of the weightfunction from -a..a)/(sigma_ext*sqrt(a))    
+    #
+    #  For basic weightfunction from Fett and Munz: 
+    #  m = sqrt(1/(pi*a)) * sqrt(a+x)/sqrt(a-x)
+    # This would be: (1/(a*sqrt(pi))) integral_-a^a sqrt(a+x)/sqrt(a-x) dx
+    # let u = x/a; du = dx/a -> dx=a*du
+    #   This would be: (1/(a*sqrt(pi))) integral_-1^1 sqrt(a+au)/sqrt(a-au) a*du
+    #   This would be: (1/(sqrt(pi))) integral_-1^1 sqrt(1+u)/sqrt(1-u) du
+    #  ... = (1/sqrt(pi)) * pi = sqrt(pi) by wolfram alpha ... CHECK!
+ 
 
     # This is the (integral of the weightfunction from 0..a)/sqrt(2*pi*a)
     # For basic weightfunction: sqrt(1/(pi*a)) * sqrt(a+x)/sqrt(a-x)
@@ -437,7 +450,7 @@ def solve_normalstress(x,x_bnd,sigma_closure,dx,sigmaext_max,a,E,nu,sigma_yield,
 
     if weightfun_times_sqrt_aminx is not None: 
         # Create K_I_ov_sigma_ext_vec and its surrogate
-        K_I_ov_sigma_ext = lambda a : scipy.integrate.quad(lambda u : weightfun_times_sqrt_aminx(u,a)/np.sqrt(a-u),0,a-weightfun_epsx)[0] + weightfun_times_sqrt_aminx(a,a)*2.0*sqrt(weightfun_epsx)
+        K_I_ov_sigma_ext = lambda a : scipy.integrate.quad(lambda u : weightfun_times_sqrt_aminx(u,a)/np.sqrt(a-u),-a,a-weightfun_epsx)[0] + weightfun_times_sqrt_aminx(a,a)*2.0*sqrt(weightfun_epsx)
         K_I_ov_sigma_ext_vect = np.vectorize(K_I_ov_sigma_ext)
         K_I_ov_sigma_ext_eval=K_I_ov_sigma_ext_vect(x)
     
@@ -552,7 +565,7 @@ def solve_normalstress(x,x_bnd,sigma_closure,dx,sigmaext_max,a,E,nu,sigma_yield,
 
         if weightfun_times_sqrt_aminx is not None:
             # Weight function
-            sigmaI_theta0_times_rootr_over_sqrt_a_over_sigmaext = (scipy.integrate.quad(lambda x: weightfun_times_sqrt_aminx(x,a)/np.sqrt(a-x),0,a-weightfun_epsx)[0] + weightfun_times_sqrt_aminx(a,a)*2.0*np.sqrt(weightfun_epsx)) / np.sqrt(2*pi*a)
+            sigmaI_theta0_times_rootr_over_sqrt_a_over_sigmaext = (scipy.integrate.quad(lambda x: weightfun_times_sqrt_aminx(x,a)/np.sqrt(a-x),-a,a-weightfun_epsx)[0] + weightfun_times_sqrt_aminx(a,a)*2.0*np.sqrt(weightfun_epsx)) / np.sqrt(2*pi*a)
             pass
         else:
             # Simple formulas
