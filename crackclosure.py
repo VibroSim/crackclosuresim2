@@ -385,14 +385,8 @@ def solve_incremental_tensilestress(x,x_bnd,sigma,sigma_closure,tensile_displ,xt
     
 
 
-#####TENSILE DISPLACEMENT FUNCTION 
-#A function for tensile displacement was obtained from Suresh (9.44b)
-#This function calculated the displacement in the y direction, uy, 
-#in Mode I. This is for a semi-infinite crack in an infinite plate
-#of an isotropic and homogeneous solid 
-#NOTE: This function will always produce uy=0 for theta equals 0. 
-#This is because sin(0)=0 and the function is multiplied completely
-#by this. 
+#####TENSILE DISPLACEMENT FUNCTION
+
 def tensile_displacement(sigma_applied,x,xt,E,nu,weightfun_times_sqrt_aminx,weightfun_epsx,K_I_ov_sigma_ext_vect):
     ##plane stress is considered
 
@@ -426,13 +420,26 @@ def tensile_displacement(sigma_applied,x,xt,E,nu,weightfun_times_sqrt_aminx,weig
         
 
         pass
-    else: 
-        Kappa = (3.0-nu)/(1.0+nu)
+    else:
+        # Non weightfunction method:
+
+        # Old method: Based on Suresh eq. 9.45.
+        # The problem with the old method is it is based
+        # on a near-tip approximation
+        #Kappa = (3.0-nu)/(1.0+nu)
+        #
+        #KI = sigma_applied*np.sqrt(np.pi*(xt))
+        #theta = np.pi
+        #u = (KI/(2.0*E))*(np.sqrt((xt-x)/(2.0*np.pi)))*((1.0+nu)* 
+        #                                                (((2.0*Kappa+1.0)*(np.sin(theta/2.0)))-np.sin(3.0*theta/2.0)))
+
+        # New Method: Based on Anderson, eq. A2.43
+        # uy = 2(sigma/Eeff)*sqrt(a^2-x^2)
+        # uy = 2(sigma/Eeff)*sqrt((a+x)(a-x))
         
-        KI = sigma_applied*np.sqrt(np.pi*(xt))
-        theta = np.pi
-        u = (KI/(2.0*E))*(np.sqrt((xt-x)/(2.0*np.pi)))*((1.0+nu)* 
-                                                        (((2.0*Kappa+1.0)*(np.sin(theta/2.0)))-np.sin(3.0*theta/2.0)))
+        Eeff = E
+        u = (2*sigma_applied/Eeff)*np.sqrt((xt+x)*(xt-x))
+        
         pass
     
     #if (xt > 1e-3):
