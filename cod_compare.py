@@ -7,6 +7,54 @@ if __name__=="__main__":
     pl.rc('text', usetex=True) # Support greek letters in plot legend
     pass
 
+# What happens when we nondimensionalize crack opening displacement?
+# uy = 2(sigma/Eeff)*sqrt(a^2-x^2)
+#  Let xbar=x/a -> x=xbar a
+# uy = 2(sigma/Eeff)*sqrt(a^2-(xbar^2)(a^2))
+# uy = 2(sigma/Eeff)*a*sqrt(1-xbar^2)
+# ... we get a dimensionless functional form, e.g. sqrt(1-xbar^2)
+# Let the functional form be represented as f(xbar).
+# Now uy = 2(sigma/Eeff)*a*f(xbar), where in this case f(xbar)=sqrt(1-xbar^2)
+
+# There must also be an analogous dimensionless functional form
+# for the surface COD of a semicircular crack. Since elasticity
+# is scale independent, it is just a different f(xbar).
+#
+# (for an elliptical crack, f would also have an aspect ratio
+# parameter, but let us ignore that -- or hold it constant --
+# for now)
+#
+# Likewise the stress intensity factor for a
+# semicircular surface crack must have the form
+#  K = sigma sqrt(pi*a*beta)
+#
+# OK. How do
+# Weight function = (Eeff/2K) du/da
+# h(x,a) = Eeff/(2*sigma*sqrt(pi*a*beta))*du/da
+# h(x,a) = Eeff/(2*sigma*sqrt(pi*a*beta))*2*(sigma/Eeff)*(d/da)(a*sqrt(1-xbar^2))
+# h(x,a) = 1/(sqrt(pi*a*beta))*(d/da)(a*f(xbar))
+# let hbar(x,a) = h(x,a)*sqrt(a)
+# hbar(x,a)/sqrt(a) = 1/(sqrt(pi*a*beta))*(d/da)(a*f(xbar))
+# hbar(x,a) = 1/(sqrt(pi*beta))*(d/da)(a*f(xbar))
+#  ... what about d/da(a*f(xbar)) ? 
+#  ... product rule: = 1*f(xbar) + a*(d/da)(f(xbar))
+#                    = 1*f(xbar) + a*(d/dxbar)(f(xbar)) * dxbar/da
+# since xbar = x/a = x*a^-1, dxbar/da = -xa^-2
+#   denote (d/dxbar)(f(xbar)) as f'(xbar)
+# now derivative  factor = 1*f(xbar) + a*f'(xbar)*(-x/a^2)
+#                        = f(xbar) - (x/a) f'(xbar)
+#                        = f(xbar) - xbar*f'(xbar)
+# So hbar(x,a) = 1/(sqrt(pi*beta))*[ f(xbar) - xbar*f'(xbar) ]
+#
+# Therefore if we can get (a) the surface COD function and its derivative
+# and (b) the stress intensity factor fudge factor beta,
+# we have a weight function and we are done!
+#
+# ... applies to both normal and shear loading.
+
+
+
+
 # OLD formula valid near crack tip
 #Kappa = (3.0-nu)/(1.0+nu)
 #
