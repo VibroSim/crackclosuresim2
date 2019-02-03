@@ -10,6 +10,75 @@ if __name__=="__main__":
     pass
 
 
+class ModeII_crack_model(object):
+    # abstract class
+    #
+    # Implementations should define:
+    #  * methods: 
+    #    * eval_tauII_theta0_times_rootr_over_sqrt_a_over_tauext(self,a)
+    #    * evaluate_ModeII_CSD_vectorized(self,tau_applied,x,xt)  # should be vectorized over x (not necessarily xt)
+    pass
+
+
+class ModeII_Beta_CSD_Formula(ModeII_crack_model):
+    """This represents a crack model where we are given a formula
+    for K_II of the form K_II = tau*sqrt(pi*a*beta), and
+    CSD is a function ut(object,surface_position,surface_length). 
+    (ut for tangent displacement)
+
+
+    You can add member variables (which will be accessible from 
+    the u function) by providing them as keyword arguments to 
+    the constructor. 
+
+    At minimum you must provide a function:
+       ut(object,surface_position,surface_length)  
+       which should be vectorized over surface position, and a function
+       beta(object), which return the COD and beta values respectively. 
+       (beta is a function, so you can set it up so that the crack model
+       will work correctly if its attribute parameters are updated)
+
+"""
+
+    ut=None
+    beta=None
+    
+    def __init__(self,**kwargs):
+        if "ut" not in kwargs:
+            raise ValueError("Must provide COD function u(object,sigma_applied,surface_position,surface_length)")
+
+        if "beta" not in kwargs:
+            raise ValueError("Must provide K coefficient beta(object)")
+        
+
+        for kwarg in kwargs:
+            setattr(self,kwarg,kwargs[kwarg])
+            pass
+
+        pass
+
+    def eval_tauII_theta0_times_rootr_over_sqrt_a_over_tauext(self,a):
+        # For a shear crack with the tip at the origin, intact material
+        # to the right (x > 0), broken material to the left (x < 0)
+        # The shear stress @ theta=0 multiplied by sqrt(x)/(sqrt(a)*tauext)
+        # where x ( > 0) is the position where the stress is measured,
+        # a is the (half) length of the crack, and tauext
+        # is the external shear load
+
+        # Per Suresh (9.47a) and Anderson (table 2.1)
+        # Based on K_II=(tau_ext*sqrt(pi*a*beta))
+        # instead of  K_II=(tau_ext*sqrt(pi*a))
+
+        tauII_theta0_times_rootr_over_sqrt_a_over_tauext = sqrt(self.beta(self))/sqrt(2.0)  
+                
+        return tauII_theta0_times_rootr_over_sqrt_a_over_tauext
+
+    def eval_ModeII_CSD_vectorized(self,sigma_applied,x,xt):
+        return self.ut(self,sigma_applied,x,xt)
+    
+    
+    pass
+
 
 
 
@@ -41,7 +110,7 @@ def indef_integral_of_simple_squareroot_quotients(a,u):
 
 
 
-def integral_shearstress_growing_effective_crack_length_byxt(x,tauext1,tauext_max,F,xt1,xt2):
+def integral_shearstress_growing_effective_crack_length_byxt(x,tauext1,tauext_max,F,xt1,xt2,crack_model):
     """ Evaluate the incremental shear stress field on a shear crack
     that is growing in effective length from xt1 to xt2 due to an external 
     load (previous value tauextp, limiting value tauext_max)
@@ -170,7 +239,6 @@ def integral_shearstress_growing_effective_crack_length_byxt(x,tauext1,tauext_ma
     # a is the (half) length of the crack, and tauext
     # is the external shear load
 
-    tauII_theta0_times_rootr_over_sqrt_a_over_tauext = 1.0/sqrt(2.0)  # Per Suresh (9.47a) and Anderson (table 2.1)
 
     tauext2 = tauext1 + (xt2-xt1)*F
 
@@ -199,7 +267,9 @@ def integral_shearstress_growing_effective_crack_length_byxt(x,tauext1,tauext_ma
 
     nonzero = x > xt1
 
+    xtavg=(xt1+use_xt2)/2.0
     
+    tauII_theta0_times_rootr_over_sqrt_a_over_tauext = crack_model.eval_tauII_theta0_times_rootr_over_sqrt_a_over_tauext(xtavg) 
     
     res[nonzero] = F*(upper_bound[nonzero]-xt1) + (tauII_theta0_times_rootr_over_sqrt_a_over_tauext*F) * (indef_integral_of_simple_squareroot_quotients(x[nonzero],upper_bound[nonzero]) - indef_integral_of_simple_squareroot_quotients(x[nonzero],xt1))
 
@@ -208,7 +278,7 @@ def integral_shearstress_growing_effective_crack_length_byxt(x,tauext1,tauext_ma
     return (use_xt2,tauext2,res)
 
 
-def solve_incremental_shearstress(x,x_bnd,tau,sigma_closure,shear_displ,xt_idx,dx,tauext,tauext_max,a,mu,E,nu):
+def solve_incremental_shearstress(x,x_bnd,tau,sigma_closure,shear_displ,xt_idx,dx,tauext,tauext_max,a,crack_model,calculate_displacements=True):
     """The overall frictional slip constraint is that
     F <= mu*N
     For a through-crack of thickness h, short segment of width dx
@@ -245,7 +315,7 @@ def solve_incremental_shearstress(x,x_bnd,tau,sigma_closure,shear_displ,xt_idx,d
         pass
     
     def obj_fcn(F):
-        (use_xt2,tauext2,tau_increment)=integral_shearstress_growing_effective_crack_length_byxt(x,tauext,tauext_max,F,x_bnd[xt_idx],next_bound)
+        (use_xt2,tauext2,tau_increment)=integral_shearstress_growing_effective_crack_length_byxt(x,tauext,tauext_max,F,x_bnd[xt_idx],next_bound,crack_model)
         return (tau+tau_increment - mu*sigma_closure)[xt_idx]
 
     # F measures the closure gradient in (Pascals external shear stress / meters of tip motion)
@@ -273,13 +343,15 @@ def solve_incremental_shearstress(x,x_bnd,tau,sigma_closure,shear_displ,xt_idx,d
             F = scipy.optimize.brentq(obj_fcn,0.0,Fbnd,disp=True)
             pass
         
-        (use_xt2,tauext2,tau_increment)=integral_shearstress_growing_effective_crack_length_byxt(x,tauext,tauext_max,F,x_bnd[xt_idx],next_bound)
+        (use_xt2,tauext2,tau_increment)=integral_shearstress_growing_effective_crack_length_byxt(x,tauext,tauext_max,F,x_bnd[xt_idx],next_bound,crack_model)
 
         # For displacement calculate at x centers... use average of left and right boundaries, except for (perhaps) last point where instead of the right boundary we use the actual tip.
-        incremental_displacement = np.zeros(x.shape[0],dtype='d')
-        xt = (x_bnd[xt_idx]+use_xt2)/2.0
-        left_of_effective_tip = (x < xt)
-        incremental_displacement[left_of_effective_tip] = shear_displacement(tauext2-tauext,x[left_of_effective_tip],xt,E,nu)
+        if calculate_displacements:
+            incremental_displacement = np.zeros(x.shape[0],dtype='d')
+            xt = (x_bnd[xt_idx]+use_xt2)/2.0
+            left_of_effective_tip = (x < xt)
+            incremental_displacement[left_of_effective_tip] = shear_displacement(tauext2-tauext,x[left_of_effective_tip],xt,crack_model)
+            pass
         pass
     else:
         # No closure stress at this point, or tau is already at the limit
@@ -296,8 +368,18 @@ def solve_incremental_shearstress(x,x_bnd,tau,sigma_closure,shear_displ,xt_idx,d
         tauext2 = tauext
         tau_increment = np.zeros(x.shape[0],dtype='d')
         incremental_displacement = np.zeros(x.shape[0],dtype='d')
+        pass
+    
+    if calculate_displacements:
+        ret_displ = shear_displ+incremental_displacement
+        pass
+    else:
+        ret_displ=None
+        pass
+
+
         
-    return (use_xt2,tauext2, tau+tau_increment, shear_displ+incremental_displacement)
+    return (use_xt2,tauext2, tau+tau_increment, ret_displ)
     
     
 
@@ -318,21 +400,19 @@ def solve_incremental_shearstress(x,x_bnd,tau,sigma_closure,shear_displ,xt_idx,d
 #displacment would have no real meaning really, so nan is 
 #sufficient because something is wrong at that point.
 # sdh 11/4/18 -- we're really interested here in theta=pi
-#                here, I think... should verify!!! ***
-def shear_displacement(tau_applied,x,xt,E,nu):
-    #plane stress is considered
-    Kappa = (3.0-nu)/(1.0+nu)
-    KII = tau_applied*np.sqrt(np.pi*(xt))
-    if (xt-x < 0).any():
-        #sys.modules["__main__"].__dict__.update(globals())
-        #sys.modules["__main__"].__dict__.update(locals())
-        raise ValueError("Shear displacement to right of crack tip")
-    theta = np.pi
-    return (KII/(2.0*E))*(np.sqrt((xt-x)/(2.0*np.pi)))*((1.0+nu)* \
-    (((2.0*Kappa+3.0)*(np.sin(theta/2.0)))+(np.sin(3.0*theta/2.0))))
+#                here, I think... (verified)
+def shear_displacement(tau_applied,x,xt,crack_model):
+    ##plane stress is considered
+    #Kappa = (3.0-nu)/(1.0+nu)
+    #KII = tau_applied*np.sqrt(np.pi*(xt))
+    #theta = np.pi
+    #return (KII/(2.0*E))*(np.sqrt((xt-x)/(2.0*np.pi)))*((1.0+nu)* \
+    # (((2.0*Kappa+3.0)*(np.sin(theta/2.0)))+(np.sin(3.0*theta/2.0))))
+    ut = crack_model.eval_ModeII_CSD_vectorized(tau_applied,x,xt)
+    return ut
 
 
-def solve_shearstress(x,x_bnd,sigma_closure,dx,tauext_max,a,mu,E,nu,tau_yield,verbose=False):
+def solve_shearstress(x,x_bnd,sigma_closure,dx,tauext_max,a,mu,tau_yield,crack_model,verbose=False,calculate_displacements=True):
     #Initialize the external applied dynamic shear stress starting at zero
     
     tauext = 0.0 # External shear load in this step (Pa)
@@ -344,9 +424,14 @@ def solve_shearstress(x,x_bnd,sigma_closure,dx,tauext_max,a,mu,E,nu,tau_yield,ve
     #Initialize shear stress field (function of x)
     tau = np.zeros(x.shape,dtype='d')
     
-    #Initialized the Displacement state as zero
-    shear_displ = np.zeros(x.shape,dtype='d')
-
+    #Initialize the Displacement state as zero
+    if calculate_displacements:
+        shear_displ = np.zeros(x.shape,dtype='d')
+        pass
+    else:
+        shear_displ = None
+        pass
+    
     #Initialize x step counter
     xt_idx = 0
 
@@ -385,7 +470,7 @@ def solve_shearstress(x,x_bnd,sigma_closure,dx,tauext_max,a,mu,E,nu,tau_yield,ve
 
     while not done: 
         
-        (use_xt2,tauext, tau, shear_displ) = solve_incremental_shearstress(x,x_bnd,tau,sigma_closure,shear_displ,xt_idx,dx,tauext,tauext_max,a,mu,E,nu)
+        (use_xt2,tauext, tau, shear_displ) = solve_incremental_shearstress(x,x_bnd,tau,sigma_closure,shear_displ,xt_idx,dx,tauext,tauext_max,a,crack_model,calculate_displacements=calculate_displacements)
         
     
         if use_xt2 < x_bnd[xt_idx+1] or tauext==tauext_max or use_xt2 >= a:
@@ -396,7 +481,9 @@ def solve_shearstress(x,x_bnd,sigma_closure,dx,tauext_max,a,mu,E,nu,tau_yield,ve
         if verbose: 
             #Print what is happening in the loop
             print("Step: %d @ x=%f mm: %f MPa of shear held" % (xt_idx,x[xt_idx]*1e3,tauext/1e6))
-            print("Shear displacement @ x=%f mm: %f nm" % (x[0]*1e3, shear_displ[0]*1e9))
+            if calculate_displacements:
+                print("Shear displacement @ x=%f mm: %f nm" % (x[0]*1e3, shear_displ[0]*1e9))
+                pass
             pass
         
         xt_idx+=1
@@ -416,7 +503,7 @@ def solve_shearstress(x,x_bnd,sigma_closure,dx,tauext_max,a,mu,E,nu,tau_yield,ve
         ti_nodivzero_nonegsqrt = x-a > 1e-10*a
         ti_divzero = (x-a >= 0) & ~ti_nodivzero_nonegsqrt
         
-        tauII_theta0_times_rootr_over_sqrt_a_over_tauext = 1.0/sqrt(2.0)  # Per Suresh (9.47a) and Anderson (table 2.1)
+        tauII_theta0_times_rootr_over_sqrt_a_over_tauext = crack_model.eval_tauII_theta0_times_rootr_over_sqrt_a_over_tauext(a) 
 
         #tau_increment = tauII_theta0_times_rootr_over_sqrt_a_over_tauext*(tauext_max-tauext)*sqrt(a)/sqrt(x-a)
         # New (sigmaext_max - sigmaext) term is the incremental external  stress field beyond the tips added in addition to the stress contcentration effect
@@ -431,8 +518,9 @@ def solve_shearstress(x,x_bnd,sigma_closure,dx,tauext_max,a,mu,E,nu,tau_yield,ve
 
         # record increment in displacement
         left_of_effective_tip = x < a
-        shear_displ[left_of_effective_tip] += shear_displacement(tauext_max-tauext,x[left_of_effective_tip],a,E,nu)
-        
+        if calculate_displacements:
+            shear_displ[left_of_effective_tip] += shear_displacement(tauext_max-tauext,x[left_of_effective_tip],a,crack_model)
+            pass
         # Record increment in tauext
         tauext = tauext_max
 
@@ -454,7 +542,30 @@ def align_yaxis(ax1, v1, ax2, v2):
     _, dy = inv.transform((0, 0)) - inv.transform((0, y1-y2))
     miny, maxy = ax2.get_ylim()
     ax2.set_ylim(miny+dy, maxy+dy)
+    pass
 
+def ModeII_throughcrack_CSDformula(E,nu):
+    def ut(E,nu,tau_applied,x,xt):
+        # Non weightfunction method:
+
+        # ***!!! This could probably be improved by using
+        # the formula for crack surface displacement along
+        # the entire crack, not the near-tip formula
+        # used below
+        
+        #plane stress is considered
+        Kappa = (3.0-nu)/(1.0+nu)
+        KII = tau_applied*np.sqrt(np.pi*(xt))
+        theta = np.pi
+        ut = (KII/(2.0*E))*(np.sqrt((xt-x)/(2.0*np.pi)))*((1.0+nu)* (((2.0*Kappa+3.0)*(np.sin(theta/2.0)))+(np.sin(3.0*theta/2.0))))
+        
+        return ut
+    
+    
+    return ModeII_Beta_CSD_Formula(E=E,
+                                   nu=nu,
+                                   beta=lambda obj: 1.0,
+                                   ut = lambda obj,tau_applied,x,xt: ut(obj.E,obj.nu,tau_applied,x,xt))
 
 if __name__=="__main__":
     #####INPUT VALUES
@@ -479,13 +590,16 @@ if __name__=="__main__":
     
     #Friction coefficient
     mu = 0.33
+
+    crack_model=ModeII_throughcrack_CSDformula(E,nu)
+
     
     # Closure state (function of position; positive compression)
     sigma_closure = 80e6/cos(x/a) -70e6 # Pa
     sigma_closure[x > a]=0.0
 
 
-    (effective_length, tau, shear_displ) = solve_shearstress(x,x_bnd,sigma_closure,dx,tauext_max,a,mu,E,nu,tau_yield,verbose=True)
+    (effective_length, tau, shear_displ) = solve_shearstress(x,x_bnd,sigma_closure,dx,tauext_max,a,mu,tau_yield,crack_model,verbose=True)
 
     (fig,ax1) = pl.subplots()
     (pl1,pl2,pl3)=ax1.plot(x*1e3,sigma_closure/1e6,'-',
@@ -511,7 +625,7 @@ if __name__=="__main__":
 
 
     
-    (effective_length2, tau2, shear_displ2) = solve_shearstress(x,x_bnd,sigma_closure2,dx,tauext_max,a,mu,E,nu,tau_yield,verbose=True)
+    (effective_length2, tau2, shear_displ2) = solve_shearstress(x,x_bnd,sigma_closure2,dx,tauext_max,a,mu,tau_yield,crack_model,verbose=True)
 
     (fig2,ax21) = pl.subplots()
     (pl21,pl22,pl23)=ax21.plot(x*1e3,sigma_closure2/1e6,'-',
@@ -537,7 +651,7 @@ if __name__=="__main__":
 
 
     
-    (effective_length3, tau3, shear_displ3) = solve_shearstress(x,x_bnd,sigma_closure3,dx,tauext_max,a,mu,E,nu,tau_yield,verbose=True)
+    (effective_length3, tau3, shear_displ3) = solve_shearstress(x,x_bnd,sigma_closure3,dx,tauext_max,a,mu,tau_yield,crack_model,verbose=True)
 
     (fig3,ax31) = pl.subplots()
     (pl31,pl32,pl33)=ax31.plot(x*1e3,sigma_closure3/1e6,'-',
