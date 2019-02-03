@@ -285,7 +285,14 @@ def solve_incremental_shearstress(x,x_bnd,tau,sigma_closure,shear_displ,xt_idx,d
         # No closure stress at this point, or tau is already at the limit
         # of what can be supported here
         
+        # ... just open up to the next spot
         use_xt2 = x_bnd[xt_idx+1]
+
+        if use_xt2 > a:
+            # Cannot open beyond tips
+            use_xt2 = a
+            pass
+
         tauext2 = tauext
         tau_increment = np.zeros(x.shape[0],dtype='d')
         incremental_displacement = np.zeros(x.shape[0],dtype='d')
