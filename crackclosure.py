@@ -389,7 +389,7 @@ def integral_tensilestress_growing_effective_crack_length_byxt(x,sigmaext1,sigma
     xt2 < x  and xt1 < x  ... xt1 < xt2
 
     So: Integral = 0 where x < xt1
-    Integral upper bound =  x where xt1 < x < xt2
+    Integral upper bound =  x where xt1 < x < xt2
     Integral upper bound = xt2 where x > xt2
 
        indef_integral_of_simple_squareroot_quotients(x,upper_bound) - indef_integral_of_simple_squareroot_quotients(x,xt1)
@@ -784,7 +784,27 @@ def ModeI_throughcrack_CODformula(Eeff):
                                   beta=lambda obj: 1.0,
                                   u = lambda obj,sigma_applied,x,xt: u(obj.Eeff,sigma_applied,x,xt))
 
-                                  
+
+def Tada_ModeI_CircularCrack_along_midline(E,nu):
+
+    def u(E,nu,sigma_applied,x,xt):
+        # For a circular crack in an infinite space,
+        # loaded in mode I.
+        # We will be evaluating along a line through the crack center
+        # Based on Tada, H., Paris, P., & Irwin, G. (2000). The stress analysis of cracks handbook / Hiroshi Tada, Paul C. Paris, George R. Irwin. (3rd ed.). New York: ASME Press.
+        
+        u = (4.0*(1-nu**2.0)/(np.pi*E)) * sigma_applied * np.sqrt(xt**2.0 - x**2.0)
+        return u
+    
+    
+    return ModeI_Beta_COD_Formula(E=E,
+                                  nu=nu,
+                                  beta=lambda obj: 4.0/(np.pi**2.0),
+                                  u = lambda obj,sigma_applied,x,xt: u(obj.E,obj.nu,sigma_applied,x,xt))
+
+
+
+
     
 if __name__=="__main__":
     # IDEA:
@@ -822,11 +842,12 @@ if __name__=="__main__":
 
     weightfun_epsx = dx/8.0
     
-    crack_model = Glinka_ModeI_ThroughCrack(Eeff,x,specimen_width,weightfun_epsx)
+    #crack_model = Glinka_ModeI_ThroughCrack(Eeff,x,specimen_width,weightfun_epsx)
     #crack_model = ModeI_throughcrack_weightfun(Eeff,x,weightfun_epsx)
 
     #crack_model = ModeI_throughcrack_CODformula(Eeff)
     
+    crack_model = Tada_ModeI_CircularCrack_along_midline(E,nu)
 
     
     # Closure state (function of position; positive compression)
