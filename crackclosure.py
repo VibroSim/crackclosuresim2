@@ -671,9 +671,9 @@ if __name__=="__main__":
     xmax = 5e-3 # as far out in x as we are calculating (m)
     xsteps = 200
 
-    #weightfun_times_sqrt_aminx = lambda x,a : weightfun_through_times_sqrt_aminx(x,a,specimen_width)
-    #weightfun_times_sqrt_aminx = lambda x,a : weightfun_basic_times_sqrt_aminx(x,a)   # WARNING: weightfun_basic seems to be incorrect (?)
-    weightfun_times_sqrt_aminx = None # (simple K_I and displacement formulas)
+    weightfun_times_sqrt_aminx = lambda x,a : weightfun_through_times_sqrt_aminx(x,a,specimen_width)
+    #weightfun_times_sqrt_aminx = lambda x,a : weightfun_basic_times_sqrt_aminx(x,a)  
+    #weightfun_times_sqrt_aminx = None # (simple K_I and displacement formulas)
 
     # x_bnd represents x coordinates of the boundaries of
     # each mesh element 
@@ -690,7 +690,7 @@ if __name__=="__main__":
     sigma_closure = 80e6/cos(x/a) -70e6 # Pa
     sigma_closure[x > a]=0.0
     
-    use_crackclosuresim=True
+    use_crackclosuresim=False
     if use_crackclosuresim:
         from scipy.interpolate import splrep
         import crackclosuresim.crack_utils_1D as cu1
