@@ -475,7 +475,7 @@ def integral_tensilestress_growing_effective_crack_length_byxt(x,sigmaext1,sigma
     return (use_xt2,sigmaext2,res)
 
 
-def solve_incremental_tensilestress(x,x_bnd,sigma,sigma_closure,tensile_displ,xt_idx,dx,sigmaext,sigmaext_max,a,crack_model):
+def solve_incremental_tensilestress(x,x_bnd,sigma,sigma_closure,tensile_displ,xt_idx,dx,sigmaext,sigmaext_max,a,crack_model,calculate_displacements=True):
     """The overall crack opening constraint is that
     (tensile load on crack surface) > 0 to open
     For a through-crack of thickness h, short segment of width dx
@@ -544,23 +544,44 @@ def solve_incremental_tensilestress(x,x_bnd,sigma,sigma_closure,tensile_displ,xt
             pass
         
         (use_xt2,sigmaext2,sigma_increment)=integral_tensilestress_growing_effective_crack_length_byxt(x,sigmaext,sigmaext_max,F,x_bnd[xt_idx],next_bound,crack_model)
+        assert(use_xt2 <= a)
+
         
         # For displacement calculate at x centers... use average of left and right boundaries, except for (perhaps) last point where instead of the right boundary we use the actual tip.
-        incremental_displacement = np.zeros(x.shape[0],dtype='d')
-        xt = (x_bnd[xt_idx]+use_xt2)/2.0
-        left_of_effective_tip = (x < xt)
-        incremental_displacement[left_of_effective_tip] = tensile_displacement(sigmaext2-sigmaext,x[left_of_effective_tip],xt,crack_model)
+        if calculate_displacements:
+            incremental_displacement = np.zeros(x.shape[0],dtype='d')
+            xt = (x_bnd[xt_idx]+use_xt2)/2.0
+            left_of_effective_tip = (x < xt)
+            incremental_displacement[left_of_effective_tip] = tensile_displacement(sigmaext2-sigmaext,x[left_of_effective_tip],xt,crack_model)
+            pass
+        
         pass
     else:
         # No closure stress at this point, or sigma is already at the limit
         # of what can be supported here
-        
+
+        # ... just open up to the next spot
         use_xt2 = x_bnd[xt_idx+1]
+
+        if use_xt2 > a:
+            # Cannot open beyond tips
+            use_xt2 = a
+            pass
+            
         sigmaext2 = sigmaext
         sigma_increment = np.zeros(x.shape[0],dtype='d')
         incremental_displacement = np.zeros(x.shape[0],dtype='d')
         pass
-    return (use_xt2,sigmaext2, sigma+sigma_increment, tensile_displ+incremental_displacement) 
+
+    if calculate_displacements:
+        ret_displ = tensile_displ+incremental_displacement
+        pass
+    else:
+        ret_displ=None
+        pass
+
+    
+    return (use_xt2,sigmaext2, sigma+sigma_increment, ret_displ) 
    
     
 
@@ -579,7 +600,7 @@ def tensile_displacement(sigma_applied,x,xt,crack_model):
     return u
 
 
-def solve_normalstress(x,x_bnd,sigma_closure,dx,sigmaext_max,a,sigma_yield,crack_model,verbose=False, diag_plots=False):
+def solve_normalstress(x,x_bnd,sigma_closure,dx,sigmaext_max,a,sigma_yield,crack_model,verbose=False, diag_plots=False,calculate_displacements=True):
     #Initialize the external applied tensile stress starting at zero
     
     sigmaext = 0.0 # External tensile load in this step (Pa)
@@ -592,7 +613,12 @@ def solve_normalstress(x,x_bnd,sigma_closure,dx,sigmaext_max,a,sigma_yield,crack
     sigma = np.zeros(x.shape,dtype='d')
     
     #Initialized the Displacement state as zero
-    tensile_displ = np.zeros(x.shape,dtype='d')
+    if calculate_displacements:
+        tensile_displ = np.zeros(x.shape,dtype='d')
+        pass
+    else:
+        tensile_displ = None
+        pass
     
     #Initialize x step counter
     xt_idx = 0
@@ -632,7 +658,7 @@ def solve_normalstress(x,x_bnd,sigma_closure,dx,sigmaext_max,a,sigma_yield,crack
     
     while not done: 
         
-        (use_xt2,sigmaext, sigma, tensile_displ) = solve_incremental_tensilestress(x,x_bnd,sigma,sigma_closure,tensile_displ,xt_idx,dx,sigmaext,sigmaext_max,a,crack_model)
+        (use_xt2,sigmaext, sigma, tensile_displ) = solve_incremental_tensilestress(x,x_bnd,sigma,sigma_closure,tensile_displ,xt_idx,dx,sigmaext,sigmaext_max,a,crack_model,calculate_displacements=calculate_displacements)
         
         
         if use_xt2 < x_bnd[xt_idx+1] or sigmaext==sigmaext_max or use_xt2 >= a:
@@ -643,7 +669,9 @@ def solve_normalstress(x,x_bnd,sigma_closure,dx,sigmaext_max,a,sigma_yield,crack
         if verbose: 
             #Print what is happening in the loop
             print("Step: %d @ x=%f mm: %f MPa of tension held" % (xt_idx,x[xt_idx]*1e3,sigmaext/1e6))
-            print("Tensile displacement @ x=%f mm: %f nm" % (x[0]*1e3, tensile_displ[0]*1e9))
+            if calculate_displacements:
+                print("Tensile displacement @ x=%f mm: %f nm" % (x[0]*1e3, tensile_displ[0]*1e9))
+                pass
             pass
         
         xt_idx+=1
@@ -679,18 +707,130 @@ def solve_normalstress(x,x_bnd,sigma_closure,dx,sigmaext_max,a,sigma_yield,crack
 
         # record increment in displacement
         left_of_effective_tip = x < a
-        tensile_displ[left_of_effective_tip] += tensile_displacement(sigmaext_max-sigmaext,x[left_of_effective_tip],a,crack_model)
+        if calculate_displacements:
+            tensile_displ[left_of_effective_tip] += tensile_displacement(sigmaext_max-sigmaext,x[left_of_effective_tip],a,crack_model)
+            pass
         
         # Record increment in sigmaext
         sigmaext = sigmaext_max
         
         if verbose:
             print("Step: Open to tips @ x=%f mm: %f MPa of tension held" % (a*1e3,sigmaext/1e6))
-            print("Tensile displacement @ x=%f mm: %f nm" % (x[0]*1e3, tensile_displ[0]*1e9))
+            if calculate_displacements:
+                print("Tensile displacement @ x=%f mm: %f nm" % (x[0]*1e3, tensile_displ[0]*1e9))
+                pass
+            
             pass
         pass
     
     return (use_xt2, sigma, tensile_displ)
+
+
+def inverse_closure(reff,seff,x,x_bnd,dx,xt,crack_model):
+    """ Given effective crack lengths reff at externally applied loads seff,
+    calculate a closure stress field that produces such a field.
+    reff,seff presumed to be ordered from most compressive to 
+    most tensile. 
+
+    
+    seff is positive for tensile opening loads
+
+    returns sigma_closure that is positive for compressive
+    closure stresses. 
+
+    if seff[0] is > 0, and reff[0] > 0 then sigma_closure corresponding
+    to reff[0] is assumed to match seff[0]. 
+
+
+"""
+
+    sigma_closure = np.ones(x.shape,dtype='d')*np.inf
+    
+    last_closure = seff[0] # If everything is closed, then closure stresses and external loads match. 
+    
+    for lcnt in range(1,reff.shape[0]):
+        # In each step, we solve for a new linear segment
+        # of the sigma_closure distribution.
+        # we assume last_closure is the end closure stress
+        # from the previous step, corresponding to a
+        # position of reff[lcnt-1], with an
+        # external load of seff[lcnt-1] opening the
+        # crack to this point
+
+        # So at this step, if the new closure stress is
+        # new_closure, then
+        # in between we have a line:
+        # sigma_closure(x) = last_closure + (new_closure-last_closure)*(x-reff[lcnt-1])
+        # So we need to iteratively solve for a new_closure that satisfies
+        
+        # (reff[lcnt], sigma, tensile_displ) = solve_normalstress(x,x_bnd,sigma_closure,dx,seff[lcnt],a,sigma_yield,crack_model)
+        # For the given reff[lcnt], seff[lcnt]
+
+        def goal(new_closure):
+            new_closure_field = sigma_closure
+
+            if lcnt==1:
+                # first iteration: extrapolate back to crack center
+                # if necessary
+                #new_zone = (x <= reff[lcnt])
+
+                # extrapolate out beyond reff[lcnt] to help with
+                # convergence
+
+                new_zone = np.ones(x.shape,dtype=np.bool)
+                pass
+            else:
+                #new_zone = (x >= reff[lcnt-1]) & (x <= reff[lcnt])
+                # extrapolate out beyond reff[lcnt] to help with
+                # convergence
+                new_zone = (x >= reff[lcnt-1]) 
+                pass
+            
+            new_closure_field[new_zone] = last_closure + (new_closure-last_closure) * (x[new_zone]-reff[lcnt-1])/(reff[lcnt]-reff[lcnt-1])
+
+            (gotreff, sigma, tensile_displ) = solve_normalstress(x,x_bnd,new_closure_field,dx,seff[lcnt],a,sigma_yield,crack_model,calculate_displacements=False)
+
+            return reff[lcnt]-gotreff
+
+        
+        
+        (new_closure,infodict,ier,mesg) = scipy.optimize.fsolve(goal,seff[lcnt],full_output=True)
+        
+        if ier != 1:
+            sys.modules["__main__"].__dict__.update(globals())
+            sys.modules["__main__"].__dict__.update(locals())
+            raise ValueError("Error in inverse_closure fsolve: %s" % str(mesg))
+        
+        if lcnt==1:
+            # first iteration: extrapolate back to crack center
+            # if necessary
+            new_zone = (x <= reff[lcnt])
+            pass
+        else:
+            new_zone = (x >= reff[lcnt-1]) & (x <= reff[lcnt])
+            pass
+        
+        closure_gradient = (new_closure-last_closure)/(reff[lcnt]-reff[lcnt-1])
+        
+        sigma_closure[new_zone] = last_closure + (new_closure-last_closure) * (x[new_zone]-reff[lcnt-1])/(reff[lcnt]-reff[lcnt-1])
+        
+        last_closure = new_closure
+        pass
+
+    if reff[lcnt] < xt:
+        # don't have data out to the tips
+        # extrapolate last closure gradient to the tips
+        
+        new_zone = (x >= reff[lcnt])
+        new_closure=last_closure + closure_gradient * (xt-reff[lcnt])
+        
+        sigma_closure[new_zone] = last_closure + (new_closure-last_closure) * (x[new_zone]-reff[lcnt])/(xt-reff[lcnt])
+        
+        pass
+
+    sigma_closure[x > a] = 0.0
+    
+    return sigma_closure
 
 
 # align_yaxis from https://stackoverflow.com/questions/10481990/matplotlib-axis-with-two-scales-shared-origin
@@ -851,8 +991,29 @@ if __name__=="__main__":
 
     
     # Closure state (function of position; positive compression)
-    sigma_closure = 80e6/cos(x/a) -70e6 # Pa
-    sigma_closure[x > a]=0.0
+
+    observed_reff = np.array([ 0.0,  1e-3, 1.5e-3, 2e-3  ],dtype='d')
+    observed_seff = np.array([ 10e6, 15e6, 30e6, 150e6  ],dtype='d')
+    
+    sigma_closure = inverse_closure(observed_reff,
+                                    observed_seff,
+                                    x,x_bnd,dx,a,crack_model)
+    
+
+    # Forward cross-check of closure
+    pl.figure()
+    pl.plot(x*1e3,sigma_closure,'-',
+         observed_reff*1e3,observed_seff,'x')
+
+    for observcnt in range(len(observed_reff)):        
+        (effective_length, sigma, tensile_displ) = solve_normalstress(x,x_bnd,sigma_closure,dx,observed_seff[observcnt],a,sigma_yield,crack_model)
+        pl.plot(effective_length*1e3,observed_seff[observcnt],'o')
+        #pl.plot(x*1e3,tensile_displ*1e15,'-')
+        pass
+    
+    
+    #sigma_closure = 80e6/cos(x/a) -70e6 # Pa
+    #sigma_closure[x > a]=0.0
     
     use_crackclosuresim=False
     if use_crackclosuresim:
