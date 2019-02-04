@@ -278,7 +278,7 @@ def integral_shearstress_growing_effective_crack_length_byxt(x,tauext1,tauext_ma
     return (use_xt2,tauext2,res)
 
 
-def solve_incremental_shearstress(x,x_bnd,tau,sigma_closure,shear_displ,xt_idx,dx,tauext,tauext_max,a,crack_model,calculate_displacements=True):
+def solve_incremental_shearstress(x,x_bnd,tau,sigma_closure,shear_displ,xt_idx,dx,tauext,tauext_max,a,mu,crack_model,calculate_displacements=True):
     """The overall frictional slip constraint is that
     F <= mu*N
     For a through-crack of thickness h, short segment of width dx
@@ -315,7 +315,7 @@ def solve_incremental_shearstress(x,x_bnd,tau,sigma_closure,shear_displ,xt_idx,d
         pass
     
     def obj_fcn(F):
-        (use_xt2,tauext2,tau_increment)=integral_shearstress_growing_effective_crack_length_byxt(x,tauext,tauext_max,F,x_bnd[xt_idx],next_bound,crack_model)
+        (use_xt2,tauext2,tau_increment)=integral_shearstress_growing_effective_crack_length_byxt(x,tauext,np.inf,F,x_bnd[xt_idx],next_bound,crack_model)
         return (tau+tau_increment - mu*sigma_closure)[xt_idx]
 
     # F measures the closure gradient in (Pascals external shear stress / meters of tip motion)
@@ -327,6 +327,12 @@ def solve_incremental_shearstress(x,x_bnd,tau,sigma_closure,shear_displ,xt_idx,d
         # contribution of tau_increment: 2.0*(tauext_max-tauext1)/(xt2-xt1)
         Fbnd = 2.0*(tauext_max - tauext)/(next_bound-x_bnd[xt_idx])
 
+        # Increase Fbnd until we get a positive result from obj_fcn
+        while obj_fcn(Fbnd) <= 0.0:
+            Fbnd*=2.0;
+            pass
+        
+        # Condition below should no longer be needed
         if obj_fcn(Fbnd) < 0.0:
             # Maximum value of objective is < 0... This means that
             # with the steepest tau vs. xt slope possible (given
@@ -470,7 +476,7 @@ def solve_shearstress(x,x_bnd,sigma_closure,dx,tauext_max,a,mu,tau_yield,crack_m
 
     while not done: 
         
-        (use_xt2,tauext, tau, shear_displ) = solve_incremental_shearstress(x,x_bnd,tau,sigma_closure,shear_displ,xt_idx,dx,tauext,tauext_max,a,crack_model,calculate_displacements=calculate_displacements)
+        (use_xt2,tauext, tau, shear_displ) = solve_incremental_shearstress(x,x_bnd,tau,sigma_closure,shear_displ,xt_idx,dx,tauext,tauext_max,a,mu,crack_model,calculate_displacements=calculate_displacements)
         
     
         if use_xt2 < x_bnd[xt_idx+1] or tauext==tauext_max or use_xt2 >= a:

@@ -411,6 +411,9 @@ def integral_tensilestress_growing_effective_crack_length_byxt(x,sigmaext1,sigma
 
     sigmaext2 = sigmaext1 + (xt2-xt1)*F
 
+    #print("sigmaext1 = %g; sigmaext2=%g; sigmaext_max=%g; xt1=%g; xt2=%g; F=%g" % (sigmaext1,sigmaext2,sigmaext_max,xt1,xt2,F))
+
+    
     use_xt2 = xt2
     if sigmaext2 > sigmaext_max:
         # bound sigmaext by sigmaext_max... by limiting xt2
@@ -425,7 +428,7 @@ def integral_tensilestress_growing_effective_crack_length_byxt(x,sigmaext1,sigma
         pass
     
     
-    
+    #print("use_xt2 = %g" % (use_xt2))
     upper_bound = use_xt2*np.ones(x.shape,dtype='d')
     
     # alternate upper_bound:
@@ -515,7 +518,8 @@ def solve_incremental_tensilestress(x,x_bnd,sigma,sigma_closure,tensile_displ,xt
         pass
     
     def obj_fcn(F):
-        (use_xt2,sigmaext2,sigma_increment)=integral_tensilestress_growing_effective_crack_length_byxt(x,sigmaext,sigmaext_max,F,x_bnd[xt_idx],next_bound,crack_model)
+        (use_xt2,sigmaext2,sigma_increment)=integral_tensilestress_growing_effective_crack_length_byxt(x,sigmaext,np.inf,F,x_bnd[xt_idx],next_bound,crack_model)
+        #print("obj_fcn return %g" % ((sigma+sigma_increment - sigma_closure)[xt_idx]))
         return (sigma+sigma_increment - sigma_closure)[xt_idx]
     
     # F measures the closure gradient in (Pascals external tensile stress / meters of tip motion)
@@ -526,7 +530,12 @@ def solve_incremental_tensilestress(x,x_bnd,sigma,sigma_closure,tensile_displ,xt
         # Bound it by 0  and the F that will give the maximum
         # contribution of sigma_increment: 2.0*(sigmaext_max-sigmaext1)/(xt2-xt1)
         Fbnd = 2.0*(sigmaext_max - sigmaext)/(next_bound-x_bnd[xt_idx])
-        
+        # Increase Fbnd until we get a positive result from obj_fcn
+        while obj_fcn(Fbnd) <= 0.0:
+            Fbnd*=2.0;
+            pass
+
+        # Condition below should no longer be needed
         if obj_fcn(Fbnd) < 0.0:
             # Maximum value of objective is < 0... This means that
             # with the steepest sigma vs. xt slope possible (given
@@ -536,6 +545,9 @@ def solve_incremental_tensilestress(x,x_bnd,sigma,sigma_closure,tensile_displ,xt
             #  < sigma_closure
             # So our best result is just Fbnd
             F=Fbnd
+
+            #print("obj_fcn(Fbnd) returns %g; obj_fcn(200*Fbnd) returns %g" % (obj_fcn(Fbnd),obj_fcn(200*Fbnd)))
+                  
             pass
         else:
             # brentq requires function to be different signs
@@ -544,6 +556,7 @@ def solve_incremental_tensilestress(x,x_bnd,sigma,sigma_closure,tensile_displ,xt
             pass
         
         (use_xt2,sigmaext2,sigma_increment)=integral_tensilestress_growing_effective_crack_length_byxt(x,sigmaext,sigmaext_max,F,x_bnd[xt_idx],next_bound,crack_model)
+        #print("use_xt2=%f" % (use_xt2))
         assert(use_xt2 <= a)
 
         
@@ -726,7 +739,7 @@ def solve_normalstress(x,x_bnd,sigma_closure,dx,sigmaext_max,a,sigma_yield,crack
     return (use_xt2, sigma, tensile_displ)
 
 
-def inverse_closure(reff,seff,x,x_bnd,dx,xt,crack_model):
+def inverse_closure(reff,seff,x,x_bnd,dx,xt,sigma_yield,crack_model):
     """ Given effective crack lengths reff at externally applied loads seff,
     calculate a closure stress field that produces such a field.
     reff,seff presumed to be ordered from most compressive to 
@@ -788,7 +801,7 @@ def inverse_closure(reff,seff,x,x_bnd,dx,xt,crack_model):
             
             new_closure_field[new_zone] = last_closure + (new_closure-last_closure) * (x[new_zone]-reff[lcnt-1])/(reff[lcnt]-reff[lcnt-1])
 
-            (gotreff, sigma, tensile_displ) = solve_normalstress(x,x_bnd,new_closure_field,dx,seff[lcnt],a,sigma_yield,crack_model,calculate_displacements=False)
+            (gotreff, sigma, tensile_displ) = solve_normalstress(x,x_bnd,new_closure_field,dx,seff[lcnt],xt,sigma_yield,crack_model,calculate_displacements=False,verbose=True)
 
             return reff[lcnt]-gotreff
 
@@ -828,7 +841,7 @@ def inverse_closure(reff,seff,x,x_bnd,dx,xt,crack_model):
         
         pass
 
-    sigma_closure[x > a] = 0.0
+    sigma_closure[x > xt] = 0.0
     
     return sigma_closure
 
@@ -997,7 +1010,8 @@ if __name__=="__main__":
     
     sigma_closure = inverse_closure(observed_reff,
                                     observed_seff,
-                                    x,x_bnd,dx,a,crack_model)
+                                    x,x_bnd,dx,a,sigma_yield,
+                                    crack_model)
     
 
     # Forward cross-check of closure
