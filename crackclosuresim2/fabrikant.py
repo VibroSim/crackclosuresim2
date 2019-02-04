@@ -3,13 +3,13 @@
 
 import numpy as np
 from scipy.integrate import quad
-
+from scipy.interpolate import splrep,splev
 
 
 def complex_quad(func,a,b,*args):
     i=0+1j
-    real_part = quad(lambda f: f.real,a,b,args=args)[0]
-    imag_part = quad(lambda f: f.imag,a,b,args=args)[0]
+    real_part = quad(lambda f: func(f,*args).real,a,b)[0]
+    imag_part = quad(lambda f: func(f,*args).imag,a,b)[0]
     return real_part + i*imag_part
 
     
@@ -19,7 +19,7 @@ def u(rho,phi,a,tauext,E,nu):
     # Assuming this written like a weight function, so the
     # tau is in fact the engineering stress at the crack location
 
-    H=(1-nu**2.0)/(np.pi*E)
+    #H=(1-nu**2.0)/(np.pi*E)
     mu = E/(2.0*(1+nu)) # Note mu is shear modulus not friction coefficient here
     G1 = (2.0-nu)/(2*np.pi*mu)  
     G2 = nu/(2*np.pi*mu)
@@ -45,7 +45,7 @@ def u(rho,phi,a,tauext,E,nu):
                          (tauext,0,0)),dtype='d')
     xform = np.array( ((np.cos(phi),np.sin(phi),0.0),
                        (-np.sin(phi),np.cos(phi),0.0),
-                       (0.0,0.0,0.0)),dtype='d');
+                       (0.0,0.0,1.0)),dtype='d');
 
     tau_rhophiz = np.matmul(xform,np.matmul(tau_xyz,xform.T))
 
@@ -54,7 +54,7 @@ def u(rho,phi,a,tauext,E,nu):
     R = lambda rho0,phi0: (rho**2.0 + rho0**2.0 - 2.0*rho*rho0*np.cos(phi-phi0))**0.5
 
     eta = lambda rho0,x: ((x**2.0 - rho**2.0)**0.5) * ((x**2.0-rho0**2.0)**0.5)/x
-    xi = lambda rho0,phi0: (rho*np.exp(i*phi)-rho0*np.exp(i*phi0))/(rho*exp(-i*phi) - rho0*exp(-i*phi0))
+    xi = lambda rho0,phi0: (rho*np.exp(i*phi)-rho0*np.exp(i*phi0))/(rho*np.exp(-i*phi) - rho0*np.exp(-i*phi0))
 
     t = lambda rho0, phi0: ((rho*rho0)/(a**2.0))*np.exp(i*(phi-phi0))
     
@@ -88,10 +88,17 @@ if __name__=="__main__":
     a=5e-3
     tauext=100e6
 
-    x=np.linspace(0,a,50)
-    u_eval = np.array([ u(xval,0.0,a,tauext,E,nu) for xval in x])
+    x=np.linspace(0,a,30)
+    u_eval = np.array([ u(xval,0.0,a,tauext,E,nu) for xval in x])[:,0]
 
+    use = ~np.isnan(u_eval)
+
+    (t,c,k)=splrep(x[use],u_eval[use])
+
+    
+    
     pl.figure()
-    pl.plot(x*1e3,u_eval*1e6,'-')
+    pl.plot(x*1e3,u_eval*1e6,'-',
+            x*1e3,splev(x,(t,c,k))*1e6,'-')
     pl.show()
     pass
