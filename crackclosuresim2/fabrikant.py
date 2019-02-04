@@ -15,7 +15,10 @@ def complex_quad(func,a,b,*args):
     
 
 
-def u(rho,phi,a,tauext,E,nu):
+def u_nondim(rho,phi,nu):
+    a=1.0
+    tauext=1.0
+    E=1.0
     # Assuming this written like a weight function, so the
     # tau is in fact the engineering stress at the crack location
 
@@ -24,6 +27,7 @@ def u(rho,phi,a,tauext,E,nu):
     G1 = (2.0-nu)/(2*np.pi*mu)  
     G2 = nu/(2*np.pi*mu)
     i=0+1j
+
 
 
     # w.o.l.o.g let tau_xz = tauext
@@ -75,10 +79,146 @@ def u(rho,phi,a,tauext,E,nu):
     u_xyz = np.matmul(xform.T,u_rhophiz[:,np.newaxis])
 
     # we are interested in u_x
-    return u_xyz[0]
+    return u_xyz[0,0]
+
+
+# Surrogate index: phi, nu
+# Surrogate value: splrep (t,c,k)
+# u_surrogate filled by putting different values
+# of nu into the main routine below,
+# and pasting in the generated output
+u_surrogate = {
+(0.0,0.33): (np.array([0.                 ,0.                 ,0.                 ,
+ 0.                 ,0.06896551724137931,0.10344827586206896,
+ 0.13793103448275862,0.1724137931034483 ,0.20689655172413793,
+ 0.24137931034482757,0.27586206896551724,0.3103448275862069 ,
+ 0.3448275862068966 ,0.3793103448275862 ,0.41379310344827586,
+ 0.4482758620689655 ,0.48275862068965514,0.5172413793103449 ,
+ 0.5517241379310345 ,0.5862068965517241 ,0.6206896551724138 ,
+ 0.6551724137931034 ,0.6896551724137931 ,0.7241379310344828 ,
+ 0.7586206896551724 ,0.7931034482758621 ,0.8275862068965517 ,
+ 0.8620689655172413 ,0.896551724137931  ,0.9310344827586207 ,
+ 1.                 ,1.                 ,1.                 ,
+ 1.                 ],dtype=np.dtype('float64')),np.array([1.3587829440880288,1.35878224800477  ,1.3571696255135128,
+ 1.3517664341764775,1.3460725288244524,1.338716290559762 ,
+ 1.3296701531836246,1.3188994132713705,1.306361492499003 ,
+ 1.2920050459271246,1.2757688113008094,1.2575801459086227,
+ 1.237353161475815 ,1.2149863302825281,1.1903593872181157,
+ 1.1633292690683246,1.133724733129758 ,1.1013390310238826,
+ 1.065919997761918 ,1.0271553097575779,0.9846538189292913,
+ 0.9379070336991843,0.8862681597575713,0.8287681354469675,
+ 0.7643611045844153,0.6902116757185301,0.6065058419172994,
+ 0.4577155876926318,0.3546653360526447,0.                ,
+ 0.                ,0.                ,0.                ,
+ 0.                ],dtype=np.dtype('float64')),3),
+}
+
+def array_repr(array):
+    return "np.array(%s,dtype=np.%s)" % (np.array2string(array,separator=',',suppress_small=False,threshold=np.inf,floatmode='unique'),repr(array.dtype))
+
+def u(rho,phi,a,tauext,E,nu,use_surrogate=True):
+
+    if use_surrogate and (phi,nu) in u_surrogate:
+        (t,c,k) = u_surrogate[(phi,nu)]
+        return splev(rho/a,(t,c,k))*a*tauext/E
+
+    if use_surrogate:
+        sys.stderr.write("crackclosuresim2.fabrikant: WARNING: Surrogate not available for u; computation will be extremely slow\n")
+        pass
+    
+    
+    return u_nondim(rho/a,phi,nu)*a*tauext/E
+    pass
+
+
+def K_nondim(phi,nu):
+    a=1.0
+    tauext=1.0
+    
+    i=0+1j
+    tau_xyz = np.array( ((0,0,tauext),
+                         (0,0,0),
+                         (tauext,0,0)),dtype='d')
+    xform = np.array( ((np.cos(phi),np.sin(phi),0.0),
+                       (-np.sin(phi),np.cos(phi),0.0),
+                       (0.0,0.0,1.0)),dtype='d');
+
+    tau_rhophiz = np.matmul(xform,np.matmul(tau_xyz,xform.T))
+
+    tau = tau_rhophiz[2,0] + i*tau_rhophiz[1,0]
+
+    G2_over_G1 = nu*(2*np.pi)/((2*np.pi)*(2.0-nu))
+
+    inner_integrand1 = lambda rho0,phi0: np.sqrt(a**2.0-rho0**2.0)*tau*rho0/(a**2.0 + rho0**2.0 - 2*a*rho0*np.cos(phi-phi0))
+
+    inner_integrand2 = lambda rho0,phi0: ((3.0*a*np.exp(-i*phi)-rho0*np.exp(-i*phi0))/((a*np.exp(-i*phi)-rho0*np.exp(-i*phi0))**2.0))*np.sqrt(a**2.0-rho0**2.0)*np.conj(tau)*rho0
+
+    outer_integrand1 = lambda phi0: complex_quad(inner_integrand1,0,a,phi0)
+    outer_integrand2 = lambda phi0: complex_quad(inner_integrand2,0,a,phi0)
+
+    integral1 = complex_quad(outer_integrand1,0,2.0*np.pi)
+    integral2 = complex_quad(outer_integrand2,0,2.0*np.pi)
+
+    K = (-1.0/(np.pi**2.0 * np.sqrt(2.0*a))) * (integral1 + (G2_over_G1*np.exp(i*phi)/a)*integral2)
+
+    
+    return K.real  # Interested in K_II only
+
+# K_surrogate filled by putting different values
+# of nu into the main routine below,
+# and pasting in the generated output
+K_surrogate={
+    (np.pi,0.33): 0.5391115671127011,
+    }
+
+def K(phi,a,tauext,nu,use_surrogate=True):
+    
+    if use_surrogate and (phi,nu) in K_surrogate:
+        return K_surrogate[(phi,nu)]*tauext*np.sqrt(a)
+
+    if use_surrogate:
+        sys.stderr.write("crackclosuresim2.fabrikant: WARNING: Surrogate not available for K; computation will be extremely slow\n")
+        pass
+    
+    K=K_nondim(phi,nu)*tauext*np.sqrt(a)
+    return K
+
+
+if __name__ != "__main__":
+    from .shear_stickslip import ModeII_Beta_CSD_Formula
+
+    def Fabrikant_ModeII_CircularCrack_along_midline(E,nu):
+
+        # For beta,
+        # K = tau*sqrt(pi*a*beta)
+        #   = K_nondim*tau*sqrt(a)
+        # Therefore K_nondim*tau*sqrt(a) = tau*sqrt(pi*a*beta)
+        # Therefore K_nondim = sqrt(pi*beta)
+        # Therefore K_nondim/sqrt(pi) = sqrt(beta)
+        # Therefore K_nondim^2/pi = beta
+
+        # use pi instead of 0 as phi for K because
+        # otherwise we (undesirably) get the negative of what we want
+        if (np.pi,nu) in K_surrogate:
+            K_nd_val = K_surrogate[(np.pi,nu)]
+            pass
+        else:
+            K_nd_val = K_nondim(np.pi,nu)
+            pass
+
+        # u(x,0.0,xt,tau_applied,obj.E,obj.nu)
+        uvec = np.vectorize(u)
+        
+        return ModeII_Beta_CSD_Formula(E=E,
+                                       nu=nu,
+                                       beta = lambda obj: (K_nd_val**2.0)/np.pi,
+                                       ut = lambda obj,tau_applied,x,xt: uvec(x,0.0,xt,tau_applied,obj.E,obj.nu))
+                                       
+    pass
 
 
 
+    
 if __name__=="__main__":
 
     from matplotlib import pyplot as pl
@@ -88,17 +228,37 @@ if __name__=="__main__":
     a=5e-3
     tauext=100e6
 
+    create_surrogate_entries=False
+    use_surrogate=True
+
+    if create_surrogate_entries:
+        xnorm = np.linspace(0.0,1.0,30)
+        u_nd_eval = np.array([ u_nondim(xval,0.0,nu) for xval in xnorm])
+
+        use = ~np.isnan(u_nd_eval)
+
+        (t,c,k)=splrep(xnorm[use],u_nd_eval[use])
+        
+        print("u_surrogate entry:")
+        print("(0.0,%s): (%s,%s,%s)," % (repr(nu),array_repr(t),array_repr(c),repr(k)))
+
+        K_nd_val = K_nondim(np.pi,nu)
+        
+        print("K_surrogate entry:")
+        print("(np.pi,%s): %s," % (repr(nu),repr(K_nd_val)))
+        pass
+    
+        
     x=np.linspace(0,a,30)
-    u_eval = np.array([ u(xval,0.0,a,tauext,E,nu) for xval in x])[:,0]
+    u_eval = np.array([ u(xval,0.0,a,tauext,E,nu,use_surrogate=use_surrogate) for xval in x])
+    
 
-    use = ~np.isnan(u_eval)
-
-    (t,c,k)=splrep(x[use],u_eval[use])
+    K_eval = K(np.pi,a,tauext,nu,use_surrogate=use_surrogate) # NOTE: K comes out negative if we use 0 for phi (!)
 
     
     
     pl.figure()
-    pl.plot(x*1e3,u_eval*1e6,'-',
-            x*1e3,splev(x,(t,c,k))*1e6,'-')
+    pl.plot(x*1e3,u_eval*1e6,'-')
+    #x*1e3,splev(x,(t,c,k))*1e6,'-')
     pl.show()
     pass
