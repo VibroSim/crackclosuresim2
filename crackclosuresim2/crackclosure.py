@@ -739,7 +739,7 @@ def solve_normalstress(x,x_bnd,sigma_closure,dx,sigmaext_max,a,sigma_yield,crack
     return (use_xt2, sigma, tensile_displ)
 
 
-def inverse_closure(reff,seff,x,x_bnd,dx,xt,sigma_yield,crack_model):
+def inverse_closure(reff,seff,x,x_bnd,dx,xt,sigma_yield,crack_model,verbose=False):
     """ Given effective crack lengths reff at externally applied loads seff,
     calculate a closure stress field that produces such a field.
     reff,seff presumed to be ordered from most compressive to 
@@ -801,7 +801,7 @@ def inverse_closure(reff,seff,x,x_bnd,dx,xt,sigma_yield,crack_model):
             
             new_closure_field[new_zone] = last_closure + (new_closure-last_closure) * (x[new_zone]-reff[lcnt-1])/(reff[lcnt]-reff[lcnt-1])
 
-            (gotreff, sigma, tensile_displ) = solve_normalstress(x,x_bnd,new_closure_field,dx,seff[lcnt],xt,sigma_yield,crack_model,calculate_displacements=False,verbose=True)
+            (gotreff, sigma, tensile_displ) = solve_normalstress(x,x_bnd,new_closure_field,dx,seff[lcnt],xt,sigma_yield,crack_model,calculate_displacements=False,verbose=verbose)
 
             return reff[lcnt]-gotreff
 
