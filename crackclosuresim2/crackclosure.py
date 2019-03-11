@@ -1066,6 +1066,7 @@ def solve_normalstress_compressive(x,x_bnd,sigma_closure,dx,sigmaext_max,a,sigma
     return (use_xt1, sigma, tensile_displ)
 
 def solve_normalstress(x,x_bnd,sigma_closure,dx,sigmaext_max,a,sigma_yield,crack_model,verbose=False, diag_plots=False,calculate_displacements=True):
+    """NOTE: sigma_closure is positive compressive; pretty much everything else is positive tensile"""
     if sigmaext_max >= 0.0:
         return solve_normalstress_tensile(x,x_bnd,sigma_closure,dx,sigmaext_max,a,sigma_yield,crack_model,verbose=verbose,diag_plots=diag_plots,calculate_displacements=calculate_displacements)
     else:
