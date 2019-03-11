@@ -84,32 +84,33 @@ for observcnt in range(len(observed_reff)):
 #sigma_closure[x > a]=0.0
 
 
-
-(effective_length, sigma, tensile_displ) = solve_normalstress(x,x_bnd,sigma_closure,dx,sigmaext_max1,a,sigma_yield,crack_model,verbose=True,diag_plots=True)
+if False:
+    (effective_length, sigma, tensile_displ) = solve_normalstress(x,x_bnd,sigma_closure,dx,sigmaext_max1,a,sigma_yield,crack_model,verbose=True,diag_plots=True)
     
-(fig,ax1) = pl.subplots()
-legax=[]
-legstr=[]
-(pl1,pl2,pl3)=ax1.plot(x*1e3,sigma_closure/1e6,'-',
-                       x*1e3,sigma/1e6,'-',
-                       x*1e3,(sigma-(sigma_closure*(sigma_closure > 0)))/1e6,'-')
-legax.extend([pl1,pl2,pl3])
-legstr.extend(['Closure stress','Tensile stress','$ \\sigma - \\sigma_{\\mbox{\\tiny closure}}$'])
-ax1.set_xlabel('Position (mm)')
-ax1.set_ylabel('Stress (MPa)')
+    (fig,ax1) = pl.subplots()
+    legax=[]
+    legstr=[]
+    (pl1,pl2,pl3)=ax1.plot(x*1e3,sigma_closure/1e6,'-',
+                           x*1e3,sigma/1e6,'-',
+                           x*1e3,(sigma-sigma_closure)/1e6,'-')
+    legax.extend([pl1,pl2,pl3])
+    legstr.extend(['Closure stress','Tensile stress','$ \\sigma - \\sigma_{\\mbox{\\tiny closure}}$'])
+    ax1.set_xlabel('Position (mm)')
+    ax1.set_ylabel('Stress (MPa)')
 
 
-ax2=ax1.twinx()
-(pl5,)=ax2.plot(x*1e3,tensile_displ*1e9,'-k')
-legax.append(pl5)
-legstr.append('uyy (new)')
-
-align_yaxis(ax1,0,ax2,0)
-ax2.set_ylabel('Tensile displacement (nm)')
-pl.legend(legax,legstr)
-#fig.tight_layout()
-pl.title('Partially closed crack')
-pl.savefig('/tmp/compressive_peel_initial.png',dpi=300)
+    ax2=ax1.twinx()
+    (pl5,)=ax2.plot(x*1e3,tensile_displ*1e9,'-k')
+    legax.append(pl5)
+    legstr.append('uyy (new)')
+    
+    align_yaxis(ax1,0,ax2,0)
+    ax2.set_ylabel('Tensile displacement (nm)')
+    pl.legend(legax,legstr)
+    #fig.tight_layout()
+    pl.title('Partially closed crack')
+    pl.savefig('/tmp/compressive_peel_initial.png',dpi=300)
+    pass
 
 sigmaext_max2=-50e6
 
@@ -120,7 +121,7 @@ legax=[]
 legstr=[]
 (pl1,pl2,pl3)=ax1.plot(x*1e3,sigma_closure/1e6,'-',
                        x*1e3,sigma/1e6,'-',
-                       x*1e3,(sigma-(sigma_closure*(sigma_closure > 0)))/1e6,'-')
+                       x*1e3,(sigma-sigma_closure)/1e6,'-')
 legax.extend([pl1,pl2,pl3])
 legstr.extend(['Closure stress','Tensile stress','$ \\sigma - \\sigma_{\\mbox{\\tiny closure}}$'])
 ax1.set_xlabel('Position (mm)')
@@ -139,6 +140,7 @@ pl.legend(legax,legstr)
 pl.title('Partially closed crack')
 pl.savefig('/tmp/compressive_peel_pressedclosed.png',dpi=300)
 
+
 sigmaext_max3=-150e6
 
 (effective_length, sigma, tensile_displ) = solve_normalstress(x,x_bnd,sigma_closure,dx,sigmaext_max3,a,sigma_yield,crack_model,verbose=True,diag_plots=True)
@@ -148,7 +150,7 @@ legax=[]
 legstr=[]
 (pl1,pl2,pl3)=ax1.plot(x*1e3,sigma_closure/1e6,'-',
                        x*1e3,sigma/1e6,'-',
-                       x*1e3,(sigma-(sigma_closure*(sigma_closure > 0)))/1e6,'-')
+                       x*1e3,(sigma-sigma_closure)/1e6,'-')
 legax.extend([pl1,pl2,pl3])
 legstr.extend(['Closure stress','Tensile stress','$ \\sigma - \\sigma_{\\mbox{\\tiny closure}}$'])
 ax1.set_xlabel('Position (mm)')
