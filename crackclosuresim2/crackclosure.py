@@ -710,6 +710,13 @@ def solve_incremental_compressivestress(x,x_bnd,sigma,sigma_closure,tensile_disp
         (use_xt1,sigmaext2,sigma_increment)=integral_compressivestress_shrinking_effective_crack_length_byxt(x,sigmaext,-np.inf,F,next_bound,use_xt2,crack_model)
         #print("obj_fcn return %g" % ((sigma+sigma_increment - sigma_closure)[xt_idx]))
         return (sigma+sigma_increment - sigma_closure)[xt_idx]
+
+    #if use_xt2 >= 1.43216e-3 and use_xt2 <= 1.4572e-3:
+    #    print("Problem spot!")
+    #    sys.modules["__main__"].__dict__.update(globals())
+    #    sys.modules["__main__"].__dict__.update(locals())
+    #    raise ValueError("Problem")
+    #    pass
     
     # F measures the closure gradient in (Pascals external tensile stress / meters of tip motion)
     
@@ -725,7 +732,7 @@ def solve_incremental_compressivestress(x,x_bnd,sigma,sigma_closure,tensile_disp
             pass
 
         # Condition below should no longer be needed
-        if obj_fcn(Fbnd) < 0.0:
+        if obj_fcn(Fbnd) > 0.0:
             # Maximum value of objective is < 0... This means that
             # with the steepest sigma vs. xt slope possible (given
             # the total tensile load we are applying) we still
