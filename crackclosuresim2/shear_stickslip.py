@@ -324,12 +324,12 @@ def solve_incremental_shearstress(x,x_bnd,tau,sigma_closure,shear_displ,xt_idx,d
         Fbnd = 2.0*(tauext_max - tauext)/(next_bound-x_bnd[xt_idx])
 
         # Increase Fbnd until we get a positive result from obj_fcn
-        while obj_fcn(Fbnd) <= 0.0:
+        while Fbnd != 0.0 and obj_fcn(Fbnd) < 0.0:
             Fbnd*=2.0;
             pass
         
-        # Condition below should no longer be needed
-        if obj_fcn(Fbnd) < 0.0:
+        # Condition below should only occur when Fbnd==0.0, i.e. when tauext_max==tauext, or if the objective function is already satisfied
+        if Fbnd == 0.0 or obj_fcn(Fbnd) <= 0.0:
             # Maximum value of objective is < 0... This means that
             # with the steepest tau vs. xt slope possible (given
             # the total shear load we are applying) we still
@@ -459,16 +459,37 @@ def solve_shearstress(x,x_bnd,sigma_closure,dx,tauext_max,a,mu,tau_yield,crack_m
         xt_idx=argmin_sigma_closure
         use_xt2=0
         pass
+    elif min_sigma_closure <= 0:
+        # There is an opening point...
 
+        # Find where sigma_closure goes from negative (tensile)
+        # to positive (compressive)
+
+        signchange_idxs = np.where((sigma_closure[x < a][:-1] < 0.0) & (sigma_closure[x < a][1:] >= 0.0))[0]
+
+        if signchange_idxs.shape[0] > 0:
+            xt_idx=signchange_idxs[0]
+            pass
+        else:
+            xt_idx = np.where(x < a)[0][-1] # open all the way to tip
+            # if closure stress is tensile everywhere
+            pass
+
+        
+        pass
+    else:
+        assert(0) # shouldn't be possible
+        pass
+    
     
 
     
     done=False
-
-    if tauext==tauext_max:
-        # Used up all of our applied load...  Done!
-        done=True
-        pass
+    
+    #if tauext==tauext_max:
+    #    # Used up all of our applied load...  Done!
+    #    done=True
+    #    pass
 
     while not done: 
         

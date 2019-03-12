@@ -66,6 +66,7 @@ sigma_closure = inverse_closure(observed_reff,
                                 observed_seff,
                                 x,x_bnd,dx,a,sigma_yield,
                                 crack_model)-50e6
+sigma_closure[x > a]=0.0
 
 
 # Forward cross-check of closure
@@ -119,11 +120,10 @@ sigmaext_max2=-50e6
 (fig,ax1) = pl.subplots()
 legax=[]
 legstr=[]
-(pl1,pl2,pl3)=ax1.plot(x*1e3,sigma_closure/1e6,'-',
-                       x*1e3,sigma/1e6,'-',
-                       x*1e3,(sigma-sigma_closure)/1e6,'-')
-legax.extend([pl1,pl2,pl3])
-legstr.extend(['Closure stress','Tensile stress','$ \\sigma - \\sigma_{\\mbox{\\tiny closure}}$'])
+(pl1,pl2)=ax1.plot(x*1e3,-sigma_closure/1e6,'-',
+                       x*1e3,sigma/1e6,'-')
+legax.extend([pl1,pl2])
+legstr.extend(['Closure stress','Contact stress'])
 ax1.set_xlabel('Position (mm)')
 ax1.set_ylabel('Stress (MPa)')
 
@@ -148,11 +148,10 @@ sigmaext_max3=-150e6
 (fig,ax1) = pl.subplots()
 legax=[]
 legstr=[]
-(pl1,pl2,pl3)=ax1.plot(x*1e3,sigma_closure/1e6,'-',
-                       x*1e3,sigma/1e6,'-',
-                       x*1e3,(sigma-sigma_closure)/1e6,'-')
-legax.extend([pl1,pl2,pl3])
-legstr.extend(['Closure stress','Tensile stress','$ \\sigma - \\sigma_{\\mbox{\\tiny closure}}$'])
+(pl1,pl2)=ax1.plot(x*1e3,-sigma_closure/1e6,'-',
+                       x*1e3,sigma/1e6,'-')
+legax.extend([pl1,pl2])
+legstr.extend(['Closure stress','Contact stress'])
 ax1.set_xlabel('Position (mm)')
 ax1.set_ylabel('Stress (MPa)')
 

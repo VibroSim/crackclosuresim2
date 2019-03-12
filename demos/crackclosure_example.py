@@ -113,11 +113,10 @@ if use_crackclosuresim:
 (fig,ax1) = pl.subplots()
 legax=[]
 legstr=[]
-(pl1,pl2,pl3)=ax1.plot(x*1e3,sigma_closure/1e6,'-',
-                       x*1e3,sigma/1e6,'-',
-                       x*1e3,(sigma-(sigma_closure*(sigma_closure > 0)))/1e6,'-')
-legax.extend([pl1,pl2,pl3])
-legstr.extend(['Closure stress','Tensile stress','$ \\sigma - \\sigma_{\\mbox{\\tiny closure}}$'])
+(pl1,pl2)=ax1.plot(x*1e3,-sigma_closure/1e6,'-',
+                       x*1e3,sigma/1e6,'-')
+legax.extend([pl1,pl2])
+legstr.extend(['Closure stress','Contact stress'])
 if (use_crackclosuresim):
     (pl4,)=ax1.plot(ccs_closurestate[0]*1e3,ccs_closurestate[1]/1e6,'-')
     legax.append(pl4)
@@ -169,11 +168,10 @@ if use_crackclosuresim:
 (fig2,ax21) = pl.subplots()
 legax=[]
 legstr=[]
-(pl21,pl22,pl23)=ax21.plot(x*1e3,sigma_closure2/1e6,'-',
-                           x*1e3,sigma2/1e6,'-',
-                           x*1e3,(sigma2-(sigma_closure2*(sigma_closure2 > 0)))/1e6,'-')
-legax.extend([pl21,pl22,pl23])
-legstr.extend(['Closure stress','Tensile stress','$ \\sigma - \\sigma_{\\mbox{\\tiny closure}}$'])
+(pl21,pl22)=ax21.plot(x*1e3,-sigma_closure2/1e6,'-',
+                           x*1e3,sigma2/1e6,'-')
+legax.extend([pl21,pl22])
+legstr.extend(['Closure stress','Contact stress'])
 if (use_crackclosuresim):
     (pl24,)=ax21.plot(ccs_closurestate2[0]*1e3,ccs_closurestate2[1]/1e6,'-')
     legax.append(pl24)
@@ -225,11 +223,10 @@ if use_crackclosuresim:
 (fig3,ax31) = pl.subplots()
 legax=[]
 legstr=[]
-(pl31,pl32,pl33)=ax31.plot(x*1e3,sigma_closure3/1e6,'-',
-                           x*1e3,sigma3/1e6,'-',
-                           x*1e3,(sigma3-(sigma_closure3*(sigma_closure3 > 0)))/1e6,'-')
-legax.extend([pl31,pl32,pl33])
-legstr.extend(['Closure stress','Tensile stress','$ \\sigma - \\sigma_{\\mbox{\\tiny closure}}$'])
+(pl31,pl32)=ax31.plot(x*1e3,-sigma_closure3/1e6,'-',
+                           x*1e3,sigma3/1e6,'-')
+legax.extend([pl31,pl32])
+legstr.extend(['Closure stress','Contact stress'])
 if (use_crackclosuresim):
     (pl34,)=ax31.plot(ccs_closurestate3[0]*1e3,ccs_closurestate3[1]/1e6,'-')
     legax.append(pl34)
