@@ -978,24 +978,8 @@ def solve_normalstress_tensile(x,x_bnd,sigma_closure,dx,sigmaext_max,a,sigma_yie
             pass
         pass
     
-    #sigma_with_sigma_closure=sigma-sigma_closure*(x > use_xt_start)*(x <= a)  # sigma_closure only contributes after where we started peeling it open
+    sigma_with_sigma_closure=sigma-sigma_closure*(x > use_xt_start)*(x <= a)  # sigma_closure only contributes after where we started peeling it open
 
-    sigma_with_sigma_closure=sigma.copy()
-    # sigma_closure should be superimposed with the
-    # external load effect sigma over the entire region
-    # where the crack is closed.
-    # this is presumbly true everywhere beyond the current segment up to the crack length a WE SHOULD PROBABLY DEAL BETTER WITH THE LAST SEGMENT AT THE TIP!
-    sigma_with_sigma_closure[(xt_idx+1):][x[(xt_idx+1):] <= a] -= sigma_closure[xt_idx+1:][x[(xt_idx+1):] <= a]
-
-    # The current segment (indexd by xt_idx) may be partial,
-    # so weight it according to the portion that is actually closed
-    
-    sigma_with_sigma_closure[xt_idx] -= sigma_closure[xt_idx]*(use_xt2-x_bnd[xt_idx])/dx;
-    
-    # correct any small residual compression
-    if sigma_with_sigma_closure[xt_idx] < 0.0:
-        sigma_with_sigma_closure[xt_idx]=0.0
-        pass
 
     
     return (use_xt2, sigma_with_sigma_closure, tensile_displ)
