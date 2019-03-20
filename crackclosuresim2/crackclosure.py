@@ -699,7 +699,7 @@ def solve_incremental_tensilestress(x,x_bnd,sigma,sigma_closure,tensile_displ,xt
 
 
 
-def solve_incremental_compressivestress(x,x_bnd,sigma,sigma_closure,tensile_displ,use_xt2,xt_idx,dx,sigmaext,sigmaext_max,a,crack_model,calculate_displacements=True):
+def solve_incremental_compressivestress(x,x_bnd,sigma,sigma_closure,tensile_displ,use_xt2,xt_idx,dx,sigmaext,sigmaext_max,a,sigma_yield,crack_model,calculate_displacements=True):
     """Like solve_incremental_tensilestress but for negative sigmaext and sigmaext_max    """
 
     next_bound = x_bnd[xt_idx]
@@ -726,7 +726,14 @@ def solve_incremental_compressivestress(x,x_bnd,sigma,sigma_closure,tensile_disp
 
         # Bound it by 0  and the F that will give the maximum
         # contribution of sigma_increment: 2.0*(sigmaext_max-sigmaext1)/(xt2-xt1)
-        Fbnd = 2.0*(sigmaext_max - sigmaext)/(next_bound-use_xt2)
+        # (F is positive, in general... next_bound is smaller than use_xt2)
+        if np.isinf(sigmaext_max): # sigmaext_max is -inf when we are closing the crack all the way to find out opening displacement
+            Fbnd = 2.0*(-sigma_yield)/(next_bound-use_xt2)
+            pass
+        else:
+            Fbnd = 2.0*(sigmaext_max - sigmaext)/(next_bound-use_xt2)
+            pass
+        
         # Increase Fbnd until we get a negative result from obj_fcn
         while Fbnd != 0.0 and obj_fcn(Fbnd) > 0.0:
             Fbnd*=2.0;
@@ -788,6 +795,12 @@ def solve_incremental_compressivestress(x,x_bnd,sigma,sigma_closure,tensile_disp
         ret_displ=None
         pass
 
+    
+    # Limit compressive stresses at physical tip (and elsewhere) to yield
+    sigma_increment[sigma + sigma_increment < -sigma_yield] = -sigma_yield-sigma[sigma+sigma_increment < -sigma_yield]
+
+
+    #assert((sigma+sigma_increment <= 0.0).all())
     
     return (use_xt1,sigmaext2, sigma+sigma_increment, ret_displ) 
    
@@ -912,8 +925,11 @@ def solve_normalstress_tensile(x,x_bnd,sigma_closure,dx,sigmaext_max,a,sigma_yie
                 print("Tensile displacement @ x=%f mm: %f nm" % (x[0]*1e3, tensile_displ[0]*1e9))
                 pass
             pass
-        
-        xt_idx+=1
+
+        if not done:
+            # loop back
+            xt_idx+=1
+            pass
         
         
         pass
@@ -962,18 +978,35 @@ def solve_normalstress_tensile(x,x_bnd,sigma_closure,dx,sigmaext_max,a,sigma_yie
             pass
         pass
     
-    sigma_with_sigma_closure=sigma-sigma_closure*(x > use_xt_start)*(x <= a)  # sigma_closure only contributes after where we started peeling it open
+    #sigma_with_sigma_closure=sigma-sigma_closure*(x > use_xt_start)*(x <= a)  # sigma_closure only contributes after where we started peeling it open
+
+    sigma_with_sigma_closure=sigma.copy()
+    # sigma_closure should be superimposed with the
+    # external load effect sigma over the entire region
+    # where the crack is closed.
+    # this is presumbly true everywhere beyond the current segment up to the crack length a WE SHOULD PROBABLY DEAL BETTER WITH THE LAST SEGMENT AT THE TIP!
+    sigma_with_sigma_closure[(xt_idx+1):][x[(xt_idx+1):] <= a] -= sigma_closure[xt_idx+1:][x[(xt_idx+1):] <= a]
+
+    # The current segment (indexd by xt_idx) may be partial,
+    # so weight it according to the portion that is actually closed
+    
+    sigma_with_sigma_closure[xt_idx] -= sigma_closure[xt_idx]*(use_xt2-x_bnd[xt_idx])/dx;
+    
+    # correct any small residual compression
+    if sigma_with_sigma_closure[xt_idx] < 0.0:
+        sigma_with_sigma_closure[xt_idx]=0.0
+        pass
+
     
     return (use_xt2, sigma_with_sigma_closure, tensile_displ)
 
-def solve_normalstress_compressive(x,x_bnd,sigma_closure,dx,sigmaext_max,a,sigma_yield,crack_model,verbose=False, diag_plots=False,calculate_displacements=True):
+
+def initialize_normalstress_compressive(x,x_bnd,sigma_closure,dx,sigmaext_max,a,sigma_yield,crack_model,calculate_displacements):
     #Initialize the external applied compressive stress (sigmaext_max negative) starting at zero
     
     sigmaext = 0.0 # External tensile load in this step (Pa)
 
     
-
-    #####MAIN SUPERPOSITION LOOP
 
     #Initialize tensile stress field (function of x)
     sigma = np.zeros(x.shape,dtype='d')
@@ -1016,7 +1049,7 @@ def solve_normalstress_compressive(x,x_bnd,sigma_closure,dx,sigmaext_max,a,sigma
         sigma_increment[si_nodivzero_nonegsqrt] = (fullyopen_compression) + sigmaI_theta0_times_rootr_over_sqrt_a_over_sigmaext*(fullyopen_compression)*sqrt(a)/sqrt(x[si_nodivzero_nonegsqrt]-a)
         sigma_increment[si_divzero]=-np.inf
         
-        # Limit tensile stresses at physical tip (and elsewhere) to yield
+        # Limit compressive stresses at physical tip (and elsewhere) to yield
         sigma_increment[sigma + sigma_increment < -sigma_yield] = -sigma_yield-sigma[sigma+sigma_increment < -sigma_yield]
         
         # accumulate stresses onto sigma
@@ -1064,6 +1097,22 @@ def solve_normalstress_compressive(x,x_bnd,sigma_closure,dx,sigmaext_max,a,sigma
         assert(0) # Shouldn't be possible
         pass
 
+
+
+    return (sigmaext,sigma,tensile_displ,xt_idx,use_xt2,use_xt1)
+
+
+def crackopening_from_tensile_closure(x,x_bnd,sigma_closure,dx,a,sigma_yield,crack_model):
+    """Based on the assumed closure model, whereby we give a 
+meaning to "tensile" closure stresses -- based on the compressive 
+loading required to close the crack to that point -- we can determine
+an opening profile for the unloaded crack. This function calculates
+that crack opening"""
+
+
+    sigmaext_max=-np.inf # as much external compression as we need
+    
+    (sigmaext,sigma,tensile_displ,xt_idx,use_xt2,use_xt1) = initialize_normalstress_compressive(x,x_bnd,sigma_closure,dx,sigmaext_max,a,sigma_yield,crack_model,calculate_displacements=True)
     
     done=False
 
@@ -1074,7 +1123,51 @@ def solve_normalstress_compressive(x,x_bnd,sigma_closure,dx,sigmaext_max,a,sigma
     
     while not done: 
         
-        (use_xt1,sigmaext, sigma, tensile_displ) = solve_incremental_compressivestress(x,x_bnd,sigma,sigma_closure,tensile_displ,use_xt2,xt_idx,dx,sigmaext,sigmaext_max,a,crack_model,calculate_displacements=calculate_displacements)
+        (use_xt1,sigmaext, sigma, tensile_displ) = solve_incremental_compressivestress(x,x_bnd,sigma,sigma_closure,tensile_displ,use_xt2,xt_idx,dx,sigmaext,sigmaext_max,a,sigma_yield,crack_model,calculate_displacements=True)
+        
+        
+        if use_xt1 <= 0.0:
+            # Used up  all of our crack... Done!
+            done=True
+            pass
+        
+        #if verbose: 
+        #    #Print what is happening in the loop
+        #    print("Step: %d @ x=%f mm: %f MPa of compression held" % (xt_idx,x[xt_idx]*1e3,-sigmaext/1e6))
+        #    if calculate_displacements:
+        #        print("Tensile displacement @ x=%f mm: %f nm" % (x[0]*1e3, tensile_displ[0]*1e9))
+        #        pass
+        #    pass
+        
+        xt_idx-=1
+        use_xt2=use_xt1
+        if not done:
+            assert(x_bnd[xt_idx+1]==use_xt2)
+            pass
+        pass
+
+    return -tensile_displ
+
+
+def solve_normalstress_compressive(x,x_bnd,sigma_closure,dx,sigmaext_max,a,sigma_yield,crack_model,verbose=False, diag_plots=False,calculate_displacements=True):
+    
+    #####MAIN SUPERPOSITION LOOP
+
+
+    (sigmaext,sigma,tensile_displ,xt_idx,use_xt2,use_xt1) = initialize_normalstress_compressive(x,x_bnd,sigma_closure,dx,sigmaext_max,a,sigma_yield,crack_model,calculate_displacements)
+
+    #assert((sigma <= 0.0).all())
+
+    done=False
+
+    #if sigmaext==sigmaext_max:
+    #    # Used up all of our applied load...  Done!
+    #    done=True
+    #    pass
+    
+    while not done: 
+        
+        (use_xt1,sigmaext, sigma, tensile_displ) = solve_incremental_compressivestress(x,x_bnd,sigma,sigma_closure,tensile_displ,use_xt2,xt_idx,dx,sigmaext,sigmaext_max,a,sigma_yield,crack_model,calculate_displacements=calculate_displacements)
         
         
         if use_xt1 > x_bnd[xt_idx] or sigmaext==sigmaext_max or use_xt1 <= 0.0:
@@ -1090,11 +1183,15 @@ def solve_normalstress_compressive(x,x_bnd,sigma_closure,dx,sigmaext_max,a,sigma
                 pass
             pass
         
-        xt_idx-=1
-        use_xt2=use_xt1
         if not done:
+            # loop back
             assert(x_bnd[xt_idx+1]==use_xt2)
+
+            xt_idx-=1
+            use_xt2=use_xt1
+            
             pass
+        
         pass
 
     if use_xt1 <= 0.0: 
@@ -1109,7 +1206,8 @@ def solve_normalstress_compressive(x,x_bnd,sigma_closure,dx,sigmaext_max,a,sigma
         sigma += uniform_tension
         sigmaext += uniform_tension
 
-        
+        #assert((sigma <= 0.0).all())
+
         if verbose:
             print("Step: Closed to center: %f MPa of compression held" % (sigmaext/1e6))
             if calculate_displacements:
@@ -1119,8 +1217,31 @@ def solve_normalstress_compressive(x,x_bnd,sigma_closure,dx,sigmaext_max,a,sigma
             pass
         pass
 
-    sigma_with_sigma_closure=sigma-sigma_closure*(x > use_xt1)*(x <= a)  # sigma_closure only contributes after the effective tip
+    #assert((sigma <= 0.0).all())
+
+    #sigma_with_sigma_closure=sigma-sigma_closure*(x > use_xt1)*(x <= a)  # sigma_closure only contributes after the effective tip
+
+    sigma_with_sigma_closure=sigma.copy()
+    # sigma_closure should be superimposed with the
+    # external load effect sigma over the entire region
+    # where the crack is closed.
+    # this is presumbly true everywhere beyond the current segment up to the crack length a WE SHOULD PROBABLY DEAL BETTER WITH THE LAST SEGMENT AT THE TIP!
+    sigma_with_sigma_closure[(xt_idx+1):][x[(xt_idx+1):] <= a] -= sigma_closure[xt_idx+1:][x[(xt_idx+1):] <= a]
+
+    # The current segment (indexd by xt_idx) may be partial,
+    # so weight it according to the portion that is actually closed
     
+    sigma_with_sigma_closure[xt_idx] -= sigma_closure[xt_idx]*(use_xt2-use_xt1)/dx;
+
+    # correct any small residual tension
+    if sigma_with_sigma_closure[xt_idx] > 0.0:
+        sigma_with_sigma_closure[xt_idx]=0.0
+        pass
+    
+        
+    
+    #assert((sigma_with_sigma_closure <= 0.0).all())
+
     return (use_xt1, sigma_with_sigma_closure, tensile_displ)
 
 def solve_normalstress(x,x_bnd,sigma_closure,dx,sigmaext_max,a,sigma_yield,crack_model,verbose=False, diag_plots=False,calculate_displacements=True):

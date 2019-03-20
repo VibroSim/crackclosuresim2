@@ -137,6 +137,8 @@ if use_crackclosuresim:
     pass
 align_yaxis(ax1,0,ax2,0)
 ax2.set_ylabel('Tensile displacement (nm)')
+ax2axis=ax2.axis()
+ax2.axis([ax2axis[0],ax2axis[1],ax2axis[2]*10,ax2axis[3]*10])
 pl.legend(legax,legstr)
 #fig.tight_layout()
 pl.title('Closed crack')
