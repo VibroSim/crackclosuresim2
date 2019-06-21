@@ -3,6 +3,7 @@ import sys
 import os
 import os.path
 import subprocess
+import re
 from setuptools import setup
 from setuptools.command.install_lib import install_lib
 from setuptools.command.install import install
@@ -39,14 +40,19 @@ if os.path.exists(".git"):
 
     # See if we can get a more meaningful description from "git describe"
     try:
-        version=subprocess.check_output(["git","describe","--tags","--match=v*"],stderr=subprocess.STDOUT).strip()
+        versionraw=subprocess.check_output(["git","describe","--tags","--match=v*"],stderr=subprocess.STDOUT).strip()
+        # versionraw is like v0.1.0-50-g434343
+        # for compatibility with PEP 440, change it to
+        # something like 0.1.0+50.g434343
+        matchobj=re.match(r"""v([^.]+[.][^.]+[.][^-.]+)-(.*)""",versionraw)
+        version=matchobj.group(1)+'+'+matchobj.group(2).replace("-",".")
         pass
     except subprocess.CalledProcessError:
         # Ignore error, falling back to above version string
         pass
 
     if modified:
-        version += "-MODIFIED"
+        version += ".modified"
         pass
     pass
 else:
