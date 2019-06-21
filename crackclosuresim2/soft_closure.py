@@ -166,7 +166,7 @@ def sigmacontact_from_displacement(scp,u):
     sigma_contact[displacement < 0.0] = ((-displacement[displacement < 0.0])**(3.0/2.0)) * scp.Hm
 
     
-    return sigma_contact
+    return (sigma_contact,displacement)
 
 
 def sigmacontact_from_stress(scp,u):
@@ -222,7 +222,7 @@ def goal_function(param,scp,sigma_ext):
     
     # sigmacontact is positive compression
     
-    from_displacement = sigmacontact_from_displacement(scp,u)
+    (from_displacement,displacement) = sigmacontact_from_displacement(scp,u)
     from_stress = sigmacontact_from_stress(scp,u)
     
     # elements of residual have units of stress^2
@@ -232,6 +232,21 @@ def goal_function(param,scp,sigma_ext):
     negative = average[average < 0]  # negative sigmacontact means tension on the surfaces, which is not allowed!
     
     return np.sum(residual**2.0) + np.sum(negative**2.0) + residual.shape[0]*(u[scp.afull_idx_fine]-sigma_ext)**2.0
+
+
+def calc_contact(scp,sigma_ext):
+    iniguess=np.arange(scp.afull_idx+1,dtype='d')/(scp.afull_idx+1) * sigma_ext
+    
+    res = scipy.optimize.minimize(goal_function,iniguess,args=(scp,sigma_ext),
+                                  options={"eps": 10000.0})
+    #res = scipy.optimize.minimize(goal_function,iniguess,method='nelder-mead',options={"maxfev": 15000})
+
+    param=res.x
+    
+    u = tip_field_integral(scp,param)
+    (contact_stress,displacement) = sigmacontact_from_displacement(scp,u)
+
+    return (param,contact_stress,displacement)
     
 
 def doplots(scp,param):
@@ -246,7 +261,7 @@ def doplots(scp,param):
 
     du_da = np.concatenate((np.array((0.0,),dtype='d'),np.diff(u)/scp.dx_fine,np.array((0.0,),dtype='d'))) # defined on the boundaries xbnd_fine
 
-    from_displacement = sigmacontact_from_displacement(scp,u)
+    (from_displacement,displacement) = sigmacontact_from_displacement(scp,u)
     from_stress = sigmacontact_from_stress(scp,u)
 
     pl.figure(1)
