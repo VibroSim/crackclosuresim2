@@ -1263,6 +1263,7 @@ def inverse_closure(reff,seff,x,x_bnd,dx,xt,sigma_yield,crack_model,verbose=Fals
     sigma_closure = np.ones(x.shape,dtype='d')*np.inf
     
     last_closure = seff[0] # If everything is closed, then closure stresses and external loads match. 
+    last_reff = reff[0]
     
     for lcnt in range(1,reff.shape[0]):
         # In each step, we solve for a new linear segment
@@ -1273,6 +1274,11 @@ def inverse_closure(reff,seff,x,x_bnd,dx,xt,sigma_yield,crack_model,verbose=Fals
         # external load of seff[lcnt-1] opening the
         # crack to this point
 
+        if lcnt==7:
+            import pdb
+            pdb.set_trace()
+            pass
+
         # So at this step, if the new closure stress is
         # new_closure, then
         # in between we have a line:
@@ -1282,6 +1288,10 @@ def inverse_closure(reff,seff,x,x_bnd,dx,xt,sigma_yield,crack_model,verbose=Fals
         # (reff[lcnt], sigma, tensile_displ) = solve_normalstress(x,x_bnd,sigma_closure,dx,seff[lcnt],a,sigma_yield,crack_model)
         # For the given reff[lcnt], seff[lcnt]
 
+        if reff[lcnt] < last_reff+dx/10.0:
+            # if the opening step is too small, skip this iteration
+            # to avoid dividing by zero
+            continue
         
         if lcnt==1:
             # first iteration: extrapolate back to crack center
@@ -1295,7 +1305,8 @@ def inverse_closure(reff,seff,x,x_bnd,dx,xt,sigma_yield,crack_model,verbose=Fals
             pass
         else:
             #new_zone = (x_bnd[1:] >= reff[lcnt-1]) & (x_bnd[:-1] <= reff[lcnt])
-            new_zone = (x_bnd[1:] >= reff[lcnt-1])
+            #new_zone = (x_bnd[1:] >= reff[lcnt-1])
+            new_zone = (x_bnd[1:] >= last_reff)
             pass
 
         
@@ -1303,7 +1314,7 @@ def inverse_closure(reff,seff,x,x_bnd,dx,xt,sigma_yield,crack_model,verbose=Fals
             new_closure_field = copy.copy(sigma_closure)
 
             
-            new_closure_field[new_zone] = last_closure + (new_closure-last_closure) * (x[new_zone]-reff[lcnt-1])/(reff[lcnt]-reff[lcnt-1])
+            new_closure_field[new_zone] = last_closure + (new_closure-last_closure) * (x[new_zone]-last_reff)/(reff[lcnt]-last_reff)
 
             (gotreff, sigma, tensile_displ) = solve_normalstress(x,x_bnd,new_closure_field,dx,seff[lcnt],xt,sigma_yield,crack_model,calculate_displacements=False,verbose=verbose)
 
@@ -1321,7 +1332,7 @@ def inverse_closure(reff,seff,x,x_bnd,dx,xt,sigma_yield,crack_model,verbose=Fals
         
         if ier != 1:
 
-            if lcnt > 0 and reff[lcnt-1] >= xt-dx/4.0:
+            if lcnt > 0 and last_reff >= xt-dx/4.0:
                 # if we don't converge and previous step was within
                 # a quarter-step of the end, claim we are good
                 # and quit.
@@ -1332,11 +1343,12 @@ def inverse_closure(reff,seff,x,x_bnd,dx,xt,sigma_yield,crack_model,verbose=Fals
             sys.modules["__main__"].__dict__.update(locals())
             raise ValueError("Error in inverse_closure fsolve: %s" % str(mesg))
         
-        closure_gradient = (new_closure-last_closure)/(reff[lcnt]-reff[lcnt-1])
+        closure_gradient = (new_closure-last_closure)/(reff[lcnt]-last_reff)
         
-        sigma_closure[new_zone] = last_closure + (new_closure-last_closure) * (x[new_zone]-reff[lcnt-1])/(reff[lcnt]-reff[lcnt-1])
+        sigma_closure[new_zone] = last_closure + (new_closure-last_closure) * (x[new_zone]-last_reff)/(reff[lcnt]-last_reff)
         
         last_closure = new_closure
+        last_reff = reff[lcnt]
         pass
 
     if reff[lcnt] < xt:

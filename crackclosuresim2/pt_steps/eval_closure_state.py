@@ -1,4 +1,5 @@
 import sys
+import csv
 import ast
 import copy
 import posixpath
@@ -24,6 +25,7 @@ def run(_xmldoc,_element,
         dc_measnum_int,
         dc_closureprofile_href,
         dc_spcYoungsModulus_numericunits,
+        dc_spcPoissonsRatio_numericunits,
         dc_crackpath,
         dc_coordinatetransform,
         dc_symmetric_cod_bool=True,
@@ -33,7 +35,7 @@ def run(_xmldoc,_element,
     sigma_yield = 400e6
     tau_yield = sigma_yield/2.0 # limits stress concentration around singularity
     E=dc_spcYoungsModulus_numericunits.value("Pa")
-    nu = 0.33    #Poisson's Ratio
+    nu = dc_spcPoissonsRatio_numericunits.value("unitless")   #Poisson's Ratio
     specimen_width=25.4e-3
 
 
@@ -90,20 +92,86 @@ def run(_xmldoc,_element,
         a_side1=np.max(observed_reff_side1)
         pass
     
-    sigma_closure = inverse_closure(observed_reff_side1,
-                                    observed_seff_side1,
-                                    x,x_bnd,dx,a_side1,sigma_yield,
-                                    crack_model)
+    sigma_closure_side1 = inverse_closure(observed_reff_side1,
+                                          observed_seff_side1,
+                                          x,x_bnd,dx,a_side1,sigma_yield,
+                                          crack_model)
+
+
+    # side 2 (right side)
+    observed_reff_side2 = tippos_side2 - CrackCenterX
+    observed_seff_side2 = loads
+
+
+    if (observed_reff_side2 > a_side2).any():
+        a_side2=np.max(observed_reff_side2)
+        pass
+    
+    sigma_closure_side2 = inverse_closure(observed_reff_side2,
+                                          observed_seff_side2,
+                                          x,x_bnd,dx,a_side2,sigma_yield,
+                                          crack_model)
 
     
     # Forward cross-check of closure
     pl.figure()
-    pl.plot(x*1e3,sigma_closure,'-',
-            observed_reff*1e3,observed_seff,'x')
-    for observcnt in range(len(observed_reff)):        
-        (effective_length, sigma, tensile_displ) = solve_normalstress(x,x_bnd,sigma_closure,dx,observed_seff[observcnt],a,sigma_yield,crack_model)
-        pl.plot(effective_length*1e3,observed_seff[observcnt],'o')
+    pl.plot(x[x < a_side1]*1e3,sigma_closure_side1[x < a_side1]/1e6,'-',
+            observed_reff_side1*1e3,observed_seff_side1/1e6,'x')
+    for observcnt in range(len(observed_reff_side1)):        
+        (effective_length, sigma, tensile_displ) = solve_normalstress(x,x_bnd,sigma_closure_side1,dx,observed_seff_side1[observcnt],a_side1,sigma_yield,crack_model)
+        pl.plot(effective_length*1e3,observed_seff_side1[observcnt]/1e6,'.')
         #pl.plot(x*1e3,tensile_displ*1e15,'-')
         pass
+    pl.grid()
+    pl.legend(('Closure stress field','Observed crack tip posn','Recon. crack tip posn'),loc="best")
+    pl.xlabel('Radius from crack center')
+    pl.ylabel('Stress (MPa)')
     pl.title('Side 1 (left)')
-    pl.show()
+    closureplot_side1_href = hrefv(posixpath.splitext(dc_closureprofile_href.get_bare_quoted_filename())[0]+"_closurestress_side1.png",contexthref=_dest_href)
+    pl.savefig(closureplot_side1_href.getpath(),dpi=300)
+
+
+    pl.figure()
+    pl.plot(x[x < a_side2]*1e3,sigma_closure_side2[x < a_side2]/1e6,'-',
+            observed_reff_side2*1e3,observed_seff_side2/1e6,'x')
+    for observcnt in range(len(observed_reff_side2)):        
+        (effective_length, sigma, tensile_displ) = solve_normalstress(x,x_bnd,sigma_closure_side2,dx,observed_seff_side2[observcnt],a_side2,sigma_yield,crack_model)
+        pl.plot(effective_length*1e3,observed_seff_side2[observcnt]/1e6,'.')
+        #pl.plot(x*1e3,tensile_displ*1e15,'-')
+        pass
+    pl.grid()
+    pl.legend(('Closure stress field','Observed crack tip posn','Recon. crack tip posn'),loc="best")
+    pl.title('Side 2 (right)')
+    pl.xlabel('Radius from crack center')
+    pl.ylabel('Stress (MPa)')
+    closureplot_side2_href = hrefv(posixpath.splitext(dc_closureprofile_href.get_bare_quoted_filename())[0]+"_closurestress_side2.png",contexthref=_dest_href)
+    pl.savefig(closureplot_side2_href.getpath(),dpi=300)
+
+    closurestress_side1_href=hrefv(posixpath.splitext(dc_closureprofile_href.get_bare_quoted_filename())[0]+"_closurestress_side1.csv",contexthref=_dest_href)
+    with open(closurestress_side1_href.getpath(),"wb") as csvfile:
+        cpwriter = csv.writer(csvfile)
+        cpwriter.writerow(["Crack radius (m)","Closure stress (side 1, Pa)"])
+        for poscnt in range(np.count_nonzero(x < a_side1)):
+            cpwriter.writerow([ x[poscnt], sigma_closure_side1[poscnt]])
+            pass
+        pass
+
+    closurestress_side2_href=hrefv(posixpath.splitext(dc_closureprofile_href.get_bare_quoted_filename())[0]+"_closurestress_side2.csv",contexthref=_dest_href)
+    with open(closurestress_side2_href.getpath(),"wb") as csvfile:
+        cpwriter = csv.writer(csvfile)
+        cpwriter.writerow(["Crack radius (m)","Closure stress (side 1, Pa)"])
+        for poscnt in range(np.count_nonzero(x < a_side2)):
+            cpwriter.writerow([ x[poscnt], sigma_closure_side2[poscnt]])
+            pass
+        pass
+
+    return {
+        "dc:closurestress_side1": closurestress_side1_href,
+        "dc:closureplot_side1": closureplot_side1_href,
+        "dc:closurestress_side2": closurestress_side2_href,
+        "dc:closureplot_side2": closureplot_side2_href,
+    }
+    
+    #pl.show()
+
+    
