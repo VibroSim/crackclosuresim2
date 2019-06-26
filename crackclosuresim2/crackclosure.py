@@ -1241,7 +1241,7 @@ def solve_normalstress(x,x_bnd,sigma_closure,dx,sigmaext_max,a,sigma_yield,crack
         return solve_normalstress_compressive(x,x_bnd,sigma_closure,dx,sigmaext_max,a,sigma_yield,crack_model,verbose=verbose,diag_plots=diag_plots,calculate_displacements=calculate_displacements)
     pass
 
-def inverse_closure_broken(reff,seff,x,x_bnd,dx,xt,sigma_yield,crack_model,verbose=False):
+def inverse_closure(reff,seff,x,x_bnd,dx,xt,sigma_yield,crack_model,verbose=False):
     """ Given effective crack lengths reff at externally applied loads seff,
     calculate a closure stress field that produces such a field.
     reff,seff presumed to be ordered from most compressive to 
@@ -1350,7 +1350,7 @@ def inverse_closure_broken(reff,seff,x,x_bnd,dx,xt,sigma_yield,crack_model,verbo
 
 
 
-def inverse_closure(reff,seff,x,x_bnd,dx,xt,sigma_yield,crack_model,verbose=False):
+def inverse_closure_backwards_broken(reff,seff,x,x_bnd,dx,xt,sigma_yield,crack_model,verbose=False):
     """ Given effective crack lengths reff at externally applied loads seff,
     calculate a closure stress field that produces such a field.
     reff,seff presumed to be ordered from most compressive to 
@@ -1366,6 +1366,8 @@ def inverse_closure(reff,seff,x,x_bnd,dx,xt,sigma_yield,crack_model,verbose=Fals
     to reff[0] is assumed to match seff[0]. 
 
 
+    NOTE: This version implements it backwards (tip to center) 
+    and is broken
 """
 
     assert((np.diff(seff) > 0).all())
