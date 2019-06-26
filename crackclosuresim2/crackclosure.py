@@ -1,5 +1,6 @@
 
 import sys
+import copy
 import numpy as np
 from numpy import sqrt,log,pi,cos,arctan
 import scipy.optimize
