@@ -1300,7 +1300,7 @@ def inverse_closure(reff,seff,x,x_bnd,dx,xt,sigma_yield,crack_model,verbose=Fals
 
         
         def goal(new_closure):
-            new_closure_field = sigma_closure
+            new_closure_field = copy.copy(sigma_closure)
 
             
             new_closure_field[new_zone] = last_closure + (new_closure-last_closure) * (x[new_zone]-reff[lcnt-1])/(reff[lcnt]-reff[lcnt-1])
