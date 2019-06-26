@@ -1286,10 +1286,16 @@ def inverse_closure(reff,seff,x,x_bnd,dx,xt,sigma_yield,crack_model,verbose=Fals
         if lcnt==1:
             # first iteration: extrapolate back to crack center
             # if necessary  ***!!!! May want to fix this
-            new_zone = (x_bnd[:-1] <= reff[lcnt])
+            #new_zone = (x_bnd[:-1] <= reff[lcnt])
+
+            # providing closure stresses to right of closure point is useful
+            # because intermediate calculations may examine more open cases,
+            # and having nice behavior here improves convergence
+            new_zone=np.ones(x.shape,dtype='d')
             pass
         else:
-            new_zone = (x_bnd[1:] >= reff[lcnt-1]) & (x_bnd[:-1] <= reff[lcnt])
+            #new_zone = (x_bnd[1:] >= reff[lcnt-1]) & (x_bnd[:-1] <= reff[lcnt])
+            new_zone = (x_bnd[1:] >= reff[lcnt-1])
             pass
 
         
