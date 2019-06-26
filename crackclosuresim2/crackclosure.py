@@ -1282,25 +1282,20 @@ def inverse_closure(reff,seff,x,x_bnd,dx,xt,sigma_yield,crack_model,verbose=Fals
         # (reff[lcnt], sigma, tensile_displ) = solve_normalstress(x,x_bnd,sigma_closure,dx,seff[lcnt],a,sigma_yield,crack_model)
         # For the given reff[lcnt], seff[lcnt]
 
+        
+        if lcnt==1:
+            # first iteration: extrapolate back to crack center
+            # if necessary  ***!!!! May want to fix this
+            new_zone = (x_bnd[:-1] <= reff[lcnt])
+            pass
+        else:
+            new_zone = (x_bnd[1:] >= reff[lcnt-1]) & (x_bnd[:-1] <= reff[lcnt])
+            pass
+
+        
         def goal(new_closure):
             new_closure_field = sigma_closure
 
-            if lcnt==1:
-                # first iteration: extrapolate back to crack center
-                # if necessary
-                #new_zone = (x <= reff[lcnt])
-
-                # extrapolate out beyond reff[lcnt] to help with
-                # convergence
-
-                new_zone = np.ones(x.shape,dtype=np.bool)
-                pass
-            else:
-                #new_zone = (x >= reff[lcnt-1]) & (x <= reff[lcnt])
-                # extrapolate out beyond reff[lcnt] to help with
-                # convergence
-                new_zone = (x >= reff[lcnt-1]) 
-                pass
             
             new_closure_field[new_zone] = last_closure + (new_closure-last_closure) * (x[new_zone]-reff[lcnt-1])/(reff[lcnt]-reff[lcnt-1])
 
@@ -1316,15 +1311,6 @@ def inverse_closure(reff,seff,x,x_bnd,dx,xt,sigma_yield,crack_model,verbose=Fals
             sys.modules["__main__"].__dict__.update(globals())
             sys.modules["__main__"].__dict__.update(locals())
             raise ValueError("Error in inverse_closure fsolve: %s" % str(mesg))
-        
-        if lcnt==1:
-            # first iteration: extrapolate back to crack center
-            # if necessary
-            new_zone = (x <= reff[lcnt])
-            pass
-        else:
-            new_zone = (x >= reff[lcnt-1]) & (x <= reff[lcnt])
-            pass
         
         closure_gradient = (new_closure-last_closure)/(reff[lcnt]-reff[lcnt-1])
         
