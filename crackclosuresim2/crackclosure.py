@@ -1309,9 +1309,15 @@ def inverse_closure(reff,seff,x,x_bnd,dx,xt,sigma_yield,crack_model,verbose=Fals
 
             return reff[lcnt]-gotreff
 
-        
-        
-        (new_closure,infodict,ier,mesg) = scipy.optimize.fsolve(goal,seff[lcnt]*4.0,full_output=True)
+        solvecnt=0
+        inifactor=1.0
+        while solvecnt < 20:
+            (new_closure,infodict,ier,mesg) = scipy.optimize.fsolve(goal,seff[lcnt]*inifactor,full_output=True)
+            if ier==1:
+                break
+            inifactor*=1.5
+            solvecnt+=1
+            pass
         
         if ier != 1:
             sys.modules["__main__"].__dict__.update(globals())
