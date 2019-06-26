@@ -66,7 +66,9 @@ def run(_xmldoc,_element,
     CrackCenterX = (crackstartx+crackendx)/2.0
 
     a = (crackendx-crackstartx)/2.0 # half-crack length (m)
-    xmax_approx = 2.0*a
+
+    # here, x really measures radius past crack center
+    xmax_approx = 1.0*a
     dx = 25e-6
     xsteps = int(xmax_approx//dx)
     xmax = dx*xsteps
