@@ -1291,7 +1291,7 @@ def inverse_closure(reff,seff,x,x_bnd,dx,xt,sigma_yield,crack_model,verbose=Fals
             # providing closure stresses to right of closure point is useful
             # because intermediate calculations may examine more open cases,
             # and having nice behavior here improves convergence
-            new_zone=np.ones(x.shape,dtype='d')
+            new_zone=np.ones(x.shape,dtype=np.bool)
             pass
         else:
             #new_zone = (x_bnd[1:] >= reff[lcnt-1]) & (x_bnd[:-1] <= reff[lcnt])
@@ -1311,7 +1311,7 @@ def inverse_closure(reff,seff,x,x_bnd,dx,xt,sigma_yield,crack_model,verbose=Fals
 
         
         
-        (new_closure,infodict,ier,mesg) = scipy.optimize.fsolve(goal,seff[lcnt],full_output=True)
+        (new_closure,infodict,ier,mesg) = scipy.optimize.fsolve(goal,seff[lcnt]*4.0,full_output=True)
         
         if ier != 1:
             sys.modules["__main__"].__dict__.update(globals())
