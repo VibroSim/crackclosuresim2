@@ -1320,6 +1320,14 @@ def inverse_closure(reff,seff,x,x_bnd,dx,xt,sigma_yield,crack_model,verbose=Fals
             pass
         
         if ier != 1:
+
+            if lcnt > 0 and reff[lcnt-1] >= xt-dx/4.0:
+                # if we don't converge and previous step was within
+                # a quarter-step of the end, claim we are good
+                # and quit.
+                break
+
+            
             sys.modules["__main__"].__dict__.update(globals())
             sys.modules["__main__"].__dict__.update(locals())
             raise ValueError("Error in inverse_closure fsolve: %s" % str(mesg))
