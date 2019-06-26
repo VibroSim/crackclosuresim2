@@ -878,7 +878,7 @@ def solve_normalstress_tensile(x,x_bnd,sigma_closure,dx,sigmaext_max,a,sigma_yie
         # Find where sigma_closure goes from negative (tensile)
         # to positive (compressive)
         
-        signchange_idxs = np.where((sigma_closure[x < a][:-1] < 0.0) & (sigma_closure[x < a][1:] >= 0.0))[0]
+        signchange_idxs = np.where((sigma_closure[x < a][:-1] <= 0.0) & (sigma_closure[x < a][1:] > 0.0))[0]
 
         if signchange_idxs.shape[0] > 0:
             xt_idx=signchange_idxs[0]
@@ -1064,7 +1064,7 @@ def initialize_normalstress_compressive(x,x_bnd,sigma_closure,dx,sigmaext_max,a,
         # to positive (compressive)
 
 
-        signchange_idxs = np.where((sigma_closure[x < a][:-1] < 0.0) & (sigma_closure[x < a][1:] >= 0.0))[0]
+        signchange_idxs = np.where((sigma_closure[x < a][:-1] <= 0.0) & (sigma_closure[x < a][1:] > 0.0))[0]
 
         if signchange_idxs.shape[0] > 0:
             xt_idx=signchange_idxs[0]
@@ -1240,7 +1240,7 @@ def solve_normalstress(x,x_bnd,sigma_closure,dx,sigmaext_max,a,sigma_yield,crack
         return solve_normalstress_compressive(x,x_bnd,sigma_closure,dx,sigmaext_max,a,sigma_yield,crack_model,verbose=verbose,diag_plots=diag_plots,calculate_displacements=calculate_displacements)
     pass
 
-def inverse_closure(reff,seff,x,x_bnd,dx,xt,sigma_yield,crack_model,verbose=False):
+def inverse_closure_broken(reff,seff,x,x_bnd,dx,xt,sigma_yield,crack_model,verbose=False):
     """ Given effective crack lengths reff at externally applied loads seff,
     calculate a closure stress field that produces such a field.
     reff,seff presumed to be ordered from most compressive to 
@@ -1256,6 +1256,7 @@ def inverse_closure(reff,seff,x,x_bnd,dx,xt,sigma_yield,crack_model,verbose=Fals
     to reff[0] is assumed to match seff[0]. 
 
 
+    ... This implementation is broken because it starts with the most closed state, and may well not converge, and I believe converges to the wrong answers
 """
 
     sigma_closure = np.ones(x.shape,dtype='d')*np.inf
@@ -1345,6 +1346,134 @@ def inverse_closure(reff,seff,x,x_bnd,dx,xt,sigma_yield,crack_model,verbose=Fals
     sigma_closure[x > xt] = 0.0
     
     return sigma_closure
+
+
+
+def inverse_closure(reff,seff,x,x_bnd,dx,xt,sigma_yield,crack_model,verbose=False):
+    """ Given effective crack lengths reff at externally applied loads seff,
+    calculate a closure stress field that produces such a field.
+    reff,seff presumed to be ordered from most compressive to 
+    most tensile. 
+
+    
+    seff is positive for tensile opening loads
+
+    returns sigma_closure that is positive for compressive
+    closure stresses. 
+
+    if seff[0] is > 0, and reff[0] > 0 then sigma_closure corresponding
+    to reff[0] is assumed to match seff[0]. 
+
+
+"""
+
+    assert((np.diff(seff) > 0).all())
+
+
+    # for a crack with no closure stresses, even an epsilon
+    # tensile opening causes the crack to open to the tips.
+
+    # We work back from the tips.
+    # at the last, radius, stress combination
+    # there is no load on the crack surface except past
+    # that last radius.
+    #
+    # sigma_closure is positive compression. 
+    
+    sigma_closure = np.zeros(x.shape,dtype='d')
+
+    last_r = xt
+    last_closure = None
+    
+    for lcnt in range(reff.shape[0]-1,-1,-1):
+        # In each step, we solve for a new linear segment
+        # of the sigma_closure distribution.
+        # we assume last_closure is the end closure stress
+        # from the previous step, corresponding to a
+        # position of reff[lcnt+1], with an
+        # external load of seff[lcnt+1] opening the
+        # crack to this point
+
+        # So at this step, if the new closure stress is
+        # new_closure, then
+        # in between we have a line:
+        # sigma_closure(x) = last_closure + (new_closure-last_closure)*(x-reff[lcnt+1])
+        # So we need to iteratively solve for a new_closure that satisfies
+        
+        # (reff[lcnt], sigma, tensile_displ) = solve_normalstress(x,x_bnd,sigma_closure,dx,seff[lcnt],a,sigma_yield,crack_model)
+        # For the given reff[lcnt], seff[lcnt]
+        
+
+        if lcnt==reff.shape[0]-1:
+            # first iteration: Don't know stress to open to tip
+            # (unless this is tip!)
+            
+            #new_zone = (x >= reff[lcnt]) & (x <= xt)
+            new_zone = (x_bnd[1:] >= reff[lcnt]) & (x_bnd[:-1] <= xt)
+            pass
+        else:
+            new_zone = (x_bnd[1:] >= reff[lcnt]) & (x_bnd[:-1] <= reff[lcnt+1])
+            #new_zone = (x >= reff[lcnt]) & (x < reff[lcnt+1])
+            pass
+        
+
+
+        def goal(new_closure):
+            new_closure_field = copy.copy(sigma_closure)
+            
+            if last_closure is not None:
+                new_closure_field[new_zone] = last_closure + (new_closure-last_closure) * (reff[lcnt+1]-x[new_zone])/(reff[lcnt+1]-reff[lcnt])   # slope
+  # slope
+                pass
+
+            else:
+                new_closure_field[new_zone] = new_closure # Horizontal line
+                pass
+            
+            (gotreff, sigma, tensile_displ) = solve_normalstress(x,x_bnd,new_closure_field,dx,seff[lcnt],xt,sigma_yield,crack_model,calculate_displacements=False,verbose=verbose)
+
+            return gotreff-reff[lcnt]
+
+        
+        if reff[lcnt] < last_r and np.count_nonzero(new_zone) > 0:
+            (new_closure,infodict,ier,mesg) = scipy.optimize.fsolve(goal,seff[lcnt]*3.4,full_output=True)
+        
+            if ier != 1:
+                sys.modules["__main__"].__dict__.update(globals())
+                sys.modules["__main__"].__dict__.update(locals())
+                raise ValueError("Error in inverse_closure fsolve: %s" % str(mesg))
+
+
+            
+            if last_closure is not None:
+                sigma_closure[new_zone] = last_closure + (new_closure-last_closure) * (reff[lcnt+1]-x[new_zone])/(reff[lcnt+1]-reff[lcnt])   # slope
+                pass
+
+            else:
+                sigma_closure[new_zone] = new_closure # Horizontal line
+                pass
+                
+            last_closure = new_closure
+            last_r = reff[lcnt]
+            pass
+        
+        pass
+    
+    #if reff[lcnt] < xt:
+    #    # don't have data out to the tips
+    #    # extrapolate last closure gradient to the tips
+    #    
+    #    new_zone = (x >= reff[lcnt])
+    #    new_closure=last_closure + closure_gradient * (xt-reff[lcnt])
+    #    
+    #    sigma_closure[new_zone] = last_closure + (new_closure-last_closure) * (x[new_zone]-reff[lcnt])/(xt-reff[lcnt])
+    #    
+    #    pass
+
+    sigma_closure[x > xt] = 0.0
+    
+    return sigma_closure
+
 
 
 

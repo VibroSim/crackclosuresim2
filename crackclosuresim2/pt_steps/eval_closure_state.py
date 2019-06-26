@@ -65,7 +65,8 @@ def run(_xmldoc,_element,
     
     CrackCenterX = (crackstartx+crackendx)/2.0
 
-    a = (crackendx-crackstartx)/2.0 # half-crack length (m)
+    a_side1 = (crackendx-crackstartx)/2.0 # half-crack length (m)
+    a_side2 = (crackendx-crackstartx)/2.0 # half-crack length (m)
 
     # here, x really measures radius past crack center
     xmax_approx = 1.0*a
@@ -81,12 +82,17 @@ def run(_xmldoc,_element,
 
 
     # side 1 (left side)
-    observed_reff = CrackCenterX - tippos_side1
-    observed_seff = loads
+    observed_reff_side1 = CrackCenterX - tippos_side1
+    observed_seff_side1 = loads
 
-    sigma_closure = inverse_closure(observed_reff,
-                                    observed_seff,
-                                    x,x_bnd,dx,a,sigma_yield,
+
+    if (observed_reff_side1 > a_side1).any():
+        a_side1=np.max(observed_reff_side1)
+        pass
+    
+    sigma_closure = inverse_closure(observed_reff_side1,
+                                    observed_seff_side1,
+                                    x,x_bnd,dx,a_side1,sigma_yield,
                                     crack_model)
 
     
