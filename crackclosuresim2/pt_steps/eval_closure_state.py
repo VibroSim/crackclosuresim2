@@ -14,12 +14,17 @@ from limatix.dc_value import numericunitsvalue as numericunitsv
 from limatix.dc_value import hrefvalue as hrefv
 from limatix.dc_value import xmltreevalue as xmltreev
 
+
+from crackclosuresim2 import inverse_closure,solve_normalstress
+from crackclosuresim2 import Tada_ModeI_CircularCrack_along_midline
+
 def run(_xmldoc,_element,
         _dest_href,
         _inputfilename,
         dc_measnum_int,
         dc_closureprofile_href,
         dc_spcYoungsModulus_numericunits,
+        dc_crackpath,
         dc_coordinatetransform,
         dc_symmetric_cod_bool=True,
         debug_bool=False):
@@ -27,12 +32,13 @@ def run(_xmldoc,_element,
     # (temporarily?) fixed parameters
     sigma_yield = 400e6
     tau_yield = sigma_yield/2.0 # limits stress concentration around singularity
+    E=dc_spcYoungsModulus_numericunits.value("Pa")
     nu = 0.33    #Poisson's Ratio
     specimen_width=25.4e-3
 
 
     # read closure profile
-    cpdata = np.loadtxt(dc_closureprofile_href.getpath(),skiprows=1)
+    cpdata = np.loadtxt(dc_closureprofile_href.getpath(),skiprows=1,delimiter=',')
     assert(cpdata.shape[1]==3)
     
     loads = cpdata[:,0]
