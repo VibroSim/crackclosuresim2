@@ -1266,8 +1266,10 @@ def inverse_closure(reff,seff,x,x_bnd,dx,xt,sigma_yield,crack_model,verbose=Fals
     
     last_closure = seff[0] # If everything is closed, then closure stresses and external loads match. 
     last_reff = reff[0]
-    
-    for lcnt in range(1,reff.shape[0]):
+
+    firstiteration=True
+
+    for lcnt in [1,0]+range(1,reff.shape[0]):
         # In each step, we solve for a new linear segment
         # of the sigma_closure distribution.
         # we assume last_closure is the end closure stress
@@ -1295,7 +1297,7 @@ def inverse_closure(reff,seff,x,x_bnd,dx,xt,sigma_yield,crack_model,verbose=Fals
         #    # to avoid dividing by zero
         #    continue
             
-        if lcnt==1:
+        if lcnt==1 and firstiteration:
             # first iteration: extrapolate back to crack center
             # if necessary  ***!!!! May want to fix this
             #new_zone = (x_bnd[:-1] <= reff[lcnt])
@@ -1304,6 +1306,17 @@ def inverse_closure(reff,seff,x,x_bnd,dx,xt,sigma_yield,crack_model,verbose=Fals
             # because intermediate calculations may examine more open cases,
             # and having nice behavior here improves convergence
             new_zone=np.ones(x.shape,dtype=np.bool)
+            #new_zone = (x_bnd[1:] >= reff[lcnt])
+            #open_zone = (x_bnd[1:] < reff[lcnt])
+            pass
+        elif lcnt==0: 
+            # Iteration at position zero after initialization at lcnt==1
+            new_zone = (x_bnd[1:] < reff[lcnt])
+            if np.count_nonzero(new_zone)==0:
+                # nothing to do 
+                continue
+            zone_following = (x_bnd[1:] >= reff[lcnt])
+            zone_following_start = np.where(zone_following)[0][0]
             pass
         else:
             #new_zone = (x_bnd[1:] >= reff[lcnt-1]) & (x_bnd[:-1] <= reff[lcnt])
@@ -1321,7 +1334,15 @@ def inverse_closure(reff,seff,x,x_bnd,dx,xt,sigma_yield,crack_model,verbose=Fals
             new_closure_field = copy.copy(sigma_closure)
 
             
-            new_closure_field[new_zone] = sigma_closure[zone_prev] + (new_closure-sigma_closure[zone_prev]) * (x[new_zone]-x[zone_prev])/(x[zone_end]-x[zone_prev])
+            if lcnt==1 and firstiteration:
+                new_closure_field[new_zone] = seff[0] + (new_closure-seff[0]) * (x[new_zone]-x[zone_prev])/(x[zone_end]-x[zone_prev])
+                pass
+            elif lcnt==0:
+                new_closure_field[new_zone] = sigma_closure[zone_following_start] + (new_closure-sigma_closure[zone_following_start]) * (x[new_zone]-x[zone_following_start])/(0.0-x[zone_following_start])
+                pass
+            else:
+                new_closure_field[new_zone] = sigma_closure[zone_prev] + (new_closure-sigma_closure[zone_prev]) * (x[new_zone]-x[zone_prev])/(x[zone_end]-x[zone_prev])
+                pass
 
             (gotreff, sigma, tensile_displ) = solve_normalstress(x,x_bnd,new_closure_field,dx,seff[lcnt],xt,sigma_yield,crack_model,calculate_displacements=False,verbose=verbose)
 
@@ -1350,15 +1371,24 @@ def inverse_closure(reff,seff,x,x_bnd,dx,xt,sigma_yield,crack_model,verbose=Fals
             sys.modules["__main__"].__dict__.update(globals())
             sys.modules["__main__"].__dict__.update(locals())
             raise ValueError("Error in inverse_closure fsolve: %s" % str(mesg))
+
         
         #closure_gradient = (sigma_closure[zone_end]-sigma_closure[zone_start])/(x[zone_end]-x[zone_start])
         
 
-        sigma_closure[new_zone] =  sigma_closure[zone_prev] + (new_closure-sigma_closure[zone_prev]) * (x[new_zone]-x[zone_prev])/(x[zone_end]-x[zone_prev])
+        if lcnt==1 and firstiteration:
+            sigma_closure[new_zone] = seff[0] + (new_closure-seff[0]) * (x[new_zone]-x[zone_prev])/(x[zone_end]-x[zone_prev])
+            pass
+        elif lcnt==0:
+            sigma_closure[new_zone] = sigma_closure[zone_following_start] + (new_closure-sigma_closure[zone_following_start]) * (x[new_zone]-x[zone_following_start])/(0.0-x[zone_following_start])
+        else:
+            sigma_closure[new_zone] =  sigma_closure[zone_prev] + (new_closure-sigma_closure[zone_prev]) * (x[new_zone]-x[zone_prev])/(x[zone_end]-x[zone_prev])
+            pass
 
         #print("sigma_closures %s" % (str(sigma_closure)))
         #print("new_zone closures: %s" % (str(sigma_closure[new_zone][:2])))
         
+        firstiteration=False
         last_closure = new_closure
         last_reff = reff[lcnt]
         pass
@@ -1377,6 +1407,12 @@ def inverse_closure(reff,seff,x,x_bnd,dx,xt,sigma_yield,crack_model,verbose=Fals
     #    pass
 
     sigma_closure[x > xt] = 0.0
+    
+    ## Extrapolate first to points back to the origin (open zone
+    #first_closure_index = np.where(~open_zone)[0][0]
+    
+    #initial_slope = (sigma_closure[first_closure_index+1]-sigma_closure[first_closure_index])/dx
+    #sigma_closure[open_zone] = sigma_closure[first_closure_index] + (x[open_zone]-x[first_closure_index])*initial_slope
     
     return sigma_closure
 
