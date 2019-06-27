@@ -44,8 +44,11 @@ if os.path.exists(".git"):
         # versionraw is like v0.1.0-50-g434343
         # for compatibility with PEP 440, change it to
         # something like 0.1.0+50.g434343
-        matchobj=re.match(r"""v([^.]+[.][^.]+[.][^-.]+)-(.*)""",versionraw)
-        version=matchobj.group(1)+'+'+matchobj.group(2).replace("-",".")
+        matchobj=re.match(r"""v([^.]+[.][^.]+[.][^-.]+)(-.*)?""",versionraw)
+        version=matchobj.group(1)
+        if matchobj.group(2) is not None:
+            version += '+'+matchobj.group(2)[1:].replace("-",".")
+            pass
         pass
     except subprocess.CalledProcessError:
         # Ignore error, falling back to above version string
