@@ -61,8 +61,8 @@ else:
 
 crackclosuresim2_package_files = [ "pt_steps/*" ]
 
-#console_scripts=["closure_measurement_dic","closure_measurement_coords","closure_measurement_processing"]
-#console_scripts_entrypoints = [ "%s = closure_measurements.bin.%s:main" % (script,script.replace("-","_")) for script in console_scripts ]
+console_scripts=["eval_closure_state"]
+console_scripts_entrypoints = [ "%s = crackclosuresim2.bin.%s:main" % (script,script.replace("-","_")) for script in console_scripts ]
 
 
 setup(name="crackclosuresim2",
@@ -71,10 +71,10 @@ setup(name="crackclosuresim2",
       version=version,
       url="http://thermal.cnde.iastate.edu",
       zip_safe=False,
-      packages=["crackclosuresim2"],
+      packages=["crackclosuresim2","crackclosuresim2.bin"],
       cmdclass={"install_lib": install_lib_save_version },
       package_data={"crackclosuresim2": crackclosuresim2_package_files},
       entry_points={ "limatix.processtrak.step_url_search_path": [ "limatix.share.pt_steps = crackclosuresim2:getstepurlpath" ],
-                     #"console_scripts": console_scripts_entrypoints,
-                     })
+                     "console_scripts": console_scripts_entrypoints,
+                 })
 

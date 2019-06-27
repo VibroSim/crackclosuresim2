@@ -45,6 +45,9 @@ from .crackclosure import Glinka_ModeI_ThroughCrack
 from .crackclosure import ModeI_throughcrack_weightfun
 from .crackclosure import ModeI_throughcrack_CODformula
 from .crackclosure import Tada_ModeI_CircularCrack_along_midline
+from .crackclosure import perform_inverse_closure
+from .crackclosure import save_closurestress
+
 
 
 from .shear_stickslip import ModeII_crack_model
