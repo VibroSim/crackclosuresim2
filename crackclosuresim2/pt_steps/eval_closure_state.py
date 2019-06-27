@@ -26,18 +26,21 @@ def run(_xmldoc,_element,
         dc_closureprofile_href,
         dc_spcYoungsModulus_numericunits,
         dc_spcPoissonsRatio_numericunits,
+        dc_spcYieldStrength_numericunits,
         dc_crackpath,
         dc_coordinatetransform,
+        dx=5e-6,
         dc_symmetric_cod_bool=True,
         debug_bool=False):
     
-    # (temporarily?) fixed parameters
-    sigma_yield = 400e6
+    #sigma_yield = 400e6
+    sigma_yield = dc_spcYieldStrength_numericunits.value("Pa")
     tau_yield = sigma_yield/2.0 # limits stress concentration around singularity
     E=dc_spcYoungsModulus_numericunits.value("Pa")
     nu = dc_spcPoissonsRatio_numericunits.value("unitless")   #Poisson's Ratio
-    specimen_width=25.4e-3
 
+    # (temporarily?) fixed parameters
+    #dx=25e-6
 
     # read closure profile
     cpdata = np.loadtxt(dc_closureprofile_href.getpath(),skiprows=1,delimiter=',')
@@ -72,7 +75,7 @@ def run(_xmldoc,_element,
 
     # here, x really measures radius past crack center
     xmax_approx = 2.0*a_side1  # x array goes past tip position (twice half-length)
-    dx = 25e-6
+    #dx = 25e-6
     xsteps = int(xmax_approx//dx)
     xmax = dx*xsteps
 
