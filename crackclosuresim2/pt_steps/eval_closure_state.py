@@ -31,6 +31,7 @@ def run(_xmldoc,_element,
         dc_spcYieldStrength_numericunits,
         dc_crackpath,
         dc_coordinatetransform,
+        dc_specimen_str,
         dx=5e-6,
         dc_symmetric_cod_bool=True,
         debug_bool=False):
@@ -64,7 +65,7 @@ def run(_xmldoc,_element,
     #a_side2 = (crackendx-crackstartx)/2.0 # half-crack length (m)
 
 
-    (x,x_bnd,a_side1,a_side2,sigma_closure_side1,sigma_closure_side2,side1fig,side2fig) = perform_inverse_closure(dc_closureprofile_href.getpath(),E,nu,sigma_yield,CrackCenterX,dx)
+    (x,x_bnd,a_side1,a_side2,sigma_closure_side1,sigma_closure_side2,side1fig,side2fig) = perform_inverse_closure(dc_closureprofile_href.getpath(),E,nu,sigma_yield,CrackCenterX,dx,dc_specimen_str)
 
 
     closureplot_side1_href = hrefv(posixpath.splitext(dc_closureprofile_href.get_bare_quoted_filename())[0]+"_closurestress_side1.png",contexthref=_dest_href)

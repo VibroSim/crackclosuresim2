@@ -48,7 +48,8 @@ def main(args=None):
         print("                    either 113.8e9 for Ti-6-4 or 200e9 for In718")
         print("  Poisson's Ratio:  Value for Poisson's ratio (unitless)")
         print("  Yield Strength:   Value for yield strength, in Pascals.")
-        print("  dx:               Step size for resulting closure stress field")
+        print("  dx:               Step size for resulting closure stress field,")
+        print("                    optional; defaults to %g m" % (dx))
         sys.exit(0)
         pass
 
@@ -63,7 +64,7 @@ def main(args=None):
         dx=float(args[6])
         pass
 
-    (x,x_bnd,a_side1,a_side2,sigma_closure_side1,sigma_closure_side2,side1fig,side2fig) = perform_inverse_closure(closureprofilefile,YoungsModulus,PoissonsRatio,YieldStrength,CrackCenterX,dx)
+    (x,x_bnd,a_side1,a_side2,sigma_closure_side1,sigma_closure_side2,side1fig,side2fig) = perform_inverse_closure(closureprofilefile,YoungsModulus,PoissonsRatio,YieldStrength,CrackCenterX,dx,None)
 
     
     outfilename_side1 = os.path.join(tempfile.gettempdir(),os.path.splitext(os.path.split(closureprofilefile)[1])[0]+"_closurestress_side1.csv")

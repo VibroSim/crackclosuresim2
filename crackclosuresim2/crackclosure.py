@@ -1255,11 +1255,6 @@ def inverse_closure(reff,seff,x,x_bnd,dx,xt,sigma_yield,crack_model,verbose=Fals
     returns sigma_closure that is positive for compressive
     closure stresses. 
 
-    if seff[0] is > 0, and reff[0] > 0 then sigma_closure corresponding
-    to reff[0] is assumed to match seff[0]. 
-
-
-    ... This implementation is broken because it starts with the most closed state, and may well not converge, and I believe converges to the wrong answers
 """
 
     sigma_closure = np.zeros(x.shape,dtype='d')
@@ -1268,6 +1263,21 @@ def inverse_closure(reff,seff,x,x_bnd,dx,xt,sigma_yield,crack_model,verbose=Fals
     last_reff = reff[0]
 
     firstiteration=True
+
+    # NOTE: Always iterate starting at step 1, then back to 0 
+    # then back to 1, then increasing. 
+    # The reason for this is to get a reasonable extrapolation 
+    # to the left of the given data. 
+    #
+    # Basically, the first iteration at step 1 uses 
+    # seff[0] as an approximation for the closure state
+    # from the (non-executed) step 0. 
+    # Then execute step 0 based on that initial result to get 
+    # a slope we can extrapolate (don't allow the slope to be negative...
+    # if it would be, just make it zero -- straight horizontal)
+    # all the way to the crack center. 
+    # Once this is done, rerun step 1 based on the step zero
+    # result and continue from there. 
 
     for lcnt in [1,0]+range(1,reff.shape[0]):
         # In each step, we solve for a new linear segment
@@ -1311,7 +1321,8 @@ def inverse_closure(reff,seff,x,x_bnd,dx,xt,sigma_yield,crack_model,verbose=Fals
             pass
         elif lcnt==0: 
             # Iteration at position zero after initialization at lcnt==1
-            new_zone = (x_bnd[1:] < reff[lcnt])
+            #new_zone = (x_bnd[1:] < reff[lcnt])
+            new_zone=np.ones(x.shape,dtype=np.bool)
             if np.count_nonzero(new_zone)==0:
                 # nothing to do 
                 continue
@@ -1338,7 +1349,14 @@ def inverse_closure(reff,seff,x,x_bnd,dx,xt,sigma_yield,crack_model,verbose=Fals
                 new_closure_field[new_zone] = seff[0] + (new_closure-seff[0]) * (x[new_zone]-x[zone_prev])/(x[zone_end]-x[zone_prev])
                 pass
             elif lcnt==0:
-                new_closure_field[new_zone] = sigma_closure[zone_following_start] + (new_closure-sigma_closure[zone_following_start]) * (x[new_zone]-x[zone_following_start])/(0.0-x[zone_following_start])
+                if new_closure >= sigma_closure[zone_following_start]:
+                    # use straight horizontal
+                    new_closure_field[new_zone] = new_closure
+                    pass
+                else: 
+                    # Connect with slope
+                    new_closure_field[new_zone] = sigma_closure[zone_following_start] + (new_closure-sigma_closure[zone_following_start]) * (x[new_zone]-x[zone_following_start])/(0.0-x[zone_following_start])
+                    pass
                 pass
             else:
                 new_closure_field[new_zone] = sigma_closure[zone_prev] + (new_closure-sigma_closure[zone_prev]) * (x[new_zone]-x[zone_prev])/(x[zone_end]-x[zone_prev])
@@ -1349,7 +1367,13 @@ def inverse_closure(reff,seff,x,x_bnd,dx,xt,sigma_yield,crack_model,verbose=Fals
             return gotreff-reff[lcnt]
 
         solvecnt=0
-        inifactor=1.0
+        if lcnt==0:
+            inifactor=0.1
+            pass
+        else:
+            inifactor=1.0
+            pass
+
         while solvecnt < 20:
             (new_closure,infodict,ier,mesg) = scipy.optimize.fsolve(goal,seff[lcnt]*inifactor,full_output=True)
             #print("ier=%d; new_closure=%g" % (ier,new_closure[0]))
@@ -1380,7 +1404,15 @@ def inverse_closure(reff,seff,x,x_bnd,dx,xt,sigma_yield,crack_model,verbose=Fals
             sigma_closure[new_zone] = seff[0] + (new_closure-seff[0]) * (x[new_zone]-x[zone_prev])/(x[zone_end]-x[zone_prev])
             pass
         elif lcnt==0:
-            sigma_closure[new_zone] = sigma_closure[zone_following_start] + (new_closure-sigma_closure[zone_following_start]) * (x[new_zone]-x[zone_following_start])/(0.0-x[zone_following_start])
+            if new_closure >= sigma_closure[zone_following_start]:
+                # use straight horizontal
+                sigma_closure[new_zone] = new_closure
+                pass
+            else: 
+                # Connect with slope
+                sigma_closure[new_zone] = sigma_closure[zone_following_start] + (new_closure-sigma_closure[zone_following_start]) * (x[new_zone]-x[zone_following_start])/(0.0-x[zone_following_start])
+                pass
+            pass
         else:
             sigma_closure[new_zone] =  sigma_closure[zone_prev] + (new_closure-sigma_closure[zone_prev]) * (x[new_zone]-x[zone_prev])/(x[zone_end]-x[zone_prev])
             pass
@@ -1648,7 +1680,7 @@ def Tada_ModeI_CircularCrack_along_midline(E,nu):
 
 
 
-def perform_inverse_closure(inputfilename,E,nu,sigma_yield,CrackCenterX,dx):
+def perform_inverse_closure(inputfilename,E,nu,sigma_yield,CrackCenterX,dx,specimen_id):
     from matplotlib import pyplot as pl
 
     #tau_yield = sigma_yield/2.0 # limits stress concentration around singularity
@@ -1708,32 +1740,41 @@ def perform_inverse_closure(inputfilename,E,nu,sigma_yield,CrackCenterX,dx):
     
     # Forward cross-check of closure
     side1fig=pl.figure()
-    pl.plot(x[x < a_side1]*1e3,sigma_closure_side1[x < a_side1]/1e6,'-',
-            observed_reff_side1*1e3,observed_seff_side1/1e6,'x')
+    pl.plot(x[x < a_side1]*1e6,sigma_closure_side1[x < a_side1]/1e6,'-',
+            observed_reff_side1*1e6,observed_seff_side1/1e6,'x')
     for observcnt in range(len(observed_reff_side1)):        
         (effective_length, sigma, tensile_displ) = solve_normalstress(x,x_bnd,sigma_closure_side1,dx,observed_seff_side1[observcnt],a_side1,sigma_yield,crack_model)
-        pl.plot(effective_length*1e3,observed_seff_side1[observcnt]/1e6,'.')
+        pl.plot(effective_length*1e6,observed_seff_side1[observcnt]/1e6,'.')
         #pl.plot(x*1e3,tensile_displ*1e15,'-')
         pass
     pl.grid()
     pl.legend(('Closure stress field','Observed crack tip posn','Recon. crack tip posn'),loc="best")
-    pl.xlabel('Radius from crack center')
+    pl.xlabel('Radius from crack center (um)')
     pl.ylabel('Stress (MPa)')
-    pl.title('Side 1 (left)')
-
+    if specimen_id is not None:
+        pl.title('%s: Side 1 (left)' % (specimen_id))
+        pass
+    else:
+        pl.title('Side 1 (left)')        
+        pass
 
     side2fig=pl.figure()
-    pl.plot(x[x < a_side2]*1e3,sigma_closure_side2[x < a_side2]/1e6,'-',
-            observed_reff_side2*1e3,observed_seff_side2/1e6,'x')
+    pl.plot(x[x < a_side2]*1e6,sigma_closure_side2[x < a_side2]/1e6,'-',
+            observed_reff_side2*1e6,observed_seff_side2/1e6,'x')
     for observcnt in range(len(observed_reff_side2)):        
         (effective_length, sigma, tensile_displ) = solve_normalstress(x,x_bnd,sigma_closure_side2,dx,observed_seff_side2[observcnt],a_side2,sigma_yield,crack_model)
-        pl.plot(effective_length*1e3,observed_seff_side2[observcnt]/1e6,'.')
+        pl.plot(effective_length*1e6,observed_seff_side2[observcnt]/1e6,'.')
         #pl.plot(x*1e3,tensile_displ*1e15,'-')
         pass
     pl.grid()
     pl.legend(('Closure stress field','Observed crack tip posn','Recon. crack tip posn'),loc="best")
-    pl.title('Side 2 (right)')
-    pl.xlabel('Radius from crack center')
+    if specimen_id is not None:
+        pl.title('%s: Side 2 (right)' % (specimen_id))
+        pass
+    else:
+        pl.title('Side 2 (right)')        
+        pass
+    pl.xlabel('Radius from crack center (um)')
     pl.ylabel('Stress (MPa)')
 
     return (x,x_bnd,a_side1,a_side2,sigma_closure_side1,sigma_closure_side2,side1fig,side2fig)
