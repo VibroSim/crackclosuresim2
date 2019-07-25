@@ -40,7 +40,7 @@ if os.path.exists(".git"):
 
     # See if we can get a more meaningful description from "git describe"
     try:
-        versionraw=subprocess.check_output(["git","describe","--tags","--match=v*"],stderr=subprocess.STDOUT).strip()
+        versionraw=subprocess.check_output(["git","describe","--tags","--match=v*"],stderr=subprocess.STDOUT).decode('utf-8').strip()
         # versionraw is like v0.1.0-50-g434343
         # for compatibility with PEP 440, change it to
         # something like 0.1.0+50.g434343

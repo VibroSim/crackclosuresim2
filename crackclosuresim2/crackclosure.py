@@ -1279,7 +1279,7 @@ def inverse_closure(reff,seff,x,x_bnd,dx,xt,sigma_yield,crack_model,verbose=Fals
     # Once this is done, rerun step 1 based on the step zero
     # result and continue from there. 
 
-    for lcnt in [1,0]+range(1,reff.shape[0]):
+    for lcnt in [1,0]+list(range(1,reff.shape[0])):
         # In each step, we solve for a new linear segment
         # of the sigma_closure distribution.
         # we assume last_closure is the end closure stress
