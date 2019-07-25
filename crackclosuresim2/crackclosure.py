@@ -1335,10 +1335,13 @@ def inverse_closure(reff,seff,x,x_bnd,dx,xt,sigma_yield,crack_model,verbose=Fals
             new_zone = (x_bnd[1:] >= last_reff)
             pass
 
-        zone_start = np.where(x_bnd[1:] >= last_reff)[0][0]
-        zone_end = np.where(x_bnd[:-1] <= reff[lcnt])[0][-1]
-        zone_prev = max(0,zone_start-1)
-        
+        if lcnt != 0:
+            # (these values are not used for lcnt==0)
+            zone_start = np.where(x_bnd[1:] >= last_reff)[0][0]
+            zone_end = np.where(x_bnd[:-1] <= reff[lcnt])[0][-1]
+            zone_prev = max(0,zone_start-1)
+            pass
+
         #print("np.where(new_zone) = %s" % (str(np.where(new_zone))))
         
         def goal(new_closure):
@@ -1732,16 +1735,16 @@ def perform_inverse_closure(inputfilename,E,nu,sigma_yield,CrackCenterX,dx,speci
 
 
     
-    sigma_closure_side1 = inverse_closure(observed_reff_side1,
-                                          observed_seff_side1,
+    sigma_closure_side1 = inverse_closure(observed_reff_side1[observed_reff_side1 >= 0.0],
+                                          observed_seff_side1[observed_reff_side1 >= 0.0],
                                           x,x_bnd,dx,a_side1,sigma_yield,
                                           crack_model)
 
 
 
     
-    sigma_closure_side2 = inverse_closure(observed_reff_side2,
-                                          observed_seff_side2,
+    sigma_closure_side2 = inverse_closure(observed_reff_side2[observed_reff_side2 >= 0.0],
+                                          observed_seff_side2[observed_reff_side2 >= 0.0],
                                           x,x_bnd,dx,a_side2,sigma_yield,
                                           crack_model)
 
