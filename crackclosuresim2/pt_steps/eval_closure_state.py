@@ -70,11 +70,11 @@ def run(_xmldoc,_element,
 
     closureplot_side1_href = hrefv(posixpath.splitext(dc_closureprofile_href.get_bare_quoted_filename())[0]+"_closurestress_side1.png",contexthref=_dest_href)
     pl.figure(side1fig.number)
-    pl.savefig(closureplot_side1_href.getpath(),dpi=300)
+    pl.savefig(closureplot_side1_href.getpath(),dpi=300,transparent=True)
 
     closureplot_side2_href = hrefv(posixpath.splitext(dc_closureprofile_href.get_bare_quoted_filename())[0]+"_closurestress_side2.png",contexthref=_dest_href)
     pl.figure(side2fig.number)
-    pl.savefig(closureplot_side2_href.getpath(),dpi=300)
+    pl.savefig(closureplot_side2_href.getpath(),dpi=300,transparent=True)
 
 
     closurestress_side1_href=hrefv(posixpath.splitext(dc_closureprofile_href.get_bare_quoted_filename())[0]+"_closurestress_side1.csv",contexthref=_dest_href)

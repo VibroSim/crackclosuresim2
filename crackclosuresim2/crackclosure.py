@@ -1326,7 +1326,7 @@ def inverse_closure(reff,seff,x,x_bnd,dx,xt,sigma_yield,crack_model,verbose=Fals
             if np.count_nonzero(new_zone)==0:
                 # nothing to do 
                 continue
-            zone_following = (x_bnd[1:] >= reff[lcnt])
+            zone_following = (x_bnd[1:] >= reff[lcnt+1])
             zone_following_start = np.where(zone_following)[0][0]
             pass
         else:
@@ -1366,20 +1366,28 @@ def inverse_closure(reff,seff,x,x_bnd,dx,xt,sigma_yield,crack_model,verbose=Fals
 
             return gotreff-reff[lcnt]
 
-        solvecnt=0
         if lcnt==0:
-            inifactor=0.1
+            # For position 0, resulting solution 
+            # may be less than seff[0] or even negative
+            max_sol_attempts=200
+            first_initialization_factor=0.1
+            initialization_scale_factor=-1.05
             pass
         else:
-            inifactor=1.0
+            max_sol_attempts=20
+            first_initialization_factor=1.0
+            initialization_scale_factor=1.1
             pass
 
-        while solvecnt < 20:
+        solvecnt=0
+
+        inifactor=first_initialization_factor
+        while solvecnt < max_sol_attempts:
             (new_closure,infodict,ier,mesg) = scipy.optimize.fsolve(goal,seff[lcnt]*inifactor,full_output=True)
             #print("ier=%d; new_closure=%g" % (ier,new_closure[0]))
             if ier==1:
                 break
-            inifactor*=1.1
+            inifactor*=initialization_scale_factor
             solvecnt+=1
             pass
         
