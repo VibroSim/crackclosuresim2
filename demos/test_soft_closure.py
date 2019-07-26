@@ -16,6 +16,9 @@ from crackclosuresim2.soft_closure import sc_params
 from crackclosuresim2.soft_closure import tip_field_integral
 from crackclosuresim2.soft_closure import calc_contact
 from crackclosuresim2.soft_closure import soft_closure_plots
+from crackclosuresim2.soft_closure import sigmacontact_from_displacement
+from crackclosuresim2.soft_closure import sigmacontact_from_stress
+from crackclosuresim2.soft_closure import calc_du_da
 
 
 # TODO:
@@ -90,8 +93,8 @@ if __name__=="__main__":
     sigma_ext=50e6
     
 
-    (param,contact_stress,displacement) = calc_contact(scp,sigma_ext)
+    (param,contact_stress,displacement,dsigmaext_dxt_hardcontact) = calc_contact(scp,sigma_ext)
 
-    soft_closure_plots(scp,param)
+    soft_closure_plots(scp,param,dsigmaext_dxt_hardcontact)
     pl.show()
     pass

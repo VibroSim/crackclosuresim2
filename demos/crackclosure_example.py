@@ -76,7 +76,7 @@ pl.plot(x*1e3,sigma_closure,'-',
         observed_reff*1e3,observed_seff,'x')
 
 for observcnt in range(len(observed_reff)):        
-    (effective_length, sigma, tensile_displ) = solve_normalstress(x,x_bnd,sigma_closure,dx,observed_seff[observcnt],a,sigma_yield,crack_model)
+    (effective_length, sigma, tensile_displ, dsigmaext_dxt) = solve_normalstress(x,x_bnd,sigma_closure,dx,observed_seff[observcnt],a,sigma_yield,crack_model)
     pl.plot(effective_length*1e3,observed_seff[observcnt],'o')
     #pl.plot(x*1e3,tensile_displ*1e15,'-')
     pass
@@ -108,7 +108,7 @@ if use_crackclosuresim:
     
     pass
 
-(effective_length, sigma, tensile_displ) = solve_normalstress(x,x_bnd,sigma_closure,dx,sigmaext_max,a,sigma_yield,crack_model,verbose=True,diag_plots=True)
+(effective_length, sigma, tensile_displ, dsigmaext_dxt) = solve_normalstress(x,x_bnd,sigma_closure,dx,sigmaext_max,a,sigma_yield,crack_model,verbose=True,diag_plots=True)
 
 (fig,ax1) = pl.subplots()
 legax=[]
@@ -165,7 +165,7 @@ if use_crackclosuresim:
 
 
 
-(effective_length2, sigma2, tensile_displ2) = solve_normalstress(x,x_bnd,sigma_closure2,dx,sigmaext_max,a,sigma_yield,crack_model,verbose=True)
+(effective_length2, sigma2, tensile_displ2, dsigmaext_dxt) = solve_normalstress(x,x_bnd,sigma_closure2,dx,sigmaext_max,a,sigma_yield,crack_model,verbose=True)
 
 (fig2,ax21) = pl.subplots()
 legax=[]
@@ -220,7 +220,7 @@ if use_crackclosuresim:
     pass
 
 
-(effective_length3, sigma3, tensile_displ3) = solve_normalstress(x,x_bnd,sigma_closure3,dx,sigmaext_max,a,sigma_yield,crack_model,verbose=True)
+(effective_length3, sigma3, tensile_displ3, dsigmaext_dxt) = solve_normalstress(x,x_bnd,sigma_closure3,dx,sigmaext_max,a,sigma_yield,crack_model,verbose=True)
 
 (fig3,ax31) = pl.subplots()
 legax=[]
