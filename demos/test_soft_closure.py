@@ -13,12 +13,12 @@ from crackclosuresim2 import ModeI_throughcrack_CODformula
 from crackclosuresim2 import Tada_ModeI_CircularCrack_along_midline
 
 from crackclosuresim2.soft_closure import sc_params
-from crackclosuresim2.soft_closure import tip_field_integral
 from crackclosuresim2.soft_closure import calc_contact
 from crackclosuresim2.soft_closure import soft_closure_plots
 from crackclosuresim2.soft_closure import sigmacontact_from_displacement
 from crackclosuresim2.soft_closure import sigmacontact_from_stress
-from crackclosuresim2.soft_closure import calc_du_da
+from crackclosuresim2.soft_closure import interpolate_hardcontact_intensity
+#from crackclosuresim2.soft_closure import calc_du_da
 
 
 # TODO:
@@ -65,8 +65,8 @@ if __name__=="__main__":
 
     # !!!*** NOTE: inverse_closure() fails if first observed_reff element is 0
     # !!!*** Should troubleshoot this.
-    observed_reff = np.array([  0.5e-3,  1e-3, 1.5e-3, scp.a  ],dtype='d')
-    observed_seff = np.array([ 1e6, 15e6, 30e6, 150e6  ],dtype='d')
+    observed_reff = np.array([  0.5e-3,  1e-3, 1.5e-3, 1.9e-3, scp.a  ],dtype='d')
+    observed_seff = np.array([ 1e6, 15e6, 30e6, 150e6, 150e6  ],dtype='d')
     
     sigma_closure = inverse_closure(observed_reff,
                                     observed_seff,
@@ -93,8 +93,8 @@ if __name__=="__main__":
     sigma_ext=50e6
     
 
-    (param,contact_stress,displacement,dsigmaext_dxt_hardcontact) = calc_contact(scp,sigma_ext)
+    (du_da,du_da_corrected,contact_stress,displacement,dsigmaext_dxt_hardcontact) = calc_contact(scp,sigma_ext)
 
-    soft_closure_plots(scp,param,dsigmaext_dxt_hardcontact)
+    soft_closure_plots(scp,du_da,dsigmaext_dxt_hardcontact)
     pl.show()
     pass

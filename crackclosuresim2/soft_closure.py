@@ -83,9 +83,14 @@ class sc_params(object):
 
     
 
+def interpolate_hardcontact_intensity(scp,dsigmaext_dxt_hardcontact):
+    dsigmaext_dxt_hardcontact_interp = scipy.interpolate.interp1d(scp.x,dsigmaext_dxt_hardcontact,kind="linear",fill_value="extrapolate")(scp.x_fine)
+    dsigmaext_dxt_hardcontact_interp[np.isnan(dsigmaext_dxt_hardcontact_interp)]=0.0  # No singularity means no concentration
 
+    return dsigmaext_dxt_hardcontact_interp
+    
 
-def tip_field_integral(scp,param,dsigmaext_dxt_hardcontact):
+def tip_field_integral_OBSOLETE(scp,param,dsigmaext_dxt_hardcontact):
     """ Calculate the tip field integral u
 from the optimization parameter or result param"""
     # Param represents first elements of u, except for the
@@ -128,7 +133,7 @@ from the optimization parameter or result param"""
 
     return (u,dsigmaext_dxt_hardcontact_interp)
 
-def calc_du_da(u,da):
+def calc_du_da_OBSOLETE(u,da):
     return np.concatenate((np.array((0.0,),dtype='d'),np.diff(u)/da,np.array((0.0,),dtype='d'))) # defined on the boundaries xbnd_fine
 
 def update_du_da_with_hardcontact(du_da,dsigmaext_dxt_hardcontact_interp,closure_index):
@@ -138,7 +143,7 @@ def update_du_da_with_hardcontact(du_da,dsigmaext_dxt_hardcontact_interp,closure
 
 # u defined on x positions, represents crack tip stress levels
 # du/da defined on x boundaries ... first one always zero
-def sigmacontact_from_displacement(scp,u,dsigmaext_dxt_hardcontact_interp):
+def sigmacontact_from_displacement(scp,du_da,dsigmaext_dxt_hardcontact_interp):
     da = scp.dx_fine # same step size
 
     # integral starts at a0, where sigma_closure > 0 (compressive)
@@ -146,7 +151,8 @@ def sigmacontact_from_displacement(scp,u,dsigmaext_dxt_hardcontact_interp):
     # first_closureidx can be thought of as index into x_bnd
     #    last_closureidx = np.where(x_bnd >= a)[0][0]
     
-    du_da = calc_du_da(u,da)
+    #du_da = calc_du_da(u,da)
+    du_da_corrected=copy.copy(du_da)
 
     # .. why use du_da[1:...]? !!!
     
@@ -161,7 +167,7 @@ def sigmacontact_from_displacement(scp,u,dsigmaext_dxt_hardcontact_interp):
         #   in next line: sqrt( (a+x) * (a-x) where x >= 0 and
         #   throw out where x >= a
         # diplacement defined on x_fine
-        displacement[:aidx] += (4.0/scp.E)*du_da[aidx+1]*np.sqrt((scp.x_fine[aidx]+scp.x_fine[:aidx])*(scp.x_fine[aidx]-scp.x_fine[:aidx]))*da
+        displacement[:aidx] += (4.0/scp.E)*du_da_corrected[aidx+1]*np.sqrt((scp.x_fine[aidx]+scp.x_fine[:aidx])*(scp.x_fine[aidx]-scp.x_fine[:aidx]))*da
         # Add in the x=a position
         # Here we have the integral of (4/E)*(du/da)*sqrt( (a+x)* (a-x) )da
         # as a goes from x[aidx] to x[aidx]+da/2
@@ -169,7 +175,7 @@ def sigmacontact_from_displacement(scp,u,dsigmaext_dxt_hardcontact_interp):
         #  (4/E)*(du/da)*sqrt(a+x) * integral of sqrt(a-x) da
         # = (4/E)*(du/da)*sqrt(a+x) * (2/3) * (  (x[aidx]+da/2-x[aidx])^(3/2) - (x[aidx]-x[aidx])^(3/2) )
         # = (4/E)*(du/da)*sqrt(a+x) * (2/3) * ( (da/2)^(3/2) )
-        displacement[aidx] += (4.0/scp.E)*du_da[aidx+1]*np.sqrt(2.0*scp.x_fine[aidx])*(da/2.0)**(3.0/2.0)
+        displacement[aidx] += (4.0/scp.E)*du_da_corrected[aidx+1]*np.sqrt(2.0*scp.x_fine[aidx])*(da/2.0)**(3.0/2.0)
 
         if displacement[aidx] > 0.0 and closure_index is None:
             assert(np.all(displacement[:aidx] > 0.0)) # if this point is open, then all points to the left should be open too
@@ -177,7 +183,7 @@ def sigmacontact_from_displacement(scp,u,dsigmaext_dxt_hardcontact_interp):
             # Open points to the left of this have distributed crack tip intensities according to the hard contact
             # (actually no contact) model with data in dsigmaext_dxt_hardcontact
             closure_index = aidx
-            update_du_da_with_hardcontact(du_da,dsigmaext_dxt_hardcontact_interp,closure_index)
+            update_du_da_with_hardcontact(du_da_corrected,dsigmaext_dxt_hardcontact_interp,closure_index)
             pass
         pass
     
@@ -189,10 +195,10 @@ def sigmacontact_from_displacement(scp,u,dsigmaext_dxt_hardcontact_interp):
     sigma_contact[displacement < 0.0] = ((-displacement[displacement < 0.0])**(3.0/2.0)) * scp.Hm
 
     
-    return (sigma_contact,displacement,closure_index,du_da) # returned du_da is actually du_da_corrected...
+    return (sigma_contact,displacement,closure_index,du_da_corrected) # returned du_da is actually du_da_corrected...
 
 
-def sigmacontact_from_stress(scp,u,dsigmaext_dxt_hardcontact_interp,du_da_corrected):
+def sigmacontact_from_stress(scp,du_da_corrected,dsigmaext_dxt_hardcontact_interp):
     # sigmacontact is positive compression
 
     sigma_closure_interp=scipy.interpolate.interp1d(scp.x,scp.sigma_closure,kind="linear",fill_value="extrapolate")(scp.x_fine)
@@ -240,9 +246,10 @@ def sigmacontact_from_stress(scp,u,dsigmaext_dxt_hardcontact_interp,du_da_correc
 
     #sigma_nominal = (np.sqrt(np.mean(sigma_closure**2.0)) + np.abs(sigma_ext))/2.0
 
-def soft_closure_goal_function_opening(param,scp,sigma_ext,dsigmaext_dxt_hardcontact):
+def soft_closure_goal_function_opening(du_da,scp,sigma_ext,dsigmaext_dxt_hardcontact):
 
-    (u,dsigmaext_dxt_hardcontact_interp) = tip_field_integral(scp,param,dsigmaext_dxt_hardcontact)
+    #(u,dsigmaext_dxt_hardcontact_interp) = tip_field_integral(scp,param,dsigmaext_dxt_hardcontact)
+    dsigmaext_dxt_hardcontact_interp=interpolate_hardcontact_intensity(scp,dsigmaext_dxt_hardcontact)
     #last_closureidx = np.where(x_bnd >= a)[0][0]
 
     #  constraint that integral of du/da must equal sigma_ext
@@ -250,11 +257,11 @@ def soft_closure_goal_function_opening(param,scp,sigma_ext,dsigmaext_dxt_hardcon
     
     # sigmacontact is positive compression
     
-    (from_displacement,displacement,closure_index,du_da_corrected) = sigmacontact_from_displacement(scp,u,dsigmaext_dxt_hardcontact_interp)
+    (from_displacement,displacement,closure_index,du_da_corrected) = sigmacontact_from_displacement(scp,du_da,dsigmaext_dxt_hardcontact_interp)
 
     u_corrected = np.cumsum(du_da_corrected)*scp.dx_fine
     
-    from_stress = sigmacontact_from_stress(scp,u,dsigmaext_dxt_hardcontact_interp,du_da_corrected)
+    from_stress = sigmacontact_from_stress(scp,du_da_corrected,dsigmaext_dxt_hardcontact_interp)
     
     # elements of residual have units of stress^2
     residual = (from_displacement[:scp.afull_idx_fine]-from_stress[:scp.afull_idx_fine])
@@ -263,13 +270,16 @@ def soft_closure_goal_function_opening(param,scp,sigma_ext,dsigmaext_dxt_hardcon
     negative = average[average < 0]  # negative sigmacontact means tension on the surfaces, which is not allowed!
     
     #return np.sum(residual**2.0) + 1.0*np.sum(negative**2.0) + residual.shape[0]*(u[scp.afull_idx_fine]-sigma_ext)**2.0
-    return np.sum(residual**2.0) + 1.0*np.sum(negative**2.0) + residual.shape[0]*(u_corrected[scp.afull_idx_fine]-sigma_ext)**2.0
+    return np.sum(residual**2.0) + 1.0*np.sum(negative**2.0) + 10*residual.shape[0]*(u_corrected[scp.afull_idx_fine]-sigma_ext)**2.0
 
 
 def calc_contact(scp,sigma_ext):
 
     if sigma_ext >= 0: # Tensile
-        iniguess=np.arange(scp.afull_idx+1,dtype='d')/(scp.afull_idx+1) * sigma_ext
+        #iniguess=np.arange(scp.afull_idx+1,dtype='d')/(scp.afull_idx+1) * sigma_ext  # This iniguess was for u
+
+        # now we use du_da
+        iniguess=np.ones(scp.xbnd_fine.shape[0],dtype='d')*(1.0/(scp.afull_idx+1)) * sigma_ext/scp.dx_fine  #
 
         # sigma_yield = scp.sigma_yield  # not a parameter yet... just use infinity for now
         sigma_yield=np.inf
@@ -281,29 +291,56 @@ def calc_contact(scp,sigma_ext):
         (effective_length, sigma, tensile_displ, dsigmaext_dxt_hardcontact) = solve_normalstress(scp.x,scp.x_bnd,scp.sigma_closure,scp.dx,np.inf,scp.a,sigma_yield,crack_model)
 
         
-        # Calculate x        
-        res = scipy.optimize.minimize(soft_closure_goal_function_opening,iniguess,args=(scp,sigma_ext,dsigmaext_dxt_hardcontact),
-                                      options={"eps": 10000.0})
-        #res = scipy.optimize.minimize(goal_function,iniguess,method='nelder-mead',options={"maxfev": 15000})
+        # Calculate x
 
-        param=res.x
+        #nonnegative_constraint = scipy.optimize.NonlinearConstraint(lambda du_da: du_da,0.0,np.inf)
+        nonnegative_constraint = { "type": "ineq",
+                                   "fun": lambda du_da: du_da }
+        
+        dsigmaext_dxt_hardcontact_interp=interpolate_hardcontact_intensity(scp,dsigmaext_dxt_hardcontact)
+        
+        def load_constraint_fun(du_da):
+            # NOTE: Could make faster by accelerating sigmacontact_from_displacement to not do anything once it figures out du_da_corrected
+            (sigma_contact,displacement,closure_index,du_da_corrected) = sigmacontact_from_displacement(scp,du_da,dsigmaext_dxt_hardcontact_interp)
+            return np.cumsum(du_da_corrected)[scp.afull_idx_fine]*scp.dx_fine-sigma_ext
+        
+        load_constraint = { "type": "eq",
+                            "fun": load_constraint_fun }
+        
+        res = scipy.optimize.minimize(soft_closure_goal_function_opening,iniguess,args=(scp,sigma_ext,dsigmaext_dxt_hardcontact),
+                                      constraints = [ nonnegative_constraint ], # , load_constraint ],
+                                      method="SLSQP",
+                                      options={"eps": 10000.0,
+                                               "maxiter": 100000})
+        #res = scipy.optimize.minimize(goal_function,iniguess,method='nelder-mead',options={"maxfev": 15000})
+        if not res.success and res.status != 4:
+            # (ignore incompatible constraint, because our constraints are
+            # compatible by definition, and scipy 1.2 seems to diagnose
+            # this incorrectly... should file bug report)
+            print("minimize error %d: %s" % (res.status,res.message))
+            import pdb
+            pdb.set_trace()
+            pass
+        
+        du_da=res.x
         pass
     else:
         # Compressive
         assert(0)
         pass
     
-    (u,dsigmaext_dxt_hardcontact_interp) = tip_field_integral(scp,param,dsigmaext_dxt_hardcontact)
-    (contact_stress,displacement,closure_index,du_da_corrected) = sigmacontact_from_displacement(scp,u,dsigmaext_dxt_hardcontact_interp)
+    #(u,dsigmaext_dxt_hardcontact_interp) = tip_field_integral(scp,param,dsigmaext_dxt_hardcontact)
+    dsigmaext_dxt_hardcontact_interp=interpolate_hardcontact_intensity(scp,dsigmaext_dxt_hardcontact)
+    (contact_stress,displacement,closure_index,du_da_corrected) = sigmacontact_from_displacement(scp,du_da,dsigmaext_dxt_hardcontact_interp)
 
-    return (param,contact_stress,displacement,dsigmaext_dxt_hardcontact)
+    return (du_da,du_da_corrected,contact_stress,displacement,dsigmaext_dxt_hardcontact)
     
 
-def soft_closure_plots(scp,param,dsigmaext_dxt_hardcontact):
+def soft_closure_plots(scp,du_da,dsigmaext_dxt_hardcontact):
     from matplotlib import pyplot as pl
     #pl.rc('text', usetex=True) # Support greek letters in plot legend
     
-    (u,dsigmaext_dxt_hardcontact_interp) = tip_field_integral(scp,param,dsigmaext_dxt_hardcontact)
+    #(u,dsigmaext_dxt_hardcontact_interp) = tip_field_integral(scp,param,dsigmaext_dxt_hardcontact)
     #last_closureidx = np.where(x_bnd >= a)[0][0]
 
     #  constraint that integral of du/da must equal sigma_ext
@@ -311,37 +348,51 @@ def soft_closure_plots(scp,param,dsigmaext_dxt_hardcontact):
     
     # sigmacontact is positive compression
 
-    du_da = calc_du_da(u,scp.dx_fine)
+    #du_da = calc_du_da(u,scp.dx_fine)
+
+    dsigmaext_dxt_hardcontact_interp=interpolate_hardcontact_intensity(scp,dsigmaext_dxt_hardcontact)
+
     
-    (from_displacement,displacement,closure_index,du_da_corrected) = sigmacontact_from_displacement(scp,u,dsigmaext_dxt_hardcontact_interp)
-    from_stress = sigmacontact_from_stress(scp,u,dsigmaext_dxt_hardcontact_interp,du_da_corrected)
+    (from_displacement,displacement,closure_index,du_da_corrected) = sigmacontact_from_displacement(scp,du_da,dsigmaext_dxt_hardcontact_interp)
+    from_stress = sigmacontact_from_stress(scp,du_da_corrected,dsigmaext_dxt_hardcontact_interp)
 
     #update_du_da_with_hardcontact(du_da,dsigmaext_dxt_hardcontact_interp,closure_index)
 
-    pl.figure()
-    pl.clf()
-    pl.plot(param)
-    pl.grid()
     
     
-    pl.figure()
-    pl.clf()
-    pl.plot(scp.x_fine,u)
-    pl.title("distributed stress concentration")
-    pl.grid()
+    #pl.figure()
+    #pl.clf()
+    #pl.plot(scp.x_fine,u)
+    #pl.title("distributed stress concentration")
+    #pl.grid()
 
     pl.figure()
     pl.clf()
-    pl.plot(scp.x_fine,from_displacement,'-',
-            scp.x_fine,from_stress,'-'),
+    pl.plot(scp.x_fine*1e3,from_displacement/1e6,'-',
+            scp.x_fine*1e3,from_stress/1e6,'-'),
     pl.grid()
     pl.legend(("from displacement","from stress"))
+    pl.ylabel("Stress (MPa)")
+    pl.xlabel('Position (mm)')
     pl.title("sigmacontact")
+
+    u_corrected = np.cumsum(du_da_corrected)*scp.dx_fine
 
     pl.figure()
     pl.clf()
-    pl.plot(scp.xbnd_fine,du_da_corrected,'-')
+    pl.plot(scp.xbnd_fine*1e3,du_da_corrected/1e6,'-')
     pl.grid()
-    pl.title("distributed stress concentration derivative (corrected)")
+    pl.title("distributed stress concentration derivative (corrected)\ntotal load=%g" % (u_corrected[scp.afull_idx_fine]))
+    pl.xlabel('Position (mm)')
+    pl.ylabel("Distributed stress concentration (MPa/m)")
+
+    pl.figure()
+    pl.clf()
+    pl.plot(scp.x*1e3,(scp.crack_initial_opening-(scp.sigma_closure/scp.Hm)**(2.0/3.0))*1e6,'-')
+    pl.plot(scp.x_fine*1e3,displacement*1e6,'-')
+    pl.grid()
+    pl.legend(('Initial displacement','Final displacement'))
+    pl.xlabel('Position (mm)')
+    pl.ylabel('Displacement (um)')
     pass
     
