@@ -13,10 +13,16 @@ from crackclosuresim2 import ModeI_throughcrack_CODformula
 from crackclosuresim2 import Tada_ModeI_CircularCrack_along_midline
 
 from crackclosuresim2.soft_closure import sc_params
+from crackclosuresim2.soft_closure import tip_field_integral
 from crackclosuresim2.soft_closure import calc_contact
 from crackclosuresim2.soft_closure import soft_closure_plots
 
 
+# TODO:
+#  * param[0] is 0... why?
+#  * sigmacontact from stress goes negative (tensile?) ... why?
+#  * du/da shows two concentrated spots and goes negative (?)
+#   ... shouldn't be possible...
 
 if __name__=="__main__":
     #####INPUT VALUES
@@ -53,9 +59,11 @@ if __name__=="__main__":
     crack_model = Tada_ModeI_CircularCrack_along_midline(E,nu)
     
     
-    
-    observed_reff = np.array([ 0.0,  1e-3, 1.5e-3, scp.a  ],dtype='d')
-    observed_seff = np.array([ 10e6, 15e6, 30e6, 150e6  ],dtype='d')
+
+    # !!!*** NOTE: inverse_closure() fails if first observed_reff element is 0
+    # !!!*** Should troubleshoot this.
+    observed_reff = np.array([  0.5e-3,  1e-3, 1.5e-3, scp.a  ],dtype='d')
+    observed_seff = np.array([ 1e6, 15e6, 30e6, 150e6  ],dtype='d')
     
     sigma_closure = inverse_closure(observed_reff,
                                     observed_seff,
@@ -85,4 +93,5 @@ if __name__=="__main__":
     (param,contact_stress,displacement) = calc_contact(scp,sigma_ext)
 
     soft_closure_plots(scp,param)
+    pl.show()
     pass

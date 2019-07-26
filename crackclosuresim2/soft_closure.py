@@ -177,27 +177,29 @@ def sigmacontact_from_stress(scp,u):
     da = scp.dx_fine # same step size
     
     # integral starts at a0, where sigma_closure > 0 (compressive)
+    # OR closure state with external load is compressive
+
     #first_closureidx = np.where(sigma_closure >0)[0][0]
     # first_closureidx can be thought of as index into x_bnd
     #last_closureidx = np.where(x_bnd >= a)[0][0]
-    
+   
     du_da = np.concatenate((np.array((0.0,),dtype='d'),np.diff(u)/da,np.array((0.0,),dtype='d'))) # defined on the boundaries xbnd_fine
 
     for aidx in range(scp.afull_idx_fine+1):
         #assert(sigma_closure[aidx] > 0)
 
-        sigmacontact[(aidx+1):] -= (1.0/sqrt(2.0))*du_da[aidx+1]*sqrt(scp.x_fine[aidx]/(scp.x_fine[(aidx+1):]-scp.x_fine[aidx]))*da
+        sigmacontact[(aidx+1):] -= du_da[aidx+1]*((1.0/sqrt(2.0))*sqrt(scp.x_fine[aidx]/(scp.x_fine[(aidx+1):]-scp.x_fine[aidx])) + 1.0)*da # + 1.0 represents stress when a large distance away from effective tip
 
-        # Need to include integral from 
-        # of (1/sqrt(2))(du/da)sqrt(a/(x-a))da
+        # Need to include integral 
+        # of (du/da)[(1/sqrt(2))sqrt(a/(x-a)) + 1]da
         # as a goes from x[aidx]-da/2 to x[aidx]
         # approximate sqrt(x-a) as only a dependence
-        # (1/sqrt(2))(du/da)*sqrt(a)*integral of sqrt(1/(x-a)) da
+        # (du/da)*(1/sqrt(2))*sqrt(a)*integral of sqrt(1/(x-a)) da + integral of du/da da
         # as a goes from x[aidx]-da/2 to x[aidx]
-        # = (1/sqrt(2))(du/da)*sqrt(a) * (-2sqrt(x-x) + 2sqrt(x-a+da/2))
-        # = (1/sqrt(2))(du/da)*sqrt(a) * 2sqrt(da/2))
+        # = (du/da)(1/sqrt(2))*sqrt(a) * (-2sqrt(x-x) + 2sqrt(x-a+da/2))  + (du/da)(da/2)
+        # = (1/sqrt(2))(du/da)*sqrt(a) * 2sqrt(da/2)) + (du/da)(da/2)
 
-        sigmacontact[aidx] -= (1.0/sqrt(2.0))*du_da[aidx+1]*np.sqrt(scp.x_fine[aidx])*2.0*sqrt(da/2.0)
+        sigmacontact[aidx] -= (du_da[aidx+1]*(1.0/sqrt(2.0))*np.sqrt(scp.x_fine[aidx])*2.0*sqrt(da/2.0) + du_da[aidx+1]*da/2.0)
         pass
     return sigmacontact
 
@@ -229,7 +231,7 @@ def goal_function(param,scp,sigma_ext):
     average = (from_displacement[:scp.afull_idx_fine]+from_stress[:scp.afull_idx_fine])/2.0
     negative = average[average < 0]  # negative sigmacontact means tension on the surfaces, which is not allowed!
     
-    return np.sum(residual**2.0) + np.sum(negative**2.0) + residual.shape[0]*(u[scp.afull_idx_fine]-sigma_ext)**2.0
+    return np.sum(residual**2.0) + 1.0*np.sum(negative**2.0) + residual.shape[0]*(u[scp.afull_idx_fine]-sigma_ext)**2.0
 
 
 def calc_contact(scp,sigma_ext):
