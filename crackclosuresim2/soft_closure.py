@@ -160,8 +160,15 @@ def sigmacontact_from_displacement(scp,du_da,dsigmaext_dxt_hardcontact_interp):
     displacement=scipy.interpolate.interp1d(scp.x,displacement_coarse,kind="linear",fill_value="extrapolate")(scp.x_fine)
     
     closure_index = None
-    
-    for aidx in range(scp.afull_idx_fine-1,-1,-1):
+
+    # !!!*** Possibly calculation should start at scp.afull_idx_fine instead of
+    # afull_idx_fine-1.
+    # Then residual and average in goal_function should consider the full range (including afull_idx_fine
+    # But this causes various problems:
+    #   * displacement assertion failed below
+    #   * Convergence failure 'Positive directional derivative for linesearch'
+
+    for aidx in range(scp.afull_idx_fine-1,-1,-1):  
         #assert(sigma_closure[aidx] > 0)
         #   in next line: sqrt( (a+x) * (a-x) where x >= 0 and
         #   throw out where x >= a
@@ -245,8 +252,10 @@ def sigmacontact_from_stress(scp,du_da_corrected,dsigmaext_dxt_hardcontact_inter
 
     #sigma_nominal = (np.sqrt(np.mean(sigma_closure**2.0)) + np.abs(sigma_ext))/2.0
 
-def soft_closure_goal_function_opening(du_da,scp,sigma_ext,dsigmaext_dxt_hardcontact):
+def soft_closure_goal_function_opening(du_da_shortened,scp,sigma_ext,dsigmaext_dxt_hardcontact):
 
+    du_da = np.concatenate((du_da_shortened,np.zeros(scp.xsteps*scp.fine_refinement - scp.afull_idx_fine - 2 ,dtype='d')))
+    
     #(u,dsigmaext_dxt_hardcontact_interp) = tip_field_integral(scp,param,dsigmaext_dxt_hardcontact)
     dsigmaext_dxt_hardcontact_interp=interpolate_hardcontact_intensity(scp,dsigmaext_dxt_hardcontact)
     #last_closureidx = np.where(x_bnd >= a)[0][0]
@@ -264,13 +273,14 @@ def soft_closure_goal_function_opening(du_da,scp,sigma_ext,dsigmaext_dxt_hardcon
     from_stress = sigmacontact_from_stress(scp,du_da_corrected,dsigmaext_dxt_hardcontact_interp)
     
     # elements of residual have units of stress^2
-    residual = (from_displacement[:scp.afull_idx_fine]-from_stress[:scp.afull_idx_fine])
+    # !!!*** should from_displacement consider to afull_idx_fine+1???
+    residual = (from_displacement[:(scp.afull_idx_fine)]-from_stress[:(scp.afull_idx_fine)])
 
-    average = (from_displacement[:scp.afull_idx_fine]+from_stress[:scp.afull_idx_fine])/2.0
+    average = (from_displacement[:(scp.afull_idx_fine)]+from_stress[:(scp.afull_idx_fine)])/2.0
     negative = average[average < 0]  # negative sigmacontact means tension on the surfaces, which is not allowed!
     
     #return np.sum(residual**2.0) + 1.0*np.sum(negative**2.0) + residual.shape[0]*(u[scp.afull_idx_fine]-sigma_ext)**2.0
-    return np.sum(residual**2.0) + 1.0*np.sum(negative**2.0) + 10*residual.shape[0]*(u_corrected[scp.afull_idx_fine]-sigma_ext)**2.0  # !!!!*** should this be afull_idx_fine-1? PROBABLY ***!!!!
+    return np.sum(residual**2.0) + 1.0*np.sum(negative**2.0) + 10*residual.shape[0]*(u_corrected[scp.afull_idx_fine]-sigma_ext)**2.0 
 
 
 def calc_contact(scp,sigma_ext):
@@ -308,7 +318,7 @@ def calc_contact(scp,sigma_ext):
         load_constraint = { "type": "eq",
                             "fun": load_constraint_fun }
         
-        res = scipy.optimize.minimize(soft_closure_goal_function_opening,iniguess,args=(scp,sigma_ext,dsigmaext_dxt_hardcontact),
+        res = scipy.optimize.minimize(soft_closure_goal_function_opening,iniguess[:(scp.afull_idx_fine+1)],args=(scp,sigma_ext,dsigmaext_dxt_hardcontact),
                                       constraints = [ nonnegative_constraint ], # , load_constraint ],
                                       method="SLSQP",
                                       options={"eps": 10000.0,
@@ -323,7 +333,8 @@ def calc_contact(scp,sigma_ext):
             pdb.set_trace()
             pass
         
-        du_da=res.x
+        du_da_shortened=res.x
+        du_da = np.concatenate((du_da_shortened,np.zeros(scp.xsteps*scp.fine_refinement - scp.afull_idx_fine - 2 ,dtype='d')))
         pass
     else:
         # Compressive
@@ -378,6 +389,7 @@ def soft_closure_plots(scp,du_da,dsigmaext_dxt_hardcontact):
     pl.title("sigmacontact")
 
     u_corrected = np.cumsum(du_da_corrected)*scp.dx_fine
+    # u_corrected nominally on position basis x_fine+dx_fine/2.0
 
     pl.figure()
     pl.clf()
