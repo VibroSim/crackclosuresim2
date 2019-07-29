@@ -94,11 +94,11 @@ if __name__=="__main__":
     
 
 
-    sigma_ext=50e6
+    sigma_ext=-50e6
     
 
-    (du_da,du_da_corrected,contact_stress,displacement,dsigmaext_dxt_hardcontact) = calc_contact(scp,sigma_ext)
+    (uniform_load,du_da,du_da_corrected,contact_stress,displacement,dsigmaext_dxt_hardcontact) = calc_contact(scp,sigma_ext)
 
-    soft_closure_plots(scp,du_da,dsigmaext_dxt_hardcontact)
+    soft_closure_plots(scp,uniform_load,du_da,dsigmaext_dxt_hardcontact)
     pl.show()
     pass
