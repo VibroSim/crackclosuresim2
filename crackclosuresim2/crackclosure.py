@@ -1616,29 +1616,33 @@ def inverse_closure_backwards_broken(reff,seff,x,x_bnd,dx,xt,sigma_yield,crack_m
 
 
 
-def Glinka_ModeI_ThroughCrack(Eeff,x,width,epsx):
+class Glinka_ModeI_ThroughCrack(ModeI_Beta_WeightFunction):
     """Create and return ModeI_crack_model corresponding
     to the Through crack weight function from the Glinka paper"""
-    
-    def weightfun_through_times_sqrt_aminx(x, a, w):
-        # Weight function (stress intensity factor resulting from point load on crack surface) for a through crack or tunnel crack 
-        # reference: Glinka, G. "Development of weight functions and computer integration procedures for calculating stress intensity factors around cracks subjected to complex stress fields." Stress and Fatigue-Fracture Design, Petersburg Ontario, Canada, Progress Report 1.1 (1996): 1.
-        # x=position, 
-    # a=half-crack length (not always physical total length, but may be an effective length for partially closed crack) 
-        # w=half-width of geometry  (same axis as x and a)
-        M1 = 0.06987 + 0.40117*(a/w) - 5.5407*(a/w)**2.0 + 50.0886*(a/w)**3.0 - 200.699*(a/w)**4.0 + 395.552*(a/w)**5.0 - 377.939*(a/w)**6.0 + 140.218*(a/w)**7.0
-        M2 = 0.09049 - 2.14886*(a/w) + 22.5325*(a/w)**2.0 - 89.6553*(a/w)**3.0 + 210.599*(a/w)**4.0 - 239.445*(a/w)**5.0 + 111.128*(a/w)**6.0
-        M3 = 0.427216 + 2.56001*(a/w) - 29.6349*(a/w)**2.0 + 138.40*(a/w)**3.0 - 347.255*(a/w)**4.0 + 457.128*(a/w)**5.0 - 295.882*(a/w)**6.0 + 68.1575*(a/w)**7.0
+
+    def __init__(self,Eeff,x,width,epsx):
+
         
-        return (2.0/np.sqrt(2*np.pi))*(1.0+M1*scipy.sqrt(1.0-x/a)+M2*(1.0-x/a)+M3*(1.0-x/a)**1.5)
-
-
-    return ModeI_Beta_WeightFunction(weightfun_times_sqrt_aminx=lambda obj,x,a: weightfun_through_times_sqrt_aminx(x,a,width),
-                                     epsx=epsx,
-                                     Eeff=Eeff,
-                                     surrogate_a=x,
-                                     use_surrogate=True)
-
+        def weightfun_through_times_sqrt_aminx(x, a, w):
+            # Weight function (stress intensity factor resulting from point load on crack surface) for a through crack or tunnel crack 
+            # reference: Glinka, G. "Development of weight functions and computer integration procedures for calculating stress intensity factors around cracks subjected to complex stress fields." Stress and Fatigue-Fracture Design, Petersburg Ontario, Canada, Progress Report 1.1 (1996): 1.
+            # x=position, 
+            # a=half-crack length (not always physical total length, but may be an effective length for partially closed crack) 
+            # w=half-width of geometry  (same axis as x and a)
+            M1 = 0.06987 + 0.40117*(a/w) - 5.5407*(a/w)**2.0 + 50.0886*(a/w)**3.0 - 200.699*(a/w)**4.0 + 395.552*(a/w)**5.0 - 377.939*(a/w)**6.0 + 140.218*(a/w)**7.0
+            M2 = 0.09049 - 2.14886*(a/w) + 22.5325*(a/w)**2.0 - 89.6553*(a/w)**3.0 + 210.599*(a/w)**4.0 - 239.445*(a/w)**5.0 + 111.128*(a/w)**6.0
+            M3 = 0.427216 + 2.56001*(a/w) - 29.6349*(a/w)**2.0 + 138.40*(a/w)**3.0 - 347.255*(a/w)**4.0 + 457.128*(a/w)**5.0 - 295.882*(a/w)**6.0 + 68.1575*(a/w)**7.0
+            
+            return (2.0/np.sqrt(2*np.pi))*(1.0+M1*scipy.sqrt(1.0-x/a)+M2*(1.0-x/a)+M3*(1.0-x/a)**1.5)
+        
+        super(Glinka_ModeI_throughcrack, self).__init__(
+            weightfun_times_sqrt_aminx=lambda obj,x,a: weightfun_through_times_sqrt_aminx(x,a,width),
+            epsx=epsx,
+            Eeff=Eeff,
+            surrogate_a=x,
+            use_surrogate=True)
+        pass
+    pass
 
 
 
@@ -1668,51 +1672,57 @@ def ModeI_throughcrack_weightfun(Eeff,x,epsx):
                                      surrogate_a=x,
                                      use_surrogate=True)
 
-def ModeI_throughcrack_CODformula(Eeff):
+class ModeI_throughcrack_CODformula(ModeI_Beta_CODformula):
 
-    def u(Eeff,sigma_applied,x,xt):
-        # Non weightfunction method:
+    def __init__(self,Eeff):
+        def u(Eeff,sigma_applied,x,xt):
+            # Non weightfunction method:
 
-        # Old method: Based on Suresh eq. 9.45.
-        # The problem with the old method is it is based
-        # on a near-tip approximation
-        #Kappa = (3.0-nu)/(1.0+nu)
-        #
-        #KI = sigma_applied*np.sqrt(np.pi*(xt))
-        #theta = np.pi
-        #u = (KI/(2.0*E))*(np.sqrt((xt-x)/(2.0*np.pi)))*((1.0+nu)* 
-        #                                                (((2.0*Kappa+1.0)*(np.sin(theta/2.0)))-np.sin(3.0*theta/2.0)))
+            # Old method: Based on Suresh eq. 9.45.
+            # The problem with the old method is it is based
+            # on a near-tip approximation
+            #Kappa = (3.0-nu)/(1.0+nu)
+            #
+            #KI = sigma_applied*np.sqrt(np.pi*(xt))
+            #theta = np.pi
+            #u = (KI/(2.0*E))*(np.sqrt((xt-x)/(2.0*np.pi)))*((1.0+nu)* 
+            #                                                (((2.0*Kappa+1.0)*(np.sin(theta/2.0)))-np.sin(3.0*theta/2.0)))
+            
+            # New Method: Based on Anderson, eq. A2.43
+            # uy = 2(sigma/Eeff)*sqrt(a^2-x^2)
+            # uy = 2(sigma/Eeff)*sqrt((a+x)(a-x))
+            
+            #Eeff = E
+            u = (2*sigma_applied/Eeff)*np.sqrt((xt+x)*(xt-x))
+            return u
+    
+        super(ModeI_throughcrack_CODformula, self).__init__(Eeff=Eeff,
+                                                            beta=lambda obj: 1.0,
+                                                            u = lambda obj,sigma_applied,x,xt: u(obj.Eeff,sigma_applied,x,xt))
+        pass
+    pass
 
-        # New Method: Based on Anderson, eq. A2.43
-        # uy = 2(sigma/Eeff)*sqrt(a^2-x^2)
-        # uy = 2(sigma/Eeff)*sqrt((a+x)(a-x))
+
+
+class Tada_ModeI_CircularCrack_along_midline(ModeI_Beta_COD_Formula):
+
+    def __init__(self,E,nu):
+        def u(E,nu,sigma_applied,x,xt):
+            # For a circular crack in an infinite space,
+            # loaded in mode I.
+            # We will be evaluating along a line through the crack center
+            # Based on Tada, H., Paris, P., & Irwin, G. (2000). The stress analysis of cracks handbook / Hiroshi Tada, Paul C. Paris, George R. Irwin. (3rd ed.). New York: ASME Press.
         
-        #Eeff = E
-        u = (2*sigma_applied/Eeff)*np.sqrt((xt+x)*(xt-x))
-        return u
+            u = (4.0*(1-nu**2.0)/(np.pi*E)) * sigma_applied * np.sqrt(xt**2.0 - x**2.0)
+            return u
     
-    
-    return ModeI_Beta_COD_Formula(Eeff=Eeff,
-                                  beta=lambda obj: 1.0,
-                                  u = lambda obj,sigma_applied,x,xt: u(obj.Eeff,sigma_applied,x,xt))
+        super(Tada_ModeI_CircularCrack_along_midline, self).__init__(E=E,
+                                                                     nu=nu,
+                                                                     beta=lambda obj: 4.0/(np.pi**2.0),
+                                                                     u = lambda obj,sigma_applied,x,xt: u(obj.E,obj.nu,sigma_applied,x,xt))
+        pass
+    pass
 
-
-def Tada_ModeI_CircularCrack_along_midline(E,nu):
-
-    def u(E,nu,sigma_applied,x,xt):
-        # For a circular crack in an infinite space,
-        # loaded in mode I.
-        # We will be evaluating along a line through the crack center
-        # Based on Tada, H., Paris, P., & Irwin, G. (2000). The stress analysis of cracks handbook / Hiroshi Tada, Paul C. Paris, George R. Irwin. (3rd ed.). New York: ASME Press.
-        
-        u = (4.0*(1-nu**2.0)/(np.pi*E)) * sigma_applied * np.sqrt(xt**2.0 - x**2.0)
-        return u
-    
-    
-    return ModeI_Beta_COD_Formula(E=E,
-                                  nu=nu,
-                                  beta=lambda obj: 4.0/(np.pi**2.0),
-                                  u = lambda obj,sigma_applied,x,xt: u(obj.E,obj.nu,sigma_applied,x,xt))
 
 
 
