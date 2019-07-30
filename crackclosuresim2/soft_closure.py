@@ -284,7 +284,6 @@ def sigmacontact_from_displacement(scp,du_da):
     #    last_closureidx = np.where(x_bnd >= a)[0][0]
     
 
-    # .. why use du_da[1:...]? !!!
     
     displacement_coarse = scp.crack_initial_opening - (scp.sigma_closure/scp.Hm)**(2.0/3.0)
 
@@ -324,7 +323,7 @@ def sigmacontact_from_displacement(scp,du_da):
     sigma_contact = np.zeros(scp.x_fine.shape[0],dtype='d')
     sigma_contact[displacement < 0.0] = ((-displacement[displacement < 0.0])**(3.0/2.0)) * scp.Hm
     
-    return (sigma_contact,displacement,du_da) 
+    return (sigma_contact,displacement) 
 
 
 def sigmacontact_from_stress(scp,du_da):
