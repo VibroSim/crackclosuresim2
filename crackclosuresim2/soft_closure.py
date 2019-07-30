@@ -387,7 +387,7 @@ def sigmacontact_from_displacement(scp,uniform_load,du_da,dsigmaext_dxt_hardcont
     #   * displacement assertion failed below -- caused by sigma_closure not having a value @ afull_idx_fine
     #   * Convergence failure 'Positive directional derivative for linesearch' ... possibly not a problem (need to adjust tolerances?)
 
-    for aidx in range(scp.afull_idx_fine,0,-1): # was range(scp.afull_idx_fine-1,-1,-1)  
+    for aidx in range(scp.afull_idx_fine,-1,-1): # was range(scp.afull_idx_fine-1,-1,-1)  
         #assert(sigma_closure[aidx] > 0)
         #   in next line: sqrt( (a+x) * (a-x) where x >= 0 and
         #   throw out where x >= a
