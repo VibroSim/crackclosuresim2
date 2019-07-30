@@ -99,13 +99,22 @@ if __name__=="__main__":
     du_da=np.zeros(scp.x.shape[0],dtype='d')
     uniform_load=0.0
 
-    soft_closure_plots(scp,uniform_load,du_da,dsigmaext_dxt_hardcontact)
+    soft_closure_plots(scp,uniform_load,du_da,dsigmaext_dxt_hardcontact,titleprefix="Initial: ")
 
-    sigma_ext=50e6
+    sigma_ext_compressive=-50e6
     
 
-    (uniform_load,du_da,du_da_corrected,contact_stress,displacement,dsigmaext_dxt_hardcontact) = calc_contact(scp,sigma_ext)
+    (uniform_load_compressive,du_da_compressive,du_da_corrected_compressive,contact_stress_compressive,displacement_compressive,dsigmaext_dxt_hardcontact_compressive) = calc_contact(scp,sigma_ext_compressive)
 
-    soft_closure_plots(scp,uniform_load,du_da,dsigmaext_dxt_hardcontact)
+    soft_closure_plots(scp,uniform_load_compressive,du_da_compressive,dsigmaext_dxt_hardcontact_compressive,titleprefix="Compressive: ")
+
+
+    sigma_ext_tensile=50e6
+    
+
+    (uniform_load_tensile,du_da_tensile,du_da_corrected_tensile,contact_stress_tensile,displacement_tensile,dsigmaext_dxt_hardcontact_tensile) = calc_contact(scp,sigma_ext_tensile)
+
+    soft_closure_plots(scp,uniform_load_tensile,du_da_tensile,dsigmaext_dxt_hardcontact_tensile,titleprefix="Tensile: ")
+
     pl.show()
     pass
