@@ -8,6 +8,7 @@ import scipy as sp
 
 from crackclosuresim2 import solve_normalstress
 from crackclosuresim2 import inverse_closure,crackopening_from_tensile_closure
+from crackclosuresim2 import ModeI_Beta_CODformula
 from crackclosuresim2 import ModeI_throughcrack_CODformula
 from crackclosuresim2 import Tada_ModeI_CircularCrack_along_midline
 
@@ -15,8 +16,8 @@ from crackclosuresim2 import Tada_ModeI_CircularCrack_along_midline
 
 class sc_params(object):
     # soft closure parameters
+    crack_model = None # crackclosuresim ModeI_crack_model object  (for now should be derived from ModeI_Beta_COD_Formula)
     Hm = None # H*m
-    E = None # Modulus or effective modulus
     xmax = None
     xsteps = None
     a_input = None
@@ -39,6 +40,11 @@ class sc_params(object):
                 raise ValueError("Invalid parameter: %s" % (argname))
             setattr(self,argname,kwargs[argname])
             pass
+
+        # For now we only support crack models with simple
+        # COD formulas... specifically the throughcrack and Tada models
+        assert(isinstance(self.crack_model,ModeI_Beta_COD_Formula))
+        
         pass
 
     def setcrackstate(self,sigma_closure,crack_initial_opening):
@@ -88,8 +94,7 @@ class sc_params(object):
         # sigma_yield = self.sigma_yield  # not a parameter yet... just use infinity for now
         sigma_yield=np.inf
         
-        #crack_model=self.crack_model  # not a parameter yet...
-        crack_model = ModeI_throughcrack_CODformula(self.E)
+        crack_model=self.crack_model  # not a parameter yet...
         
         
         #def load_constraint_fun(uniform_du_da_shortened):
@@ -201,7 +206,7 @@ class sc_params(object):
 
     
     @classmethod
-    def fromcrackgeom(cls,E,xmax,xsteps,a_input,fine_refinement,Hm):
+    def fromcrackgeom(cls,crack_model,xmax,xsteps,a_input,fine_refinement,Hm):
         # x_bnd represents x coordinates of the boundaries of
         # each mesh element 
         x_bnd=np.linspace(0,xmax,xsteps,dtype='d')
@@ -216,7 +221,7 @@ class sc_params(object):
         afull_idx_fine = afull_idx*fine_refinement  # xbnd_fine[afull_idx_fine]==a within roundoff error
 
 
-        return cls(E=E,
+        return cls(crack_model=crack_model,
                    xmax=xmax,
                    xsteps=xsteps,
                    a_input=a_input,
@@ -298,22 +303,51 @@ def sigmacontact_from_displacement(scp,du_da):
     #   * displacement assertion failed below -- caused by sigma_closure not having a value @ afull_idx_fine
     #   * Convergence failure 'Positive directional derivative for linesearch' ... possibly not a problem (need to adjust tolerances?)
 
-    for aidx in range(scp.afull_idx_fine,-1,-1): # was range(scp.afull_idx_fine-1,-1,-1)  
-        #assert(sigma_closure[aidx] > 0)
-        #   in next line: sqrt( (a+x) * (a-x) where x >= 0 and
-        #   throw out where x >= a
-        # diplacement defined on x_fine
-        displacement[:aidx] += (4.0/scp.E)*du_da[aidx]*np.sqrt((scp.x_fine[aidx]+scp.x_fine[:aidx])*(scp.x_fine[aidx]-scp.x_fine[:aidx]))*da
-        # Add in the x=a position
-        # Here we have the integral of (4/E)*(du/da)*sqrt( (a+x)* (a-x) )da
-        # as a goes from x[aidx] to x[aidx]+da/2
-        # ... treat du/da and sqrt(a+x) as constant:
-        #  (4/E)*(du/da)*sqrt(a+x) * integral of sqrt(a-x) da
-        # = (4/E)*(du/da)*sqrt(a+x) * (2/3) * (  (x[aidx]+da/2-x[aidx])^(3/2) - (x[aidx]-x[aidx])^(3/2) )
-        # = (4/E)*(du/da)*sqrt(a+x) * (2/3) * ( (da/2)^(3/2) )
-        displacement[aidx] += (4.0/scp.E)*du_da[aidx]*np.sqrt(2.0*scp.x_fine[aidx])*(da/2.0)**(3.0/2.0)
-
+    if isinstance(self.crack_model,ModeI_throughcrack_CODformula):
+    
+        for aidx in range(scp.afull_idx_fine,-1,-1): 
+            #assert(sigma_closure[aidx] > 0)
+            #   in next line: sqrt( (a+x) * (a-x) where x >= 0 and
+            #   throw out where x >= a
+            # diplacement defined on x_fine
+            displacement[:aidx] += (4.0/scp.E)*du_da[aidx]*np.sqrt((scp.x_fine[aidx]+scp.x_fine[:aidx])*(scp.x_fine[aidx]-scp.x_fine[:aidx]))*da
+            # Add in the x=a position
+            # Here we have the integral of (4/E)*(du/da)*sqrt( (a+x)* (a-x) )da
+            # as a goes from x[aidx] to x[aidx]+da/2
+            # ... treat du/da and sqrt(a+x) as constant:
+            #  (4/E)*(du/da)*sqrt(a+x) * integral of sqrt(a-x) da
+            # = (4/E)*(du/da)*sqrt(a+x) * (2/3) * (  (x[aidx]+da/2-x[aidx])^(3/2) - (x[aidx]-x[aidx])^(3/2) )
+            # = (4/E)*(du/da)*sqrt(a+x) * (2/3) * ( (da/2)^(3/2) )
+            displacement[aidx] += (4.0/scp.E)*du_da[aidx]*np.sqrt(2.0*scp.x_fine[aidx])*(da/2.0)**(3.0/2.0)
+            
+            pass
         pass
+    elif isinstance(self.crack_model,Tada_ModeI_CircularCrack_along_midline):
+        for aidx in range(scp.afull_idx_fine,-1,-1): 
+            #assert(sigma_closure[aidx] > 0)
+            #   in next line: sqrt( (a+x) * (a-x) where x >= 0 and
+            #   throw out where x >= a
+            # displacement defined on x_fine
+            # NOTE: displacement is 2* usual formula because we are concerned with total distance between both crack faces
+
+            # Tada turns out to have sqrt(xt^2-x^2) === sqrt((xt-x)(xt+x)) form
+            # as throughcrack, so same integral calculation applies.
+            # We just change the leading factors
+            displacement[:aidx] += (8.0*(1.0-scp.crack_model.nu**2.0)/(np.pi*scp.crack_model.E))*du_da[aidx]*np.sqrt((scp.x_fine[aidx]+scp.x_fine[:aidx])*(scp.x_fine[aidx]-scp.x_fine[:aidx]))*da
+            # Add in the x=a position
+            # Here we have the integral of (4/E)*(du/da)*sqrt( (a+x)* (a-x) )da
+            # as a goes from x[aidx] to x[aidx]+da/2
+            # ... treat du/da and sqrt(a+x) as constant:
+            #  (4/E)*(du/da)*sqrt(a+x) * integral of sqrt(a-x) da
+            # = (4/E)*(du/da)*sqrt(a+x) * (2/3) * (  (x[aidx]+da/2-x[aidx])^(3/2) - (x[aidx]-x[aidx])^(3/2) )
+            # = (4/E)*(du/da)*sqrt(a+x) * (2/3) * ( (da/2)^(3/2) )
+            displacement[aidx] += (8.0*(1.0-scp.crack_model.nu**2.0)/(np.pi*scp.crack_model.E))*du_da[aidx]*np.sqrt(2.0*scp.x_fine[aidx])*(da/2.0)**(3.0/2.0)
+            pass
+
+        
+        pass
+    else:
+        raise ValueError("Unsupported crack model for soft_closure")
     
     # Displacement calculated....
     # Sigma contact exists where displacement is negative
@@ -344,12 +378,12 @@ def sigmacontact_from_stress(scp,du_da):
    
     #du_da = calc_du_da(u,da)
 
-    
+    betaval = scp.crack_model.beta(scp.crack_model)
     
     for aidx in range(scp.afull_idx_fine+1):
         #assert(sigma_closure[aidx] > 0)
 
-        sigmacontact[(aidx+1):] -= du_da[aidx]*((1.0/sqrt(2.0))*sqrt(scp.x_fine[aidx]/(scp.x_fine[(aidx+1):]-scp.x_fine[aidx])) + 1.0)*da # + 1.0 represents stress when a large distance away from effective tip
+        sigmacontact[(aidx+1):] -= du_da[aidx]*((betaval/sqrt(2.0))*sqrt(scp.x_fine[aidx]/(scp.x_fine[(aidx+1):]-scp.x_fine[aidx])) + 1.0)*da # + 1.0 represents stress when a large distance away from effective tip
 
         # Need to include integral 
         # of (du/da)[(1/sqrt(2))sqrt(a/(x-a)) + 1]da
@@ -360,7 +394,7 @@ def sigmacontact_from_stress(scp,du_da):
         # = (du/da)(1/sqrt(2))*sqrt(a) * (-2sqrt(x-x) + 2sqrt(x-a+da/2))  + (du/da)(da/2)
         # = (1/sqrt(2))(du/da)*sqrt(a) * 2sqrt(da/2)) + (du/da)(da/2)
 
-        sigmacontact[aidx] -= (du_da[aidx]*(1.0/sqrt(2.0))*np.sqrt(scp.x_fine[aidx])*2.0*sqrt(da/2.0) + du_da[aidx]*da/2.0)
+        sigmacontact[aidx] -= (du_da[aidx]*(betaval/sqrt(2.0))*np.sqrt(scp.x_fine[aidx])*2.0*sqrt(da/2.0) + du_da[aidx]*da/2.0)
         pass
 
     return sigmacontact

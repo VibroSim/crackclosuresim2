@@ -52,14 +52,14 @@ if __name__=="__main__":
     # Hm has units of Pa/m^(3/2)
     Hm = 10e6/(100e-9**(3.0/2.0))  # rough order of magnitude guess
 
-    scp = sc_params.fromcrackgeom(E,xmax,xsteps,a_input,fine_refinement,Hm)
-
     
     # Closure state (function of position; positive compression)
     # Use hard closure model to solve for closure state
-    #crack_model = ModeI_throughcrack_CODformula(Eeff)
-    crack_model = Tada_ModeI_CircularCrack_along_midline(E,nu)
+    crack_model = ModeI_throughcrack_CODformula(Eeff)
+    #crack_model = Tada_ModeI_CircularCrack_along_midline(E,nu)
     
+
+    scp = sc_params.fromcrackgeom(crack_model,xmax,xsteps,a_input,fine_refinement,Hm)
     
 
     # !!!*** NOTE: inverse_closure() fails if first observed_reff element is 0
