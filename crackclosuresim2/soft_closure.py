@@ -48,6 +48,8 @@ class sc_params(object):
 
     def initialize_contact(self,sigma_closure,crack_initial_opening):
 
+        assert(np.all(sigma_closure >= 0.0)) # given sigma_closure should not have any tensile component
+        
         #self.crack_initial_opening=copy.copy(crack_initial_opening)
         self.crack_initial_opening=np.zeros(self.x.shape[0],dtype='d')
         self.sigma_closure=np.zeros(self.x.shape[0],dtype='d')
@@ -152,9 +154,9 @@ class sc_params(object):
         du_da_shortened=res.x
         du_da = np.concatenate((np.zeros(closure_index+1,dtype='d'),du_da_shortened,np.zeros(self.xsteps*self.fine_refinement - self.afull_idx_fine - 2 ,dtype='d')))
         
-        (contact_stress,displacement,du_da_corrected) = sigmacontact_from_displacement(self,du_da)
+        (contact_stress,displacement) = sigmacontact_from_displacement(self,du_da)
 
-        from_stress = sigmacontact_from_stress(self,du_da_corrected)
+        from_stress = sigmacontact_from_stress(self,du_da)
 
         # displacement = crack_initial_opening - (sigma_closure_stored/Hm)^(2/3) + displacement_due_to_distributed_stress_concentrations
         # sigmacontact_from_displacement = 0 when displacement > 0
@@ -179,9 +181,9 @@ class sc_params(object):
         #raise ValueError("Foo!")
 
         # Now we apply our sigma_closure
-        (contact_stress,displacement,du_da_corrected) = sigmacontact_from_displacement(self,du_da)
+        (contact_stress,displacement) = sigmacontact_from_displacement(self,du_da)
 
-        from_stress = sigmacontact_from_stress(self,du_da_corrected)
+        from_stress = sigmacontact_from_stress(self,du_da)
 
         # This becomes our new initial state
         self.crack_initial_opening = displacement + (sigma_closure/self.Hm)**(2.0/3.0) # we add sigma_closure displacement back in because sigmacontact_from_displacement() will subtract it out
@@ -247,12 +249,12 @@ def initialize_contact_goal_function(du_da_shortened,scp,sigma_closure_interp,cl
     
     # sigmacontact is positive compression
     
-    (from_displacement,displacement,du_da_corrected) = sigmacontact_from_displacement(scp,du_da)
+    (from_displacement,displacement) = sigmacontact_from_displacement(scp,du_da)
 
-    #u_corrected = np.cumsum(du_da_corrected)*scp.dx_fine
-    # u_corrected nominally on position basis x_fine+dx_fine/2.0
+    #u = np.cumsum(du_da)*scp.dx_fine
+    # u nominally on position basis x_fine+dx_fine/2.0
     
-    from_stress = sigmacontact_from_stress(scp,du_da_corrected)
+    from_stress = sigmacontact_from_stress(scp,du_da)
     
     # elements of residual have units of stress^2
     # !!!*** should from_displacement consider to afull_idx_fine+1???
@@ -262,7 +264,7 @@ def initialize_contact_goal_function(du_da_shortened,scp,sigma_closure_interp,cl
     #negative = average[average < 0]  # negative sigmacontact means tension on the surfaces, which is not allowed!
     
     #return np.sum(residual**2.0) + 1.0*np.sum(negative**2.0) + residual.shape[0]*(u[scp.afull_idx_fine]-sigma_ext)**2.0
-    return np.sum(residual**2.0) # + 1.0*np.sum(negative**2.0) #  + 10*residual.shape[0]*(u_corrected[scp.afull_idx_fine]-sigma_ext)**2.0 
+    return np.sum(residual**2.0) # + 1.0*np.sum(negative**2.0) #  + 10*residual.shape[0]*(u[scp.afull_idx_fine]-sigma_ext)**2.0 
 
 
 
@@ -281,8 +283,6 @@ def sigmacontact_from_displacement(scp,du_da):
     # first_closureidx can be thought of as index into x_bnd
     #    last_closureidx = np.where(x_bnd >= a)[0][0]
     
-    #du_da = calc_du_da(u,da)
-    du_da_corrected=copy.copy(du_da)
 
     # .. why use du_da[1:...]? !!!
     
@@ -304,7 +304,7 @@ def sigmacontact_from_displacement(scp,du_da):
         #   in next line: sqrt( (a+x) * (a-x) where x >= 0 and
         #   throw out where x >= a
         # diplacement defined on x_fine
-        displacement[:aidx] += (4.0/scp.E)*du_da_corrected[aidx]*np.sqrt((scp.x_fine[aidx]+scp.x_fine[:aidx])*(scp.x_fine[aidx]-scp.x_fine[:aidx]))*da
+        displacement[:aidx] += (4.0/scp.E)*du_da[aidx]*np.sqrt((scp.x_fine[aidx]+scp.x_fine[:aidx])*(scp.x_fine[aidx]-scp.x_fine[:aidx]))*da
         # Add in the x=a position
         # Here we have the integral of (4/E)*(du/da)*sqrt( (a+x)* (a-x) )da
         # as a goes from x[aidx] to x[aidx]+da/2
@@ -312,7 +312,7 @@ def sigmacontact_from_displacement(scp,du_da):
         #  (4/E)*(du/da)*sqrt(a+x) * integral of sqrt(a-x) da
         # = (4/E)*(du/da)*sqrt(a+x) * (2/3) * (  (x[aidx]+da/2-x[aidx])^(3/2) - (x[aidx]-x[aidx])^(3/2) )
         # = (4/E)*(du/da)*sqrt(a+x) * (2/3) * ( (da/2)^(3/2) )
-        displacement[aidx] += (4.0/scp.E)*du_da_corrected[aidx]*np.sqrt(2.0*scp.x_fine[aidx])*(da/2.0)**(3.0/2.0)
+        displacement[aidx] += (4.0/scp.E)*du_da[aidx]*np.sqrt(2.0*scp.x_fine[aidx])*(da/2.0)**(3.0/2.0)
 
         pass
     
@@ -324,10 +324,10 @@ def sigmacontact_from_displacement(scp,du_da):
     sigma_contact = np.zeros(scp.x_fine.shape[0],dtype='d')
     sigma_contact[displacement < 0.0] = ((-displacement[displacement < 0.0])**(3.0/2.0)) * scp.Hm
     
-    return (sigma_contact,displacement,du_da_corrected) # returned du_da is actually du_da_corrected...
+    return (sigma_contact,displacement,du_da) 
 
 
-def sigmacontact_from_stress(scp,du_da_corrected):
+def sigmacontact_from_stress(scp,du_da):
     # sigmacontact is positive compression
 
     sigma_closure_interp=scipy.interpolate.interp1d(scp.x,scp.sigma_closure,kind="linear",fill_value="extrapolate")(scp.x_fine)
@@ -350,7 +350,7 @@ def sigmacontact_from_stress(scp,du_da_corrected):
     for aidx in range(scp.afull_idx_fine+1):
         #assert(sigma_closure[aidx] > 0)
 
-        sigmacontact[(aidx+1):] -= du_da_corrected[aidx]*((1.0/sqrt(2.0))*sqrt(scp.x_fine[aidx]/(scp.x_fine[(aidx+1):]-scp.x_fine[aidx])) + 1.0)*da # + 1.0 represents stress when a large distance away from effective tip
+        sigmacontact[(aidx+1):] -= du_da[aidx]*((1.0/sqrt(2.0))*sqrt(scp.x_fine[aidx]/(scp.x_fine[(aidx+1):]-scp.x_fine[aidx])) + 1.0)*da # + 1.0 represents stress when a large distance away from effective tip
 
         # Need to include integral 
         # of (du/da)[(1/sqrt(2))sqrt(a/(x-a)) + 1]da
@@ -361,7 +361,7 @@ def sigmacontact_from_stress(scp,du_da_corrected):
         # = (du/da)(1/sqrt(2))*sqrt(a) * (-2sqrt(x-x) + 2sqrt(x-a+da/2))  + (du/da)(da/2)
         # = (1/sqrt(2))(du/da)*sqrt(a) * 2sqrt(da/2)) + (du/da)(da/2)
 
-        sigmacontact[aidx] -= (du_da_corrected[aidx]*(1.0/sqrt(2.0))*np.sqrt(scp.x_fine[aidx])*2.0*sqrt(da/2.0) + du_da_corrected[aidx]*da/2.0)
+        sigmacontact[aidx] -= (du_da[aidx]*(1.0/sqrt(2.0))*np.sqrt(scp.x_fine[aidx])*2.0*sqrt(da/2.0) + du_da[aidx]*da/2.0)
         pass
 
     return sigmacontact
@@ -392,12 +392,12 @@ def soft_closure_goal_function(du_da_shortened,scp,sigma_ext,closure_index):
     
     # sigmacontact is positive compression
     
-    (from_displacement,displacement,du_da_corrected) = sigmacontact_from_displacement(scp,du_da)
+    (from_displacement,displacement) = sigmacontact_from_displacement(scp,du_da)
 
-    u_corrected = np.cumsum(du_da_corrected)*scp.dx_fine
-    # u_corrected nominally on position basis x_fine+dx_fine/2.0
+    #u = np.cumsum(du_da)*scp.dx_fine
+    # u nominally on position basis x_fine+dx_fine/2.0
     
-    from_stress = sigmacontact_from_stress(scp,du_da_corrected)
+    from_stress = sigmacontact_from_stress(scp,du_da)
     
     # elements of residual have units of stress^2
     # !!!*** should from_displacement consider to afull_idx_fine+1???
@@ -409,7 +409,7 @@ def soft_closure_goal_function(du_da_shortened,scp,sigma_ext,closure_index):
     displaced = average[displacement[:(scp.afull_idx_fine+1)] > 0.0] # should not have stresses with positive displacement 
     
     #return np.sum(residual**2.0) + 1.0*np.sum(negative**2.0) + residual.shape[0]*(u[scp.afull_idx_fine]-sigma_ext)**2.0
-    return 1.0*np.sum(residual**2.0) + 1.0*np.sum(negative**2.0) + 1.0*np.sum(displaced**2.0) #  + 10*residual.shape[0]*(u_corrected[scp.afull_idx_fine]-sigma_ext)**2.0 
+    return 1.0*np.sum(residual**2.0) + 1.0*np.sum(negative**2.0) + 1.0*np.sum(displaced**2.0) #  + 10*residual.shape[0]*(u[scp.afull_idx_fine]-sigma_ext)**2.0 
 
 
 
@@ -445,14 +445,12 @@ def calc_contact(scp,sigma_ext):
 
 
     def load_constraint_fun(du_da_shortened):
-        # NOTE: Could make faster by accelerating sigmacontact_from_displacement to not do anything once it figures out du_da_corrected
 
         du_da = np.concatenate((np.zeros(closure_index+1,dtype='d'),du_da_shortened,np.zeros(scp.xsteps*scp.fine_refinement - scp.afull_idx_fine - 2 ,dtype='d')))        
         
-        (sigma_contact,displacement,du_da_corrected) = sigmacontact_from_displacement(scp,du_da)
 
         
-        return (np.cumsum(du_da_corrected)[scp.afull_idx_fine]*scp.dx_fine)-sigma_ext  # !!!*** should go to afulL_idx_fine+1??? 
+        return (np.cumsum(du_da)[scp.afull_idx_fine]*scp.dx_fine)-sigma_ext  # !!!*** should go to afull_idx_fine+1??? 
         
     load_constraint = { "type": "eq",
                         "fun": load_constraint_fun }
@@ -546,7 +544,7 @@ def calc_contact(scp,sigma_ext):
         du_da_shortened=res.x
         du_da = np.concatenate((du_da_shortened,np.zeros(scp.xsteps*scp.fine_refinement - scp.afull_idx_fine - 2 ,dtype='d')))
 
-        (contact_stress,displacement,du_da_corrected) = sigmacontact_from_displacement(scp,du_da)
+        (contact_stress,displacement) = sigmacontact_from_displacement(scp,du_da)
         
 
         
@@ -558,11 +556,11 @@ def calc_contact(scp,sigma_ext):
 
 
     
-    (contact_stress,displacement,du_da_corrected) = sigmacontact_from_displacement(scp,du_da)
+    (contact_stress,displacement) = sigmacontact_from_displacement(scp,du_da)
 
 
     
-    return (du_da,du_da_corrected,contact_stress,displacement)
+    return (du_da,contact_stress,displacement)
     
 
 
@@ -588,8 +586,8 @@ def soft_closure_plots(scp,du_da,titleprefix=""):
 
 
     
-    (from_displacement,displacement,du_da_corrected) = sigmacontact_from_displacement(scp,du_da)
-    from_stress = sigmacontact_from_stress(scp,du_da_corrected)
+    (from_displacement,displacement) = sigmacontact_from_displacement(scp,du_da)
+    from_stress = sigmacontact_from_stress(scp,du_da)
 
 
     
@@ -610,14 +608,14 @@ def soft_closure_plots(scp,du_da,titleprefix=""):
     pl.xlabel('Position (mm)')
     pl.title(titleprefix+"sigmacontact")
 
-    u_corrected = np.cumsum(du_da_corrected)*scp.dx_fine
-    # u_corrected nominally on position basis x_fine+dx_fine/2.0
+    u = np.cumsum(du_da)*scp.dx_fine
+    # u nominally on position basis x_fine+dx_fine/2.0
 
     pl.figure()
     pl.clf()
-    pl.plot(scp.x_fine*1e3,du_da_corrected/1e6,'-')
+    pl.plot(scp.x_fine*1e3,du_da/1e6,'-')
     pl.grid()
-    pl.title(titleprefix+"distributed stress concentration derivative (corrected)\ntotal load=%g" % (u_corrected[scp.afull_idx_fine]))
+    pl.title(titleprefix+"distributed stress concentration derivative (corrected)\ntotal load=%g" % (u[scp.afull_idx_fine]))
     pl.xlabel('Position (mm)')
     pl.ylabel("Distributed stress concentration (MPa/m)")
 
