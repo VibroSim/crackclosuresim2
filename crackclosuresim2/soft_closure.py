@@ -45,7 +45,169 @@ class sc_params(object):
         self.sigma_closure=sigma_closure
         self.crack_initial_opening=crack_initial_opening
         pass
+
+    def initialize_contact(self,sigma_closure,crack_initial_opening):
+
+        #self.crack_initial_opening=copy.copy(crack_initial_opening)
+        self.crack_initial_opening=np.zeros(self.x.shape[0],dtype='d')
+        self.sigma_closure=np.zeros(self.x.shape[0],dtype='d')
+
+        # closure index is the last point prior to closure
+        closure_index = np.where(sigma_closure[:(self.afull_idx)]==0.0)[0][-1]*self.fine_refinement
+        assert(np.all(sigma_closure[:(closure_index//self.fine_refinement+1)]==0.0))
+
+        
+        
+        # ***!!!! will need to change this integration for a different
+        # crack model!!!***
+        thickness=2.0e-3 # ***!!! should get from crack model... but we divide it out so it really doesn't matter
+        #sigma_closure_avg_stress = np.sum(sigma_closure[sigma_closure > 0.0])*self.dx*thickness/(self.a*thickness)
+        
+        # now we use uniform_du_da_shortened
+        # which is one number representing uniform load
+        # divided by dx_fine
+        # followed by afull_idx_fine+1 numbers representing
+        # the distributed stress concentration
+        # ... Note that the distributed stress concentration indices
+        # have no effect to the left of the closure point and
+        # the uniform load has no effect unless the crack is completely closed
+
+        sigma_closure_interp = scipy.interpolate.interp1d(self.x,sigma_closure,kind="linear",fill_value="extrapolate")(self.x_fine)
+
+        
+        uniform_du_da_shortened_iniguess=np.zeros(1+self.afull_idx_fine+1,dtype='d')*(1.0/(self.afull_idx+1)) # * (-sigma_closure_avg_stress)/self.dx_fine  #
+        uniform_du_da_shortened_iniguess[1:(self.afull_idx_fine+2)] = -sigma_closure_interp[:(self.afull_idx_fine+1)]
+
+        
+        
+        # sigma_yield = self.sigma_yield  # not a parameter yet... just use infinity for now
+        sigma_yield=np.inf
+        
+        #crack_model=self.crack_model  # not a parameter yet...
+        crack_model = ModeI_throughcrack_CODformula(self.E)
+        
+        
+        def load_constraint_fun(uniform_du_da_shortened):
+            # NOTE: Could make faster by accelerating sigmacontact_from_displacement to not do anything once it figures out du_da_corrected
+            
+            uniform_load=uniform_du_da_shortened[0]*self.dx_fine  # Uniform stress in Pa across crack
+            uniform_load = 0.0
+            
+            du_da = np.concatenate((uniform_du_da_shortened[1:],np.zeros(self.xsteps*self.fine_refinement - self.afull_idx_fine - 2 ,dtype='d')))        
+        
+            (sigma_contact,displacement,closure_index,du_da_corrected) = sigmacontact_from_displacement(self,uniform_load,du_da,dsigmaext_dxt_hardcontact_interp)
+            
+            if closure_index is not None or uniform_load > 0.0:
+                # Open crack cannot hold uniform load; no tensile uniform load possible
+                uniform_load = 0.0
+                pass
+            
+            return (uniform_load + np.cumsum(du_da_corrected)[self.afull_idx_fine]*self.dx_fine)-(-sigma_closure_avg_stress)
+        
+        load_constraint = { "type": "eq",
+                            "fun": load_constraint_fun }
+        
+        
+        def crack_open_constraint_fun(uniform_du_da_shortened):
+            """ Represents that crack should be open up
+               through closure_index and closed thereafter"""
+            
+            uniform_load=uniform_du_da_shortened[0]*self.dx_fine  # Uniform stress in Pa across crack
+            uniform_load = 0.0
+            
+            du_da = np.concatenate((uniform_du_da_shortened[1:],np.zeros(self.xsteps*self.fine_refinement - self.afull_idx_fine - 2 ,dtype='d')))        
+            
+            (sigma_contact,displacement,closure_index_junk,du_da_corrected) = sigmacontact_from_displacement(self,uniform_load,du_da,dsigmaext_dxt_hardcontact_interp)
+            
+            return np.concatenate((displacement[:(closure_index+1)],-displacement[(closure_index+1):]))  # require displacement >= 0 in open region and <= 0 in closed region
+
+        crack_open_constraint = { "type": "ineq",
+                                  "fun": crack_open_constraint_fun }
+        
+
+               
+        
+        # Zero load
+        #dsigmaext_dxt_hardcontact=None
+        dsigmaext_dxt_hardcontact=np.zeros(self.xsteps-1,dtype='d')
+        #dsigmaext_dxt_hardcontact_interp=None
+        dsigmaext_dxt_hardcontact_interp=np.zeros(self.xsteps*self.fine_refinement-1,dtype='d')  # !!!*** Is the length here correct? Need to check
     
+
+        constraints = [] #[ load_constraint, crack_open_constraint ]
+        
+        res = scipy.optimize.minimize(initialize_contact_goal_function,uniform_du_da_shortened_iniguess,args=(self,sigma_closure_interp),
+                                      constraints = constraints,
+                                      method="SLSQP",
+                                      options={"eps": 10000.0,
+                                               "maxiter": 10000,
+                                               "ftol": self.afull_idx_fine*(abs(np.mean(sigma_closure))+20e6)**2.0/1e19})
+        
+        if not res.success: #  and res.status != 4:
+            # (ignore incompatible constraint, because our constraints are
+            # compatible by definition, and scipy 1.2 seems to diagnose
+            # this incorrectly... should file bug report)
+            print("minimize error %d: %s" % (res.status,res.message))
+            import pdb
+            pdb.set_trace()
+            pass
+        
+        uniform_du_da_shortened=res.x
+        uniform_load=uniform_du_da_shortened[0]*self.dx_fine  # Uniform stress in Pa across crack
+        uniform_load=0.0
+        du_da = np.concatenate((uniform_du_da_shortened[1:],np.zeros(self.xsteps*self.fine_refinement - self.afull_idx_fine - 2 ,dtype='d')))
+        
+        (contact_stress,displacement,closure_index,du_da_corrected) = sigmacontact_from_displacement(self,uniform_load,du_da,dsigmaext_dxt_hardcontact_interp)
+
+        from_stress = sigmacontact_from_stress(self,uniform_load,du_da_corrected,dsigmaext_dxt_hardcontact_interp,closure_index)
+
+        # displacement = crack_initial_opening - (sigma_closure_stored/Hm)^(2/3) + displacement_due_to_distributed_stress_concentrations
+        # sigmacontact_from_displacement = 0 when displacement > 0
+        # sigmacontact_from_displacement = (-displacement)^(3/2)*Hm when displacement < 0
+        
+        # we made sigmacontact_from_stress match sigma_closure...
+
+        # So let's set sigmacontact_from_displacement equal and solve for displacement
+        # sigma_closure = (-displacement)^(3/2)*Hm
+        # (-displacement)^(3/2) = sigma_closure/Hm = 
+        # displacement = -(sigma_closure/Hm)^(2/3)
+        # crack_initial_opening + displacement_due_to_distributed_stress_concentrations = -(sigma_closure/Hm)^(2/3)
+        # crack_initial_opening = -displacement_due_to_distributed_stress_concentrations -(sigma_closure/Hm)^(2/3)
+
+        # To evaluate modeled residual stressing operation starting
+        # at zero initial opening and zero closure, 
+        # stop here, and run soft_closure_plots()
+        self.crack_initial_opening = crack_initial_opening -displacement - (sigma_closure/self.Hm)**(2.0/3.0)  # Through this line we have evaluated an initial opening displacement
+
+        #sys.modules["__main__"].__dict__.update(globals())
+        #sys.modules["__main__"].__dict__.update(locals())
+        #raise ValueError("Foo!")
+
+        # Now we apply our sigma_closure
+        (contact_stress,displacement,closure_index,du_da_corrected) = sigmacontact_from_displacement(self,uniform_load,du_da,dsigmaext_dxt_hardcontact_interp)
+
+        from_stress = sigmacontact_from_stress(self,uniform_load,du_da_corrected,dsigmaext_dxt_hardcontact_interp,closure_index)
+
+        # This becomes our new initial state
+        self.crack_initial_opening = displacement + (sigma_closure/self.Hm)**(2.0/3.0) # we add sigma_closure displacement back in because sigmacontact_from_displacement() will subtract it out
+        self.sigma_closure = sigma_closure
+        du_da[:]=0.0
+        
+        if closure_index is not None or uniform_load > 0.0:
+            # Open crack cannot hold uniform load; no tensile uniform load possible
+            uniform_load = 0.0
+            pass    
+        
+        
+        
+        #sys.modules["__main__"].__dict__.update(globals())
+        #sys.modules["__main__"].__dict__.update(locals())
+        #raise ValueError("Foo!")
+    
+        pass
+    
+
+
     
     @classmethod
     def fromcrackgeom(cls,E,xmax,xsteps,a_input,fine_refinement,Hm):
@@ -81,7 +243,49 @@ class sc_params(object):
         pass
     pass
 
+
+
+def initialize_contact_goal_function(uniform_du_da_shortened,scp,sigma_closure_interp):
+    # ***NOTE: Could define a separate version that doesn't
+    # bother to calculate  dsigmaext_dxt_hardcontact_interp when calculating
+    # compressive (sigma_ext < 0) loads. 
+
+    uniform_load=uniform_du_da_shortened[0]*scp.dx_fine  # Uniform stress in Pa across crack
+    uniform_load = 0.0
     
+    du_da = np.concatenate((uniform_du_da_shortened[1:],np.zeros(scp.xsteps*scp.fine_refinement - scp.afull_idx_fine - 2 ,dtype='d')))
+    
+    #(u,dsigmaext_dxt_hardcontact_interp) = tip_field_integral(scp,param,dsigmaext_dxt_hardcontact)
+
+    dsigmaext_dxt_hardcontact=None
+    dsigmaext_dxt_hardcontact_interp=None
+
+    #last_closureidx = np.where(x_bnd >= a)[0][0]
+
+    #  constraint that integral of du/da must equal sigma_ext
+    # means that last value of u should match sigma_ext
+    
+    # sigmacontact is positive compression
+    
+    (from_displacement,displacement,closure_index,du_da_corrected) = sigmacontact_from_displacement(scp,uniform_load,du_da,dsigmaext_dxt_hardcontact_interp)
+
+    #u_corrected = np.cumsum(du_da_corrected)*scp.dx_fine
+    # u_corrected nominally on position basis x_fine+dx_fine/2.0
+    
+    from_stress = sigmacontact_from_stress(scp,uniform_load,du_da_corrected,dsigmaext_dxt_hardcontact_interp,closure_index)
+    
+    # elements of residual have units of stress^2
+    # !!!*** should from_displacement consider to afull_idx_fine+1???
+    residual = (sigma_closure_interp[:(scp.afull_idx_fine+1)]-from_stress[:(scp.afull_idx_fine+1)])
+
+    #average = (from_displacement[:(scp.afull_idx_fine+1)]+from_stress[:(scp.afull_idx_fine+1)])/2.0
+    #negative = average[average < 0]  # negative sigmacontact means tension on the surfaces, which is not allowed!
+    
+    #return np.sum(residual**2.0) + 1.0*np.sum(negative**2.0) + residual.shape[0]*(u[scp.afull_idx_fine]-sigma_ext)**2.0
+    return np.sum(residual**2.0) # + 1.0*np.sum(negative**2.0) #  + 10*residual.shape[0]*(u_corrected[scp.afull_idx_fine]-sigma_ext)**2.0 
+
+
+
 
 def interpolate_hardcontact_intensity(scp,dsigmaext_dxt_hardcontact):
     if dsigmaext_dxt_hardcontact is None:
@@ -176,7 +380,7 @@ def sigmacontact_from_displacement(scp,uniform_load,du_da,dsigmaext_dxt_hardcont
     #   * displacement assertion failed below -- caused by sigma_closure not having a value @ afull_idx_fine
     #   * Convergence failure 'Positive directional derivative for linesearch' ... possibly not a problem (need to adjust tolerances?)
 
-    for aidx in range(scp.afull_idx_fine-1,-1,-1):  
+    for aidx in range(scp.afull_idx_fine,0,-1): # was range(scp.afull_idx_fine-1,-1,-1)  
         #assert(sigma_closure[aidx] > 0)
         #   in next line: sqrt( (a+x) * (a-x) where x >= 0 and
         #   throw out where x >= a
@@ -191,7 +395,7 @@ def sigmacontact_from_displacement(scp,uniform_load,du_da,dsigmaext_dxt_hardcont
         # = (4/E)*(du/da)*sqrt(a+x) * (2/3) * ( (da/2)^(3/2) )
         displacement[aidx] += (4.0/scp.E)*du_da_corrected[aidx]*np.sqrt(2.0*scp.x_fine[aidx])*(da/2.0)**(3.0/2.0)
 
-        if displacement[aidx] > 0.0 and closure_index is None:
+        if False and displacement[aidx] > 0.0 and closure_index is None:
             assert(np.all(displacement[:aidx] > 0.0)) # if this point is open, then all points to the left should be open too
 
             # Open points to the left of this have distributed crack tip intensities according to the hard contact
@@ -288,6 +492,7 @@ def soft_closure_goal_function(uniform_du_da_shortened,scp,sigma_ext,dsigmaext_d
     # compressive (sigma_ext < 0) loads. 
 
     uniform_load=uniform_du_da_shortened[0]*scp.dx_fine  # Uniform stress in Pa across crack
+    uniform_load = 0.0
     
     du_da = np.concatenate((uniform_du_da_shortened[1:],np.zeros(scp.xsteps*scp.fine_refinement - scp.afull_idx_fine - 2 ,dtype='d')))
     
@@ -316,13 +521,15 @@ def soft_closure_goal_function(uniform_du_da_shortened,scp,sigma_ext,dsigmaext_d
     
     # elements of residual have units of stress^2
     # !!!*** should from_displacement consider to afull_idx_fine+1???
-    residual = (from_displacement[:(scp.afull_idx_fine)]-from_stress[:(scp.afull_idx_fine)])
+    residual = (from_displacement[:(scp.afull_idx_fine+1)]-from_stress[:(scp.afull_idx_fine+1)])
 
-    average = (from_displacement[:(scp.afull_idx_fine)]+from_stress[:(scp.afull_idx_fine)])/2.0
+    average = (from_displacement[:(scp.afull_idx_fine+1)]+from_stress[:(scp.afull_idx_fine+1)])/2.0
     negative = average[average < 0]  # negative sigmacontact means tension on the surfaces, which is not allowed!
     
     #return np.sum(residual**2.0) + 1.0*np.sum(negative**2.0) + residual.shape[0]*(u[scp.afull_idx_fine]-sigma_ext)**2.0
     return np.sum(residual**2.0) + 1.0*np.sum(negative**2.0) #  + 10*residual.shape[0]*(u_corrected[scp.afull_idx_fine]-sigma_ext)**2.0 
+
+
 
 
 def calc_contact(scp,sigma_ext):
@@ -351,6 +558,7 @@ def calc_contact(scp,sigma_ext):
         # NOTE: Could make faster by accelerating sigmacontact_from_displacement to not do anything once it figures out du_da_corrected
 
         uniform_load=uniform_du_da_shortened[0]*scp.dx_fine  # Uniform stress in Pa across crack
+        uniform_load=0.0
         du_da = np.concatenate((uniform_du_da_shortened[1:],np.zeros(scp.xsteps*scp.fine_refinement - scp.afull_idx_fine - 2 ,dtype='d')))        
         
         (sigma_contact,displacement,closure_index,du_da_corrected) = sigmacontact_from_displacement(scp,uniform_load,du_da,dsigmaext_dxt_hardcontact_interp)
@@ -367,7 +575,7 @@ def calc_contact(scp,sigma_ext):
         
 
     
-    if sigma_ext >= 0: # Tensile
+    if sigma_ext > 0: # Tensile
 
         #nonnegative_constraint = scipy.optimize.NonlinearConstraint(lambda du_da: du_da,0.0,np.inf)
         nonnegative_constraint = { "type": "ineq",
@@ -384,11 +592,11 @@ def calc_contact(scp,sigma_ext):
         dsigmaext_dxt_hardcontact_interp=interpolate_hardcontact_intensity(scp,dsigmaext_dxt_hardcontact)
         
         res = scipy.optimize.minimize(soft_closure_goal_function,uniform_du_da_shortened_iniguess,args=(scp,sigma_ext,dsigmaext_dxt_hardcontact),
-                                      constraints = [ nonnegative_constraint, load_constraint ],
+                                      constraints = [ load_constraint ], #[ nonnegative_constraint, load_constraint ],
                                       method="SLSQP",
                                       options={"eps": 10000.0,
                                                "maxiter": 100000,
-                                               "ftol": scp.afull_idx_fine*(sigma_ext+20e6)**2.0/1e9})
+                                               "ftol": scp.afull_idx_fine*(np.abs(sigma_ext)+20e6)**2.0/1e19})
         #res = scipy.optimize.minimize(goal_function,uniform_du_da_shortened_iniguess,method='nelder-mead',options={"maxfev": 15000})
         if not res.success: # and res.status != 4:
             # (ignore incompatible constraint, because our constraints are
@@ -401,28 +609,38 @@ def calc_contact(scp,sigma_ext):
         
         uniform_du_da_shortened=res.x
         uniform_load=uniform_du_da_shortened[0]*scp.dx_fine  # Uniform stress in Pa across crack
+        uniform_load=0.0
         du_da = np.concatenate((uniform_du_da_shortened[1:],np.zeros(scp.xsteps*scp.fine_refinement - scp.afull_idx_fine - 2 ,dtype='d')))
 
         dsigmaext_dxt_hardcontact_interp=interpolate_hardcontact_intensity(scp,dsigmaext_dxt_hardcontact)
 
         pass
     else:
-        # Compressive
-        dsigmaext_dxt_hardcontact=None
-        dsigmaext_dxt_hardcontact_interp=None
+        # Compressive or zero load
+        #dsigmaext_dxt_hardcontact=None
+        dsigmaext_dxt_hardcontact=np.zeros(scp.xsteps-1,dtype='d')
+        #dsigmaext_dxt_hardcontact_interp=None
+        dsigmaext_dxt_hardcontact_interp=np.zeros(scp.xsteps*scp.fine_refinement-1,dtype='d')  # !!!*** Is the length here correct? Need to check
         
         #nonpositive_constraint = scipy.optimize.NonlinearConstraint(lambda du_da: du_da,0.0,np.inf)
         nonpositive_constraint = { "type": "ineq",
                                    "fun": lambda uniform_du_da_shortened: -uniform_du_da_shortened }
 
 
+        constraints = [ load_constraint ]
+        
+        #if sigma_ext < 0.0:
+        #    # if we are applying compressive external load,
+        #    # net shift of concentration should always be compressive
+        #    constraints.append(nonpositive_constraint)
+        #    pass
 
         res = scipy.optimize.minimize(soft_closure_goal_function,uniform_du_da_shortened_iniguess,args=(scp,sigma_ext,dsigmaext_dxt_hardcontact),
-                                      constraints = [ nonpositive_constraint, load_constraint ],
+                                      constraints = constraints,
                                       method="SLSQP",
                                       options={"eps": 10000.0,
                                                "maxiter": 100000,
-                                               "ftol": scp.afull_idx_fine*(sigma_ext+20e6)**2.0/1e9})
+                                               "ftol": scp.afull_idx_fine*(np.abs(sigma_ext)+20e6)**2.0/1e19})
         
         #res = scipy.optimize.minimize(goal_function,uniform_du_da_shortened_iniguess,method='nelder-mead',options={"maxfev": 15000})
         if not res.success: #  and res.status != 4:
@@ -436,9 +654,21 @@ def calc_contact(scp,sigma_ext):
         
         uniform_du_da_shortened=res.x
         uniform_load=uniform_du_da_shortened[0]*scp.dx_fine  # Uniform stress in Pa across crack
+        uniform_load=0.0
         du_da = np.concatenate((uniform_du_da_shortened[1:],np.zeros(scp.xsteps*scp.fine_refinement - scp.afull_idx_fine - 2 ,dtype='d')))
 
+        (contact_stress,displacement,closure_index,du_da_corrected) = sigmacontact_from_displacement(scp,uniform_load,du_da,dsigmaext_dxt_hardcontact_interp)
         
+        if closure_index is not None or uniform_load > 0.0:
+            # Open crack cannot hold uniform load; no tensile uniform load possible
+            uniform_load = 0.0
+            pass    
+
+        
+
+        sys.modules["__main__"].__dict__.update(globals())
+        sys.modules["__main__"].__dict__.update(locals())
+        raise ValueError("Foo!")
         pass
 
 
@@ -454,6 +684,14 @@ def calc_contact(scp,sigma_ext):
     
     return (uniform_load,du_da,du_da_corrected,contact_stress,displacement,dsigmaext_dxt_hardcontact)
     
+
+
+
+
+
+
+
+
 
 def soft_closure_plots(scp,uniform_load,du_da,dsigmaext_dxt_hardcontact):
     from matplotlib import pyplot as pl
@@ -516,3 +754,5 @@ def soft_closure_plots(scp,uniform_load,du_da,dsigmaext_dxt_hardcontact):
     pl.ylabel('Displacement (um)')
     pass
     
+
+

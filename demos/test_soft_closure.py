@@ -89,12 +89,19 @@ if __name__=="__main__":
     sigma_closure[sigma_closure < 0.0]=0.0
     
 
+    #scp.setcrackstate(sigma_closure,crack_initial_opening)
 
-    scp.setcrackstate(sigma_closure,crack_initial_opening)
+
+    scp.initialize_contact(sigma_closure,crack_initial_opening)
     
 
+    dsigmaext_dxt_hardcontact=np.zeros(scp.x.shape[0],dtype='d')
+    du_da=np.zeros(scp.x.shape[0],dtype='d')
+    uniform_load=0.0
 
-    sigma_ext=-50e6
+    soft_closure_plots(scp,uniform_load,du_da,dsigmaext_dxt_hardcontact)
+
+    sigma_ext=50e6
     
 
     (uniform_load,du_da,du_da_corrected,contact_stress,displacement,dsigmaext_dxt_hardcontact) = calc_contact(scp,sigma_ext)
