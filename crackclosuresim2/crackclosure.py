@@ -1672,7 +1672,7 @@ def ModeI_throughcrack_weightfun(Eeff,x,epsx):
                                      surrogate_a=x,
                                      use_surrogate=True)
 
-class ModeI_throughcrack_CODformula(ModeI_Beta_CODformula):
+class ModeI_throughcrack_CODformula(ModeI_Beta_COD_Formula):
 
     def __init__(self,Eeff):
         def u(Eeff,sigma_applied,x,xt):

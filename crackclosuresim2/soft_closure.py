@@ -8,7 +8,7 @@ import scipy as sp
 
 from crackclosuresim2 import solve_normalstress
 from crackclosuresim2 import inverse_closure,crackopening_from_tensile_closure
-from crackclosuresim2 import ModeI_Beta_CODformula
+from crackclosuresim2 import ModeI_Beta_COD_Formula
 from crackclosuresim2 import ModeI_throughcrack_CODformula
 from crackclosuresim2 import Tada_ModeI_CircularCrack_along_midline
 
@@ -303,14 +303,14 @@ def sigmacontact_from_displacement(scp,du_da):
     #   * displacement assertion failed below -- caused by sigma_closure not having a value @ afull_idx_fine
     #   * Convergence failure 'Positive directional derivative for linesearch' ... possibly not a problem (need to adjust tolerances?)
 
-    if isinstance(self.crack_model,ModeI_throughcrack_CODformula):
+    if isinstance(scp.crack_model,ModeI_throughcrack_CODformula):
     
         for aidx in range(scp.afull_idx_fine,-1,-1): 
             #assert(sigma_closure[aidx] > 0)
             #   in next line: sqrt( (a+x) * (a-x) where x >= 0 and
             #   throw out where x >= a
             # diplacement defined on x_fine
-            displacement[:aidx] += (4.0/scp.E)*du_da[aidx]*np.sqrt((scp.x_fine[aidx]+scp.x_fine[:aidx])*(scp.x_fine[aidx]-scp.x_fine[:aidx]))*da
+            displacement[:aidx] += (4.0/scp.crack_model.Eeff)*du_da[aidx]*np.sqrt((scp.x_fine[aidx]+scp.x_fine[:aidx])*(scp.x_fine[aidx]-scp.x_fine[:aidx]))*da
             # Add in the x=a position
             # Here we have the integral of (4/E)*(du/da)*sqrt( (a+x)* (a-x) )da
             # as a goes from x[aidx] to x[aidx]+da/2
@@ -318,11 +318,11 @@ def sigmacontact_from_displacement(scp,du_da):
             #  (4/E)*(du/da)*sqrt(a+x) * integral of sqrt(a-x) da
             # = (4/E)*(du/da)*sqrt(a+x) * (2/3) * (  (x[aidx]+da/2-x[aidx])^(3/2) - (x[aidx]-x[aidx])^(3/2) )
             # = (4/E)*(du/da)*sqrt(a+x) * (2/3) * ( (da/2)^(3/2) )
-            displacement[aidx] += (4.0/scp.E)*du_da[aidx]*np.sqrt(2.0*scp.x_fine[aidx])*(da/2.0)**(3.0/2.0)
+            displacement[aidx] += (4.0/scp.crack_model.Eeff)*du_da[aidx]*np.sqrt(2.0*scp.x_fine[aidx])*(da/2.0)**(3.0/2.0)
             
             pass
         pass
-    elif isinstance(self.crack_model,Tada_ModeI_CircularCrack_along_midline):
+    elif isinstance(scp.crack_model,Tada_ModeI_CircularCrack_along_midline):
         for aidx in range(scp.afull_idx_fine,-1,-1): 
             #assert(sigma_closure[aidx] > 0)
             #   in next line: sqrt( (a+x) * (a-x) where x >= 0 and
@@ -461,7 +461,7 @@ def calc_contact(scp,sigma_ext):
     sigma_yield=np.inf
     
     #crack_model=scp.crack_model  # not a parameter yet...
-    crack_model = ModeI_throughcrack_CODformula(scp.E)
+    #crack_model = ModeI_throughcrack_CODformula(scp.E)
 
     if sigma_ext > 0: # Tensile
 
