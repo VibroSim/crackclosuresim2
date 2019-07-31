@@ -451,17 +451,21 @@ def soft_closure_goal_function(du_da_shortened,scp,closure_index):
     from_stress = sigmacontact_from_stress(scp,du_da_short)
     
     # elements of residual have units of stress^2
-    # !!!*** should from_displacement consider to afull_idx_fine+1???
     residual = (from_displacement-from_stress)
 
     average = (from_displacement+from_stress)/2.0
-    negative = average[average < 0]  # negative sigmacontact means tension on the surfaces, which is not allowed!
 
-    displaced = average[displacement > 0.0] # should not have stresses with positive displacement 
+    # We only worry about residual, negative, and displaced
+    # up to the point before the last... why?
+    # well the last point corresponds to the crack tip, which
+    # CAN hold tension and doesn't have to follow the contact stress
+    # law... so all these [:-1]'s represent that a stress concentration
+    # at the crack tip is OK for our goal 
+    negative = average[:-1][average[:-1] < 0]  # negative sigmacontact means tension on the surfaces, which is not allowed (except at the actual tip)!
+
+    displaced = average[:-1][displacement[:-1] > 0.0] # should not have stresses with positive displacement 
     
-    #return np.sum(residual**2.0) + 1.0*np.sum(negative**2.0) + residual.shape[0]*(u[scp.afull_idx_fine]-sigma_ext)**2.0
-    return 1.0*np.sum(residual**2.0) + 1.0*np.sum(negative**2.0) + 1.0*np.sum(displaced**2.0) #  + 10*residual.shape[0]*(u[scp.afull_idx_fine]-sigma_ext)**2.0 
-
+    return 1.0*np.sum(residual[:-1]**2.0) + 1.0*np.sum(negative**2.0) + 1.0*np.sum(displaced**2.0) 
 
 
 

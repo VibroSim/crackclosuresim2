@@ -222,12 +222,19 @@ static double soft_closure_goal_function_c(double *du_da_shortened,int du_da_sho
   }
 
   
-  for (cnt=0;cnt < du_da_short_len;cnt++) {
+  // We only worry about residual, negative, and displaced
+  // up to the point before the last... why?
+  //  well the last point corresponds to the crack tip, which
+  // CAN hold tension and doesn't have to follow the contact stress
+  // law... so we only iterate up to du_da_short_len-1,
+  // representing that a stress concentration
+  //  at the crack tip is OK for our goal 
+  for (cnt=0;cnt < du_da_short_len-1;cnt++) {
     residual += pow(from_displacement[cnt]-from_stress[cnt],2.0);
     average = (from_displacement[cnt]+from_stress[cnt])/2.0;
 
     if (average < 0.0) {
-      negative += pow(average,2.0); // negative sigmacontact means tension on the surfaces, which is not allowed!
+      negative += pow(average,2.0); // negative sigmacontact means tension on the surfaces, which is not allowed (except at the actual tip)!
 
       if (displacement[cnt] > 0.0) {
 	displaced += pow(average,2.0);  // should not have stresses with positive displacement 
