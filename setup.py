@@ -9,6 +9,7 @@ from setuptools.command.install_lib import install_lib
 from setuptools.command.install import install
 import setuptools.command.bdist_egg
 import sys
+from Cython.Build import cythonize
 
 
 
@@ -64,8 +65,19 @@ else:
 
 crackclosuresim2_package_files = [ "pt_steps/*" ]
 
+ext_modules=cythonize("crackclosuresim2/*.pyx")
+em_dict=dict([ (module.name,module) for module in ext_modules])
+sca_pyx_ext=em_dict["crackclosuresim2.soft_closure_accel"]
+sca_pyx_ext.include_dirs=["."]
+#sca_pyx_ext.extra_compile_args=['-O0','-g','-Wno-uninitialized']
+sca_pyx_ext.extra_compile_args=['-fopenmp','-O5','-Wno-uninitialized']
+sca_pyx_ext.libraries=['gomp']
+
+
+
 console_scripts=["eval_closure_state"]
 console_scripts_entrypoints = [ "%s = crackclosuresim2.bin.%s:main" % (script,script.replace("-","_")) for script in console_scripts ]
+
 
 
 setup(name="crackclosuresim2",
@@ -74,6 +86,7 @@ setup(name="crackclosuresim2",
       version=version,
       url="http://thermal.cnde.iastate.edu",
       zip_safe=False,
+      ext_modules=ext_modules,
       packages=["crackclosuresim2","crackclosuresim2.bin"],
       cmdclass={"install_lib": install_lib_save_version },
       package_data={"crackclosuresim2": crackclosuresim2_package_files},

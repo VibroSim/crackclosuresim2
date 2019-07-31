@@ -6,11 +6,13 @@ import scipy.optimize
 import scipy as sp
 
 
-from crackclosuresim2 import solve_normalstress
-from crackclosuresim2 import inverse_closure,crackopening_from_tensile_closure
-from crackclosuresim2 import ModeI_Beta_COD_Formula
-from crackclosuresim2 import ModeI_throughcrack_CODformula
-from crackclosuresim2 import Tada_ModeI_CircularCrack_along_midline
+from . import solve_normalstress
+from . import inverse_closure,crackopening_from_tensile_closure
+from . import ModeI_Beta_COD_Formula
+from . import ModeI_throughcrack_CODformula
+from . import Tada_ModeI_CircularCrack_along_midline
+from .soft_closure_accel import initialize_contact_goal_function_accel
+from .soft_closure_accel import soft_closure_goal_function_accel
 
 
 
@@ -32,7 +34,9 @@ class sc_params(object):
     x_fine = None
     afull_idx_fine = None
     sigma_closure = None
+    sigma_closure_interp = None
     crack_initial_opening = None
+    crack_initial_opening_interp = None
 
     def __init__(self,**kwargs):
         for argname in kwargs:
@@ -49,7 +53,11 @@ class sc_params(object):
 
     def setcrackstate(self,sigma_closure,crack_initial_opening):
         self.sigma_closure=sigma_closure
+        self.sigma_closure_interp=scipy.interpolate.interp1d(self.x,self.sigma_closure,kind="linear",fill_value="extrapolate")(self.x_fine)
+
+        
         self.crack_initial_opening=crack_initial_opening
+        self.crack_initial_opening_interp=scipy.interpolate.interp1d(self.x,self.crack_initial_opening,kind="linear",fill_value="extrapolate")(self.x_fine)
         pass
 
     def initialize_contact(self,sigma_closure,crack_initial_opening):
@@ -58,7 +66,9 @@ class sc_params(object):
         
         #self.crack_initial_opening=copy.copy(crack_initial_opening)
         self.crack_initial_opening=np.zeros(self.x.shape[0],dtype='d')
+        self.crack_initial_opening_interp=np.zeros(self.x_fine.shape[0],dtype='d')
         self.sigma_closure=np.zeros(self.x.shape[0],dtype='d')
+        self.sigma_closure_interp=np.zeros(self.x_fine.shape[0],dtype='d')
 
         ## closure index is the last point prior to closure
         closure_index = np.where(sigma_closure[:(self.afull_idx)]!=0.0)[0][0]*self.fine_refinement - 1
@@ -140,7 +150,7 @@ class sc_params(object):
 
         constraints = [] #[ load_constraint, crack_open_constraint ]
         
-        res = scipy.optimize.minimize(initialize_contact_goal_function,du_da_shortened_iniguess,args=(self,sigma_closure_interp,closure_index),
+        res = scipy.optimize.minimize(initialize_contact_goal_function_accel,du_da_shortened_iniguess,args=(self,sigma_closure_interp,closure_index),
                                       constraints = constraints,
                                       method="SLSQP",
                                       options={"eps": 10000.0,
@@ -180,7 +190,9 @@ class sc_params(object):
         # at zero initial opening and zero closure, 
         # stop here, and run soft_closure_plots()
         self.crack_initial_opening = crack_initial_opening -displacement - (sigma_closure/self.Hm)**(2.0/3.0)  # Through this line we have evaluated an initial opening displacement
+        self.crack_initial_opening_interp=scipy.interpolate.interp1d(self.x,self.crack_initial_opening,kind="linear",fill_value="extrapolate")(self.x_fine)
 
+        
         #sys.modules["__main__"].__dict__.update(globals())
         #sys.modules["__main__"].__dict__.update(locals())
         #raise ValueError("Foo!")
@@ -192,7 +204,10 @@ class sc_params(object):
 
         # This becomes our new initial state
         self.crack_initial_opening = displacement + (sigma_closure/self.Hm)**(2.0/3.0) # we add sigma_closure displacement back in because sigmacontact_from_displacement() will subtract it out
+        self.crack_initial_opening_interp=scipy.interpolate.interp1d(self.x,self.crack_initial_opening,kind="linear",fill_value="extrapolate")(self.x_fine)
+
         self.sigma_closure = sigma_closure
+        self.sigma_closure_interp=scipy.interpolate.interp1d(self.x,self.sigma_closure,kind="linear",fill_value="extrapolate")(self.x_fine)
         du_da[:]=0.0
         
         
@@ -242,6 +257,7 @@ class sc_params(object):
 
 
 def initialize_contact_goal_function(du_da_shortened,scp,sigma_closure_interp,closure_index):
+    """ NOTE: This should be kept identical functionally to initialize_contact_goal_function_accel in soft_closure_accel.pyx"""
 
     #du_da = np.concatenate((np.zeros(closure_index+1,dtype='d'),du_da_shortened,np.zeros(scp.xsteps*scp.fine_refinement - scp.afull_idx_fine - 2 ,dtype='d')))
     du_da_short = np.concatenate((np.zeros(closure_index+1,dtype='d'),du_da_shortened))  # short version goes only up to afull_idx_fine as last element (afull_idx_fine+1 elements total)
@@ -254,7 +270,7 @@ def initialize_contact_goal_function(du_da_shortened,scp,sigma_closure_interp,cl
     
     # sigmacontact is positive compression
     
-    (from_displacement,displacement) = sigmacontact_from_displacement(scp,du_da_short)
+    #(from_displacement,displacement) = sigmacontact_from_displacement(scp,du_da_short)
 
     
     from_stress = sigmacontact_from_stress(scp,du_da_short)
@@ -273,6 +289,7 @@ def initialize_contact_goal_function(du_da_shortened,scp,sigma_closure_interp,cl
 
 # du/da defined on x positions... represents distributed stress concentrations
 def sigmacontact_from_displacement(scp,du_da):
+    """ NOTE: This should be kept functionally identical to sigmacontact_from_displacement() in soft_closure_accel_ops.h"""
     # 
     da = scp.dx_fine # same step size
 
@@ -356,6 +373,7 @@ def sigmacontact_from_displacement(scp,du_da):
 
 
 def sigmacontact_from_stress(scp,du_da):
+    """ NOTE: This should be kept functionally identical to sigmacontact_from_stress() in soft_closure_accel_ops.h"""
     # sigmacontact is positive compression
 
     sigma_closure_interp=scipy.interpolate.interp1d(scp.x,scp.sigma_closure,kind="linear",fill_value="extrapolate")(scp.x_fine)
@@ -405,7 +423,8 @@ def sigmacontact_from_stress(scp,du_da):
 
     #sigma_nominal = (np.sqrt(np.mean(sigma_closure**2.0)) + np.abs(sigma_ext))/2.0
 
-def soft_closure_goal_function(du_da_shortened,scp,sigma_ext,closure_index):
+def soft_closure_goal_function(du_da_shortened,scp,closure_index):
+    """ NOTE: This should be kept identical functionally to soft_closure_goal_function_accel in soft_closure_accel.pyx"""
     # closure_index is used in tension to shorten du_da, disallowing any stresses or concentration to left of initial opening distance
     
 
@@ -478,11 +497,11 @@ def calc_contact(scp,sigma_ext):
 
     def load_constraint_fun(du_da_shortened):
 
-        du_da = np.concatenate((np.zeros(closure_index+1,dtype='d'),du_da_shortened,np.zeros(scp.xsteps*scp.fine_refinement - scp.afull_idx_fine - 2 ,dtype='d')))        
+        du_da_short = np.concatenate((np.zeros(closure_index+1,dtype='d'),du_da_shortened))        
         
 
         
-        return (np.cumsum(du_da)[scp.afull_idx_fine]*scp.dx_fine)-sigma_ext  # !!!*** should go to afull_idx_fine+1??? 
+        return (np.sum(du_da_short)*scp.dx_fine)-sigma_ext  
         
     load_constraint = { "type": "eq",
                         "fun": load_constraint_fun }
@@ -502,7 +521,7 @@ def calc_contact(scp,sigma_ext):
 
         
         
-        res = scipy.optimize.minimize(soft_closure_goal_function,du_da_shortened_iniguess,args=(scp,sigma_ext,closure_index),
+        res = scipy.optimize.minimize(soft_closure_goal_function_accel,du_da_shortened_iniguess,args=(scp,closure_index),
                                       constraints = [ load_constraint ], #[ nonnegative_constraint, load_constraint ],
                                       method="SLSQP",
                                       options={"eps": 10000.0,
@@ -556,7 +575,7 @@ def calc_contact(scp,sigma_ext):
         #    constraints.append(nonpositive_constraint)
         #    pass
 
-        res = scipy.optimize.minimize(soft_closure_goal_function,du_da_shortened_iniguess,args=(scp,sigma_ext,closure_index),
+        res = scipy.optimize.minimize(soft_closure_goal_function_accel,du_da_shortened_iniguess,args=(scp,closure_index),
                                       constraints = constraints,
                                       method="SLSQP",
                                       options={"eps": 10000.0,
