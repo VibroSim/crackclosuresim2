@@ -599,7 +599,7 @@ def calc_contact(scp,sigma_ext):
         du_da_shortened=res.x
         du_da = np.concatenate((du_da_shortened,np.zeros(scp.xsteps*scp.fine_refinement - scp.afull_idx_fine - 2 ,dtype='d')))
 
-        (contact_stress,displacement) = sigmacontact_from_displacement(scp,du_da)
+        #(contact_stress,displacement) = sigmacontact_from_displacement(scp,du_da)
         
 
         
