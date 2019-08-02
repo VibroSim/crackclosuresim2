@@ -55,13 +55,18 @@ if os.path.exists(".git"):
         # Ignore error, falling back to above version string
         pass
 
-    if modified:
+    if modified and version.find('+') >= 0:
         version += ".modified"
+        pass
+    elif modified:
+        version += "+modified"
         pass
     pass
 else:
     version = "UNKNOWN"
     pass
+
+print("version = %s" % (version))
 
 crackclosuresim2_package_files = [ "pt_steps/*" ]
 

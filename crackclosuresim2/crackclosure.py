@@ -931,7 +931,7 @@ def solve_normalstress_tensile(x,x_bnd,sigma_closure,dx,sigmaext_max,a,sigma_yie
 
     dsigmaext_dxt = np.ones(x.shape,dtype='d')*np.nan  # dsigmaext_dxt is a measure of the distributed stress concentration
     
-    while not done: 
+    while not done and sigmaext < sigmaext_max: 
         
         (use_xt2,sigmaext, sigma, tensile_displ, dsigmaext_dxt[xt_idx]) = solve_incremental_tensilestress(x,x_bnd,sigma,sigma_closure,tensile_displ,xt_idx,dx,sigmaext,sigmaext_max,a,crack_model,calculate_displacements=calculate_displacements)
         
@@ -1175,7 +1175,7 @@ def solve_normalstress_compressive(x,x_bnd,sigma_closure,dx,sigmaext_max,a,sigma
     dsigmaext_dxt = np.ones(x.shape,dtype='d')*np.nan  # dsigmaext_dxt is a measure of the distributed stress concentration
 
     
-    while not done: 
+    while not done and sigmaext > sigmaext_max: 
         
         (use_xt1,sigmaext, sigma, tensile_displ, dsigmaext_dxt[xt_idx]) = solve_incremental_compressivestress(x,x_bnd,sigma,sigma_closure,tensile_displ,use_xt2,xt_idx,dx,sigmaext,sigmaext_max,a,sigma_yield,crack_model,calculate_displacements=calculate_displacements)
         

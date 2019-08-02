@@ -491,7 +491,7 @@ def solve_shearstress(x,x_bnd,sigma_closure,dx,tauext_max,a,mu,tau_yield,crack_m
     #    done=True
     #    pass
 
-    while not done: 
+    while not done and tauext < tauext_max: 
         
         (use_xt2,tauext, tau, shear_displ) = solve_incremental_shearstress(x,x_bnd,tau,sigma_closure,shear_displ,xt_idx,dx,tauext,tauext_max,a,mu,crack_model,calculate_displacements=calculate_displacements)
         
