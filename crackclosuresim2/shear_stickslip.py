@@ -457,7 +457,7 @@ def solve_shearstress(x,x_bnd,sigma_closure,dx,tauext_max,a,mu,tau_yield,crack_m
         # sigma_closure minimum is free to move
         # once we get to this point
         xt_idx=argmin_sigma_closure
-        use_xt2=0
+        use_xt2=x_bnd[xt_idx]
         pass
     elif min_sigma_closure <= 0:
         # There is an opening point...
@@ -475,6 +475,7 @@ def solve_shearstress(x,x_bnd,sigma_closure,dx,tauext_max,a,mu,tau_yield,crack_m
             # if closure stress is tensile everywhere
             pass
 
+        use_xt2=x_bnd[xt_idx]
         
         pass
     else:

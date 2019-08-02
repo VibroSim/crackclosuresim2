@@ -929,6 +929,8 @@ def solve_normalstress_tensile(x,x_bnd,sigma_closure,dx,sigmaext_max,a,sigma_yie
 
     use_xt_start=x_bnd[xt_idx]
 
+    use_xt2 = use_xt_start
+    
     dsigmaext_dxt = np.ones(x.shape,dtype='d')*np.nan  # dsigmaext_dxt is a measure of the distributed stress concentration
     
     while not done and sigmaext < sigmaext_max: 
@@ -1098,6 +1100,7 @@ def initialize_normalstress_compressive(x,x_bnd,sigma_closure,dx,sigmaext_max,a,
             pass
 
         use_xt2=x_bnd[xt_idx+1]
+        use_xt1=x_bnd[xt_idx+1]
         
         pass
     else:
