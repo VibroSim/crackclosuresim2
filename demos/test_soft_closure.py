@@ -65,7 +65,7 @@ if __name__=="__main__":
                                 scp.a  ],dtype='d')
     observed_seff = np.array([ 1e6, 15e6, 30e6,
                                150e6,
-                               150e6  ],dtype='d')
+                               170e6  ],dtype='d')
     
     sigma_closure = inverse_closure(observed_reff,
                                     observed_seff,

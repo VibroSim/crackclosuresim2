@@ -1,3 +1,7 @@
+import sys
+import os
+import os.path
+import tempfile
 import numpy as np
 from matplotlib import pyplot as pl
 from scipy.integrate import quad
@@ -130,4 +134,5 @@ pl.xlabel('a/x')
 pl.ylabel('COD*$E_{\mbox{eff}}$/$(x\sigma_{\mbox{ext}})$')
 pl.legend(('Near-tip COD formula','Elliptical COD formula','Calculated from textbook weightfunction','Calculated from Holland weightfunction'))
 pl.grid()
-pl.savefig('/tmp/weightfunction_COD.png',dpi=300)
+pl.savefig(os.path.join(tempfile.gettempdir(),'weightfunction_COD.png'),dpi=300)
+pl.show()

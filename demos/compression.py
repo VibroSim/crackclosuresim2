@@ -1,4 +1,7 @@
 import sys
+import os
+import os.path
+import tempfile
 import numpy as np
 from numpy import sqrt,log,pi,cos,arctan
 import scipy.optimize
@@ -66,7 +69,7 @@ observed_seff = np.array([ 10e6, 15e6, 30e6, 150e6  ],dtype='d')
 sigma_closure = inverse_closure(observed_reff,
                                 observed_seff,
                                 x,x_bnd,dx,a,sigma_yield,
-                                crack_model)-50e6
+                                crack_model)
 sigma_closure[x > a]=0.0
 
 crack_opening = crackopening_from_tensile_closure(x,x_bnd,sigma_closure,dx,a,sigma_yield,crack_model)
@@ -114,7 +117,7 @@ if True:
     pl.legend(legax,legstr)
     #fig.tight_layout()
     pl.title('Partially closed crack')
-    pl.savefig('/tmp/compressive_peel_initial.png',dpi=300)
+    pl.savefig(os.path.join(tempfile.gettempdir(),'compressive_peel_initial.png'),dpi=300)
     pass
 
 sigmaext_max2=-50e6
@@ -142,7 +145,7 @@ ax2.set_ylabel('Crack opening (nm)')
 pl.legend(legax,legstr)
 #fig.tight_layout()
 pl.title('Partially closed crack')
-pl.savefig('/tmp/compressive_peel_pressedclosed.png',dpi=300)
+pl.savefig(os.path.join(tempfile.gettempdir(),'compressive_peel_pressedclosed.png'),dpi=300)
 
 
 sigmaext_max3=-150e6
@@ -170,7 +173,7 @@ ax2.set_ylabel('Crack opening (nm)')
 pl.legend(legax,legstr)
 #fig.tight_layout()
 pl.title('Partially closed crack')
-pl.savefig('/tmp/compressive_peel_pressedclosedharder.png',dpi=300)
+pl.savefig(os.path.join(tempfile.gettempdir(),'compressive_peel_pressedclosedharder.png'),dpi=300)
 
 
 pl.show()

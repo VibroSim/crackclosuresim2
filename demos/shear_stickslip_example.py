@@ -1,5 +1,8 @@
-
 import sys
+import os
+import os.path
+import tempfile
+
 import numpy as np
 from numpy import sqrt,log,pi,cos,arctan
 import scipy.optimize
@@ -71,7 +74,7 @@ ax2.set_ylabel('Shear displacement (nm)')
 pl.legend((pl1,pl2,pl3,pl4),('Closure stress','Shear stress','$ \\tau - \\mu \\sigma_{\\mbox{\\tiny closure}}$','Shear displacement'))
 #fig.tight_layout()
 pl.title('Closed crack')
-pl.savefig('/tmp/shear_stickslip_closedcrack.png',dpi=300)
+pl.savefig(os.path.join(tempfile.gettempdir(),'shear_stickslip_closedcrack.png'),dpi=300)
 
 
 # Alternate closure state (function of position; positive compression)
@@ -97,7 +100,7 @@ ax22.set_ylabel('Shear displacement (nm)')
 pl.legend((pl21,pl22,pl23,pl24),('Closure stress','Shear stress','$ \\tau - \\mu \\sigma_{\\mbox{\\tiny closure}}$','Shear displacement'))
 #fig.tight_layout()
 pl.title('Tight crack')
-pl.savefig('/tmp/shear_stickslip_tightcrack.png',dpi=300)
+pl.savefig(os.path.join(tempfile.gettempdir(),'shear_stickslip_tightcrack.png'),dpi=300)
 
 
 # Alternate closure state (function of position; positive compression)
@@ -123,7 +126,7 @@ ax32.set_ylabel('Shear displacement (nm)')
 pl.legend((pl31,pl32,pl33,pl34),('Closure stress','Shear stress','$ \\tau - \\mu \\sigma_{\\mbox{\\tiny closure}}$','Shear displacement'))
 #fig.tight_layout()
 pl.title('Partially open crack')
-pl.savefig('/tmp/shear_stickslip_opencrack.png',dpi=300)
+pl.savefig(os.path.join(tempfile.gettempdir(),'/tmp/shear_stickslip_opencrack.png'),dpi=300)
 
 
 

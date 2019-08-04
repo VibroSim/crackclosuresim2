@@ -1,4 +1,7 @@
 import sys
+import os
+import os.path
+import tempfile
 import numpy as np
 from numpy import sqrt,log,pi,cos,arctan
 import scipy.optimize
@@ -142,7 +145,7 @@ ax2.axis([ax2axis[0],ax2axis[1],ax2axis[2]*10,ax2axis[3]*10])
 pl.legend(legax,legstr)
 #fig.tight_layout()
 pl.title('Closed crack')
-pl.savefig('/tmp/tensile_peel_closedcrack.png',dpi=300)
+pl.savefig(os.path.join(tempfile.gettempdir(),'tensile_peel_closedcrack.png'),dpi=300)
 
 
 # Alternate closure state (function of position; positive compression)
@@ -197,7 +200,7 @@ ax22.set_ylabel('Tensile displacement (nm)')
 pl.legend(legax,legstr)
 #fig.tight_layout()
 pl.title('Tight crack')
-pl.savefig('/tmp/tensile_peel_tightcrack.png',dpi=300)
+pl.savefig(os.path.join(tempfile.gettempdir(),'tensile_peel_tightcrack.png'),dpi=300)
 
 
 # Alternate closure state (function of position; positive compression)
@@ -252,7 +255,7 @@ ax32.set_ylabel('Tensile displacement (nm)')
 pl.legend(legax,legstr)
 #fig.tight_layout()
 pl.title('Partially open crack')
-pl.savefig('/tmp/tensile_peel_opencrack.png',dpi=300)
+pl.savefig(os.path.join(tempfile.gettempdir(),'tensile_peel_opencrack.png'),dpi=300)
 
 
 
