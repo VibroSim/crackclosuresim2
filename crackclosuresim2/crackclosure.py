@@ -1258,7 +1258,7 @@ def solve_normalstress_compressive(x,x_bnd,sigma_closure,dx,sigmaext_max,a,sigma
         
         if not done:
             # loop back
-            assert(x_bnd[xt_idx+1]==use_xt2)
+            #assert(x_bnd[xt_idx+1]==use_xt2)
 
             xt_idx-=1
             use_xt2=use_xt1

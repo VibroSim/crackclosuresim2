@@ -470,6 +470,17 @@ def soft_closure_goal_function(du_da_shortened,scp,closure_index):
 
 
 def calc_contact(scp,sigma_ext):
+    """
+    return (du_da, # distributed stress concentration field along crack, in Pa/m, positive tensile 
+            contact_stress,  # physical positive-compression contact stress between crack faces, Pa
+            displacement)  # Physical displacement between crack surfaces; positive means no contact. 
+                           # Negative means Hertzian soft contact stress is present given crack 
+                           # parameters (scp) and externally applied load (sigma_ext, positive tensile). 
+   
+    n.b. displacement here is twice what you would get from solve_normalstress() for hard closure, 
+         because solve_normalstress() gives you the displacement of each side whereas calc_contact() 
+         gives you the dissplacement between the two sides! 
+"""
 
     #iniguess=np.arange(scp.afull_idx+1,dtype='d')/(scp.afull_idx+1) * sigma_ext  # This iniguess was for u
     

@@ -17,14 +17,8 @@ from crackclosuresim2.soft_closure import calc_contact
 from crackclosuresim2.soft_closure import soft_closure_plots
 from crackclosuresim2.soft_closure import sigmacontact_from_displacement
 from crackclosuresim2.soft_closure import sigmacontact_from_stress
-#from crackclosuresim2.soft_closure import calc_du_da
+#from angled_friction_model.asperity_stiffness import asperity_stiffness
 
-
-# TODO:
-#  * param[0] is 0... why?
-#  * sigmacontact from stress goes negative (tensile?) ... why?
-#  * du/da shows two concentrated spots and goes negative (?)
-#   ... shouldn't be possible...
 
 if __name__=="__main__":
     #####INPUT VALUES
@@ -52,6 +46,10 @@ if __name__=="__main__":
     # Hm has units of Pa/m^(3/2)
     Hm = 10e6/(100e-9**(3.0/2.0))  # rough order of magnitude guess
 
+    # Hm can also be calculated with angled_friction_model.asperity_stiffness()
+    # Hm = asperity_stiffness(msqrtR,E,nu,angular_stddev)
+
+
     
     # Closure state (function of position; positive compression)
     # Use hard closure model to solve for closure state
@@ -62,8 +60,6 @@ if __name__=="__main__":
     scp = sc_params.fromcrackgeom(crack_model,xmax,xsteps,a_input,fine_refinement,Hm)
     
 
-    # !!!*** NOTE: inverse_closure() fails if first observed_reff element is 0
-    # !!!*** Should troubleshoot this.
     observed_reff = np.array([  0.0e-3,  1e-3, 1.5e-3,
                                 1.9e-3,
                                 scp.a  ],dtype='d')
@@ -78,17 +74,12 @@ if __name__=="__main__":
 
     crack_initial_opening = crackopening_from_tensile_closure(scp.x,scp.x_bnd,sigma_closure,scp.dx,scp.a,sigma_yield,crack_model)
 
-    # ***!!! NOTE: soft closure portion does not yet use crack_model !!!***
     
-    # temporary zero out sigma_closure
-    #sigma_closure[:]=0.0
     
     # In the soft closure model, sigma_closure can't be negativej
     # (use crack_initial_opening values instead in that domain)
     sigma_closure[sigma_closure < 0.0]=0.0
     
-
-    #scp.setcrackstate(sigma_closure,crack_initial_opening)
 
 
     scp.initialize_contact(sigma_closure,crack_initial_opening)
