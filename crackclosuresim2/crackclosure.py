@@ -1450,7 +1450,14 @@ def inverse_closure(reff,seff,x,x_bnd,dx,xt,sigma_yield,crack_model,verbose=Fals
                     pass
                 pass
             else:
-                new_closure_field[new_zone] = sigma_closure[zone_prev] + (new_closure-sigma_closure[zone_prev]) * (x[new_zone]-x[zone_prev])/(x[zone_end]-x[zone_prev])
+                if new_closure < sigma_closure[zone_prev]:
+                    # closure stress should increase along the crack,
+                    # so we just hold it constant
+                    new_closure_field[new_zone] = sigma_closure[zone_prev]
+                    pass
+                else:
+                    new_closure_field[new_zone] = sigma_closure[zone_prev] + (new_closure-sigma_closure[zone_prev]) * (x[new_zone]-x[zone_prev])/(x[zone_end]-x[zone_prev])
+                    pass
                 pass
 
             (gotreff, sigma, tensile_displ, dsigmaext_dxt) = solve_normalstress(x,x_bnd,new_closure_field,dx,seff[lcnt],xt,sigma_yield,crack_model,calculate_displacements=False,verbose=verbose)
