@@ -194,9 +194,10 @@ static double soft_closure_goal_function_c(double *du_da_shortened,int du_da_sho
   // and sigmacontact_from_stress() in parallel if possible with
   // OpenMP: Put them in a loop with two iterations.
   {
-#pragma omp parallel default(shared) num_threads(2)
+    int iter;
+#pragma omp parallel default(shared) num_threads(2) private(iter)
 #pragma omp for schedule(static,1)
-    for (int iter=0;iter < 2; iter++) {
+    for (iter=0;iter < 2; iter++) {
       if (iter==0) {
 	sigmacontact_from_displacement(du_da_short,du_da_short_len,
 				       afull_idx_fine,

@@ -62,14 +62,12 @@ if __name__=="__main__":
     scp = sc_params.fromcrackgeom(crack_model,xmax,xsteps,a_input,fine_refinement,Hm)
     
 
-    # !!!*** NOTE: inverse_closure() fails if first observed_reff element is 0
-    # !!!*** Should troubleshoot this.
     observed_reff = np.array([  0.5e-3,  1e-3, 1.5e-3,
                                 1.9e-3,
                                 scp.a  ],dtype='d')
     observed_seff = np.array([ 1e6, 15e6, 30e6,
                                150e6,
-                               150e6  ],dtype='d')
+                               170e6  ],dtype='d')
     
     sigma_closure = inverse_closure(observed_reff,
                                     observed_seff,
