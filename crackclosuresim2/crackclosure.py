@@ -891,7 +891,11 @@ def solve_normalstress_tensile(x,x_bnd,sigma_closure,dx,sigmaext_max,a,sigma_yie
         # sigma_closure minimum is open
         # once we get to this point
         xt_idx=argmin_sigma_closure
-        #use_xt2=0
+        assert(xt_idx==0) # for now, do not yet handle cases where crack starts peeling open anywhere but the center
+        
+        use_xt_start=x_bnd[xt_idx]        
+        use_xt2 = use_xt_start
+        
         pass
     elif min_sigma_closure <= 0:
         # There is an opening point...
@@ -903,12 +907,31 @@ def solve_normalstress_tensile(x,x_bnd,sigma_closure,dx,sigmaext_max,a,sigma_yie
 
         if signchange_idxs.shape[0] > 0:
             xt_idx=signchange_idxs[0]
+
+            if x_bnd[xt_idx+1] < a:
+                closure_slope=(sigma_closure[xt_idx+2]-sigma_closure[xt_idx+1])/dx
+                pass
+            else:
+                closure_slope=(sigma_closure[xt_idx+1]-sigma_closure[xt_idx])/dx
+                pass
+            
+            assert(closure_slope > 0.0)
+            
+            # Project tip position backwards from x[signchange_idxs+1]
+            use_xt_start=x[xt_idx+1]-sigma_closure[xt_idx+1]/closure_slope        
+            use_xt2 = use_xt_start
+            
+            
             pass
         else:
             xt_idx = np.where(x < a)[0][-1] # open all the way to tip
             # if closure stress is tensile everywhere
+            use_xt_start = a
+            use_xt2 = a
             pass
+
         
+
         
         ## Use the rightmost opening point (closest to physical tip)
         #xt_idx=xt_idxs[-1]
@@ -927,9 +950,6 @@ def solve_normalstress_tensile(x,x_bnd,sigma_closure,dx,sigmaext_max,a,sigma_yie
     
     done=False
 
-    use_xt_start=x_bnd[xt_idx]
-
-    use_xt2 = use_xt_start
     
     dsigmaext_dxt = np.ones(x.shape,dtype='d')*np.nan  # dsigmaext_dxt is a measure of the distributed stress concentration
     
@@ -1032,7 +1052,7 @@ def initialize_normalstress_compressive(x,x_bnd,sigma_closure,dx,sigmaext_max,a,
     xt_idx = np.where(x<a)[0][-1]
 
     use_xt2=a
-    use_xt1=x_bnd[xt_idx]
+    use_xt1=a #x_bnd[xt_idx]
     
     # Before closing, situation acts just like crack of length a
     # (Note: stress distribution may not be very accurate if
@@ -1093,14 +1113,31 @@ def initialize_normalstress_compressive(x,x_bnd,sigma_closure,dx,sigmaext_max,a,
 
         if signchange_idxs.shape[0] > 0:
             xt_idx=signchange_idxs[0]
+
+
+            if x_bnd[xt_idx+1] < a:
+                closure_slope=(sigma_closure[xt_idx+2]-sigma_closure[xt_idx+1])/dx
+                pass
+            else:
+                closure_slope=(sigma_closure[xt_idx+1]-sigma_closure[xt_idx])/dx
+                pass
+            
+            assert(closure_slope > 0.0)
+
+            # Project tip position backwards from x[signchange_idxs+1]
+            use_xt2=x[xt_idx+1]-sigma_closure[xt_idx+1]/closure_slope        
+            use_xt1 = use_xt2
+
             pass
         else:
             xt_idx = np.where(x < a)[0][-1] # open all the way to tip
             # if closure stress is tensile everywhere
+
+            use_xt2=a
+            use_xt1=a #x_bnd[xt_idx]
+
             pass
 
-        use_xt2=x_bnd[xt_idx+1]
-        use_xt1=x_bnd[xt_idx+1]
         
         pass
     else:
@@ -1400,21 +1437,23 @@ def inverse_closure(reff,seff,x,x_bnd,dx,xt,sigma_yield,crack_model,verbose=Fals
         if lcnt==0:
             # For position 0, resulting solution 
             # may be less than seff[0] or even negative
-            max_sol_attempts=200
-            first_initialization_factor=0.1
+            max_sol_attempts=300
+            first_initialization_factor=0.03
             initialization_scale_factor=-1.05
+            seed=max(abs(seff[-1]-seff[0]),seff[0],np.mean(seff))
             pass
         else:
             max_sol_attempts=20
             first_initialization_factor=1.0
             initialization_scale_factor=1.1
+            seed = seff[lcnt]
             pass
 
         solvecnt=0
 
         inifactor=first_initialization_factor
         while solvecnt < max_sol_attempts:
-            (new_closure,infodict,ier,mesg) = scipy.optimize.fsolve(goal,seff[lcnt]*inifactor,full_output=True)
+            (new_closure,infodict,ier,mesg) = scipy.optimize.fsolve(goal,seed*inifactor,full_output=True)
             #print("ier=%d; new_closure=%g" % (ier,new_closure[0]))
             if ier==1:
                 break

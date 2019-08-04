@@ -64,7 +64,7 @@ if __name__=="__main__":
 
     # !!!*** NOTE: inverse_closure() fails if first observed_reff element is 0
     # !!!*** Should troubleshoot this.
-    observed_reff = np.array([  0.5e-3,  1e-3, 1.5e-3,
+    observed_reff = np.array([  0.0e-3,  1e-3, 1.5e-3,
                                 1.9e-3,
                                 scp.a  ],dtype='d')
     observed_seff = np.array([ 1e6, 15e6, 30e6,

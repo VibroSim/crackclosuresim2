@@ -469,13 +469,25 @@ def solve_shearstress(x,x_bnd,sigma_closure,dx,tauext_max,a,mu,tau_yield,crack_m
 
         if signchange_idxs.shape[0] > 0:
             xt_idx=signchange_idxs[0]
-            pass
+
+
+            if x_bnd[xt_idx+1] < a:
+                closure_slope=(sigma_closure[xt_idx+2]-sigma_closure[xt_idx+1])/dx
+                pass
+            else:
+                closure_slope=(sigma_closure[xt_idx+1]-sigma_closure[xt_idx])/dx
+                pass
+            
+            assert(closure_slope > 0.0)
+            
+            # Project tip position backwards from x[signchange_idxs+1]
+            use_xt2=x[xt_idx+1]-sigma_closure[xt_idx+1]/closure_slope                       pass
         else:
             xt_idx = np.where(x < a)[0][-1] # open all the way to tip
             # if closure stress is tensile everywhere
+            use_xt2=a
             pass
 
-        use_xt2=x_bnd[xt_idx]
         
         pass
     else:
