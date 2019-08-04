@@ -924,12 +924,24 @@ def solve_normalstress_tensile(x,x_bnd,sigma_closure,dx,sigmaext_max,a,sigma_yie
             
             pass
         else:
-            xt_idx = np.where(x < a)[0][-1] # open all the way to tip
-            # if closure stress is tensile everywhere
-            use_xt_start = a
-            use_xt2 = a
-            pass
+            # No signchange
+            
+            if sigma_closure[x<a][-1] > 0.0:
+                # have compressive (positive) closure stresses, but no signchange
+                # ... crack must be fully closed
+                xt_idx=0
+                use_xt_start=0.0
+                use_xt2=0.0
+                pass
+            else:
+                # crack must be fully open
 
+                xt_idx = np.where(x < a)[0][-1] # open all the way to tip
+                # if closure stress is tensile everywhere
+                use_xt_start = a
+                use_xt2 = a
+                pass
+            pass
         
 
         
@@ -1130,12 +1142,23 @@ def initialize_normalstress_compressive(x,x_bnd,sigma_closure,dx,sigmaext_max,a,
 
             pass
         else:
-            xt_idx = np.where(x < a)[0][-1] # open all the way to tip
-            # if closure stress is tensile everywhere
-
-            use_xt2=a
-            use_xt1=a #x_bnd[xt_idx]
-
+            # No signchange
+            
+            if sigma_closure[x<a][-1] > 0.0:
+                # have compressive (positive) closure stresses, but no signchange
+                # ... crack must be fully closed
+                xt_idx=0
+                use_xt2=0.0
+                use_xt1=0.0
+                pass
+            else:
+                # crack must be fully open
+                xt_idx = np.where(x < a)[0][-1] # open all the way to tip
+                # if closure stress is tensile everywhere
+                
+                use_xt2=a
+                use_xt1=a #x_bnd[xt_idx]
+                pass
             pass
 
         

@@ -184,7 +184,7 @@ def K_nondim(phi,nu):
     K = (-1.0/(np.pi**2.0 * np.sqrt(2.0*a))) * (integral1 + (G2_over_G1*np.exp(i*phi)/a)*integral2)
 
     #print("K_full.real=%g" % (K_full.real))
-    print("K.real=%g" % (K.real))
+    #print("K.real=%g" % (K.real))
     
     return K.real  # Interested in K_II only
 

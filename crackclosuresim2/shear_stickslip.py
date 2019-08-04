@@ -484,9 +484,21 @@ def solve_shearstress(x,x_bnd,sigma_closure,dx,tauext_max,a,mu,tau_yield,crack_m
             use_xt2=x[xt_idx+1]-sigma_closure[xt_idx+1]/closure_slope
             pass
         else:
-            xt_idx = np.where(x < a)[0][-1] # open all the way to tip
-            # if closure stress is tensile everywhere
-            use_xt2=a
+            # No signchange
+            
+            if sigma_closure[x<a][-1] > 0.0:
+                # have compressive (positive) closure stresses, but no signchange
+                # ... crack must be fully closed
+                xt_idx=0
+                use_xt2=0.0
+                
+                pass
+            else:
+                # crack must be fully open            
+                xt_idx = np.where(x < a)[0][-1] # open all the way to tip
+                # if closure stress is tensile everywhere
+                use_xt2=a
+                pass
             pass
 
         
