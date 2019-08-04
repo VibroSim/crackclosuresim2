@@ -72,7 +72,9 @@ def u_nondim(rho,phi,nu):
     outer_integrand1 = lambda phi0: complex_quad(inner_integrand1,0,a,phi0)
     outer_integrand2 = lambda phi0: complex_quad(inner_integrand2,0,a,phi0)
     
+    print("u complex_quad(outer_integrand1,0,2pi")
     integral1 = complex_quad(outer_integrand1,0,2.0*np.pi)
+    print("u complex_quad(outer_integrand2,0,2pi")
     integral2 = complex_quad(outer_integrand2,0,2.0*np.pi)
 
     u = (G1/np.pi)*integral1 + (G2/np.pi)*integral2
@@ -155,14 +157,34 @@ def K_nondim(phi,nu):
 
     inner_integrand2 = lambda rho0,phi0: ((3.0*a*np.exp(-i*phi)-rho0*np.exp(-i*phi0))/((a*np.exp(-i*phi)-rho0*np.exp(-i*phi0))**2.0))*np.sqrt(a**2.0-rho0**2.0)*np.conj(tau)*rho0
 
-    outer_integrand1 = lambda phi0: complex_quad(inner_integrand1,0,a,phi0)
-    outer_integrand2 = lambda phi0: complex_quad(inner_integrand2,0,a,phi0)
+    #outer_integrand1_full = lambda phi0: complex_quad(inner_integrand1,0,a,phi0)
+    # Integrate only to .999985*crack length (a-15e-6) to avoid a nasty message
+    # from the QUADPACK integrator. This does cause a .4% error, but
+    # that is substantially less than the other expected errors in our
+    # various calculations.
+    #
+    # ... Should probably verify the integral using an independent
+    # integration tool ... 
+    outer_integrand1 = lambda phi0: complex_quad(inner_integrand1,0,a-15e-6,phi0)
+    #outer_integrand2_full = lambda phi0: complex_quad(inner_integrand2,0,a,phi0)
+    outer_integrand2 = lambda phi0: complex_quad(inner_integrand2,0,a-15e-6,phi0)
 
+    #print("K complex_quad(outer_integrand1,0,2pi")
+    #integral1_full = complex_quad(outer_integrand1_full,0,2.0*np.pi)
     integral1 = complex_quad(outer_integrand1,0,2.0*np.pi)
+    
+    #print("K complex_quad(outer_integrand2,0,2pi")
+    #integral2_full = complex_quad(outer_integrand2_full,0,2.0*np.pi)
     integral2 = complex_quad(outer_integrand2,0,2.0*np.pi)
 
+
+    
+    #K_full = (-1.0/(np.pi**2.0 * np.sqrt(2.0*a))) * (integral1_full + (G2_over_G1*np.exp(i*phi)/a)*integral2_full)
+    
     K = (-1.0/(np.pi**2.0 * np.sqrt(2.0*a))) * (integral1 + (G2_over_G1*np.exp(i*phi)/a)*integral2)
 
+    #print("K_full.real=%g" % (K_full.real))
+    print("K.real=%g" % (K.real))
     
     return K.real  # Interested in K_II only
 
