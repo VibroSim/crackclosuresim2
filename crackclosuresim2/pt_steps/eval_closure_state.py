@@ -88,6 +88,8 @@ def run(_xmldoc,_element,
         "dc:closureplot_side1": closureplot_side1_href,
         "dc:closurestress_side2": closurestress_side2_href,
         "dc:closureplot_side2": closureplot_side2_href,
+        "dc:a_side1": numericunitsv(a_side1,"m"),
+        "dc:a_side2": numericunitsv(a_side2,"m"),
     }
     
     #pl.show()
