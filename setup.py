@@ -9,6 +9,7 @@ from setuptools.command.install_lib import install_lib
 from setuptools.command.install import install
 import setuptools.command.bdist_egg
 import sys
+import numpy as np
 from Cython.Build import cythonize
 
 
@@ -73,7 +74,7 @@ crackclosuresim2_package_files = [ "pt_steps/*" ]
 ext_modules=cythonize("crackclosuresim2/*.pyx")
 em_dict=dict([ (module.name,module) for module in ext_modules])
 sca_pyx_ext=em_dict["crackclosuresim2.soft_closure_accel"]
-sca_pyx_ext.include_dirs=["."]
+sca_pyx_ext.include_dirs=[".", np.get_include() ]
 #sca_pyx_ext.extra_compile_args=['-O0','-g','-Wno-uninitialized']
 sca_pyx_ext.extra_compile_args=['-fopenmp','-O5','-Wno-uninitialized']
 sca_pyx_ext.libraries=['gomp']
