@@ -890,9 +890,11 @@ def solve_normalstress_tensile(x,x_bnd,sigma_closure,dx,sigmaext_max,a,sigma_yie
         # assume anything to the left of the
         # sigma_closure minimum is open
         # once we get to this point
-        xt_idx=argmin_sigma_closure
-        assert(xt_idx==0) # for now, do not yet handle cases where crack starts peeling open anywhere but the center
+        #xt_idx=argmin_sigma_closure
+        #assert(xt_idx==0) # for now, do not yet handle cases where crack starts peeling open anywhere but the center
+        xt_idx=0
         
+
         use_xt_start=x_bnd[xt_idx]        
         use_xt2 = use_xt_start
         
@@ -1436,6 +1438,8 @@ def inverse_closure(reff,seff,x,x_bnd,dx,xt,sigma_yield,crack_model,verbose=Fals
             new_closure_field = copy.copy(sigma_closure)
 
             
+            # WARNING: All changes that affect new_closure_field in goal()
+            # MUST ALSO BE APPLIED to generating sigma_closure after the optimization !!!
             if lcnt==1 and firstiteration:
                 new_closure_field[new_zone] = seff[0] + (new_closure-seff[0]) * (x[new_zone]-x[zone_prev])/(x[zone_end]-x[zone_prev])
                 pass
@@ -1450,14 +1454,8 @@ def inverse_closure(reff,seff,x,x_bnd,dx,xt,sigma_yield,crack_model,verbose=Fals
                     pass
                 pass
             else:
-                if new_closure < sigma_closure[zone_prev]:
-                    # closure stress should increase along the crack,
-                    # so we just hold it constant
-                    new_closure_field[new_zone] = sigma_closure[zone_prev]
-                    pass
-                else:
-                    new_closure_field[new_zone] = sigma_closure[zone_prev] + (new_closure-sigma_closure[zone_prev]) * (x[new_zone]-x[zone_prev])/(x[zone_end]-x[zone_prev])
-                    pass
+                # draw straight line between zone_prev and new_zone. Use np.max() to prevent new_closure_field from being negative. 
+                new_closure_field[new_zone] = np.max((np.zeros(np.count_nonzero(new_zone),dtype='d'),sigma_closure[zone_prev] + (new_closure-sigma_closure[zone_prev]) * (x[new_zone]-x[zone_prev])/(x[zone_end]-x[zone_prev])),axis=0)
                 pass
 
             (gotreff, sigma, tensile_displ, dsigmaext_dxt) = solve_normalstress(x,x_bnd,new_closure_field,dx,seff[lcnt],xt,sigma_yield,crack_model,calculate_displacements=False,verbose=verbose)
@@ -1481,33 +1479,45 @@ def inverse_closure(reff,seff,x,x_bnd,dx,xt,sigma_yield,crack_model,verbose=Fals
 
         solvecnt=0
 
-        inifactor=first_initialization_factor
-        while solvecnt < max_sol_attempts:
-            (new_closure,infodict,ier,mesg) = scipy.optimize.fsolve(goal,seed*inifactor,full_output=True)
-            #print("ier=%d; new_closure=%g" % (ier,new_closure[0]))
-            if ier==1:
-                break
-            inifactor*=initialization_scale_factor
-            solvecnt+=1
-            pass
-        
-        if ier != 1:
 
-            if lcnt > 0 and last_reff >= xt-dx/4.0:
-                # if we don't converge and previous step was within
-                # a quarter-step of the end, claim we are good
-                # and quit.
-                break
+        if lcnt > 1 and not firstiteration and goal(-np.inf) < 0.0:
+            # Applying 
+            # no increment isn't enough to get
+            # it to open this far under this load...
+            # Use the most extreme value possible
+            new_closure = -np.inf
+            pass
+        else:
+            inifactor=first_initialization_factor
+            while solvecnt < max_sol_attempts:
+                (new_closure,infodict,ier,mesg) = scipy.optimize.fsolve(goal,seed*inifactor,full_output=True)
+                #print("ier=%d; new_closure=%g" % (ier,new_closure[0]))
+                if ier==1:
+                    break
+                inifactor*=initialization_scale_factor
+                solvecnt+=1
+                pass
+            if ier != 1:
+
+                if lcnt > 0 and last_reff >= xt-dx/4.0:
+                    # if we don't converge and previous step was within
+                    # a quarter-step of the end, claim we are good
+                    # and quit.
+                    break
 
             
-            sys.modules["__main__"].__dict__.update(globals())
-            sys.modules["__main__"].__dict__.update(locals())
-            raise ValueError("Error in inverse_closure fsolve: %s" % str(mesg))
+                sys.modules["__main__"].__dict__.update(globals())
+                sys.modules["__main__"].__dict__.update(locals())
+                raise ValueError("Error in inverse_closure fsolve: %s" % str(mesg))
+            pass
+        
 
         
         #closure_gradient = (sigma_closure[zone_end]-sigma_closure[zone_start])/(x[zone_end]-x[zone_start])
         
 
+        # WARNING: All changes that affect sigma_closure here
+        # MUST ALSO BE APPLIED to generating new_closure_field in goal()!!!
         if lcnt==1 and firstiteration:
             sigma_closure[new_zone] = seff[0] + (new_closure-seff[0]) * (x[new_zone]-x[zone_prev])/(x[zone_end]-x[zone_prev])
             pass
@@ -1522,7 +1532,8 @@ def inverse_closure(reff,seff,x,x_bnd,dx,xt,sigma_yield,crack_model,verbose=Fals
                 pass
             pass
         else:
-            sigma_closure[new_zone] =  sigma_closure[zone_prev] + (new_closure-sigma_closure[zone_prev]) * (x[new_zone]-x[zone_prev])/(x[zone_end]-x[zone_prev])
+            # draw straight line between zone_prev and new_zone. Use np.max() to prevent sigma_closure from being negative. 
+            sigma_closure[new_zone] = np.max((np.zeros(np.count_nonzero(new_zone),dtype='d'),sigma_closure[zone_prev] + (new_closure-sigma_closure[zone_prev]) * (x[new_zone]-x[zone_prev])/(x[zone_end]-x[zone_prev])),axis=0)
             pass
 
         #print("sigma_closures %s" % (str(sigma_closure)))
