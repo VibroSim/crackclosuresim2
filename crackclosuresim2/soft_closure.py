@@ -539,7 +539,7 @@ def calc_contact(scp,sigma_ext):
         res = scipy.optimize.minimize(soft_closure_goal_function_accel,du_da_shortened_iniguess,args=(scp,closure_index),
                                       constraints = [ load_constraint ], #[ nonnegative_constraint, load_constraint ],
                                       method="SLSQP",
-                                      options={"eps": 10000.0,
+                                      options={"eps": 1000000.0,
                                                "maxiter": 100000,
                                                "ftol": scp.afull_idx_fine*(np.abs(sigma_ext)+20e6)**2.0/1e19})
         #res = scipy.optimize.minimize(goal_function,du_da_shortened_iniguess,method='nelder-mead',options={"maxfev": 15000})
