@@ -535,13 +535,28 @@ def calc_contact(scp,sigma_ext):
         # Calculate x
 
         
-        
-        res = scipy.optimize.minimize(soft_closure_goal_function_accel,du_da_shortened_iniguess,args=(scp,closure_index),
-                                      constraints = [ load_constraint ], #[ nonnegative_constraint, load_constraint ],
-                                      method="SLSQP",
-                                      options={"eps": 100000000.0,
-                                               "maxiter": 200000,
-                                               "ftol": scp.afull_idx_fine*(np.abs(sigma_ext)+20e6)**2.0/1e19})
+        # Allow total iterations to be broken into pieces separated by failures with minimize error 9 (Iteration limit exceeded)
+        # (for some reason, restarting the minimizer where it left off seems to help get it to the goal)
+        total_maxiter=100000
+        niter = 0
+        terminate=False
+        starting_value=du_da_shortened_iniguess
+        while niter < total_maxiter and not terminate: 
+            this_niter=10000
+            res = scipy.optimize.minimize(soft_closure_goal_function_accel,starting_value,args=(scp,closure_index),
+                                          constraints = [ load_constraint ], #[ nonnegative_constraint, load_constraint ],
+                                          method="SLSQP",
+                                          options={"eps": 100000000.0,
+                                                   "maxiter": this_niter,
+                                                   "ftol": scp.afull_idx_fine*(np.abs(sigma_ext)+20e6)**2.0/1e19})
+            if res.status != 9:  # anything but reached iteration limit
+                terminate=True
+                pass
+            else:
+                starting_value = res.x # Next iteration starts where this one left off
+                pass
+            niter += this_niter
+            pass
         #res = scipy.optimize.minimize(goal_function,du_da_shortened_iniguess,method='nelder-mead',options={"maxfev": 15000})
         if not res.success: # and res.status != 4:
             # (ignore incompatible constraint, because our constraints are
