@@ -548,7 +548,7 @@ def calc_contact(scp,sigma_ext):
                                           method="SLSQP",
                                           options={"eps": 100000000.0,
                                                    "maxiter": this_niter,
-                                                   "ftol": scp.afull_idx_fine*(np.abs(sigma_ext)+20e6)**2.0/1e19})
+                                                   "ftol": scp.afull_idx_fine*(np.abs(sigma_ext)+20e6)**2.0/1e14})
             if res.status != 9:  # anything but reached iteration limit
                 terminate=True
                 pass
@@ -605,13 +605,27 @@ def calc_contact(scp,sigma_ext):
         #    constraints.append(nonpositive_constraint)
         #    pass
 
-        res = scipy.optimize.minimize(soft_closure_goal_function_accel,du_da_shortened_iniguess,args=(scp,closure_index),
-                                      constraints = constraints,
-                                      method="SLSQP",
-                                      options={"eps": 10000.0,
-                                               "maxiter": 100000,
-                                               "ftol": scp.afull_idx_fine*(np.abs(sigma_ext)+20e6)**2.0/1e19})
-        
+        total_maxiter=100000
+        niter = 0
+        terminate=False
+        starting_value=du_da_shortened_iniguess
+        while niter < total_maxiter and not terminate: 
+            this_niter=10000
+            res = scipy.optimize.minimize(soft_closure_goal_function_accel,starting_value,args=(scp,closure_index),
+                                          constraints = constraints,
+                                          method="SLSQP",
+                                          options={"eps": 100000000.0,
+                                                   "maxiter": this_niter,
+                                                   "ftol": scp.afull_idx_fine*(np.abs(sigma_ext)+20e6)**2.0/1e14})
+            if res.status != 9: # anything but reached iteration limit
+                terminate=True
+                pass
+            else:
+                starting_value = res.x # Next iteration starts where this one left off
+                pass
+            niter += this_niter
+            pass
+            
         #res = scipy.optimize.minimize(goal_function,du_da_shortened_iniguess,method='nelder-mead',options={"maxfev": 15000})
         if not res.success: #  and res.status != 4:
             # (ignore incompatible constraint, because our constraints are
