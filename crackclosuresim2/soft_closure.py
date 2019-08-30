@@ -540,7 +540,7 @@ def calc_contact(scp,sigma_ext):
                                       constraints = [ load_constraint ], #[ nonnegative_constraint, load_constraint ],
                                       method="SLSQP",
                                       options={"eps": 100000000.0,
-                                               "maxiter": 100000,
+                                               "maxiter": 200000,
                                                "ftol": scp.afull_idx_fine*(np.abs(sigma_ext)+20e6)**2.0/1e19})
         #res = scipy.optimize.minimize(goal_function,du_da_shortened_iniguess,method='nelder-mead',options={"maxfev": 15000})
         if not res.success: # and res.status != 4:
