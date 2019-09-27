@@ -7,12 +7,54 @@ import re
 from setuptools import setup
 from setuptools.command.install_lib import install_lib
 from setuptools.command.install import install
+from setuptools.command.build_ext import build_ext
 import setuptools.command.bdist_egg
 import sys
 import numpy as np
 from Cython.Build import cythonize
 
 
+extra_compile_args = {
+    "msvc": ["/openmp"],
+    #"gcc": ["-O0", "-g", "-Wno-uninitialized"),    # Replace the line below with this line to enable debugging of the compiled extension
+    "gcc": ["-fopenmp","-O5","-Wno-uninitialized"],
+    "clang": ["-fopenmp","-O5","-Wno-uninitialized"],
+}
+
+extra_libraries = {
+    "msvc": [],
+    "gcc": ["gomp",],
+    "clang": [],
+}
+
+extra_link_args = {
+    "msvc": [],
+    "gcc": [],
+    "clang": ["-fopenmp=libomp"],
+}
+
+class build_ext_compile_args(build_ext):
+    def build_extensions(self):
+        compiler=self.compiler.compiler_type
+        for ext in self.extensions:
+            if compiler in extra_compile_args:
+                ext.extra_compile_args=extra_compile_args[compiler]
+                ext.extra_link_args=extra_link_args[compiler]
+                ext.libraries.extend(list(extra_libraries[compiler]))
+                pass
+            else:
+                # use gcc parameters as default
+                ext.extra_compile_args=extra_compile_args["gcc"]
+                ext.extra_link_args=extra_link_args["gcc"]
+                ext.libraries.extend(extra_libraries["gcc"])
+                pass
+                
+            pass
+            
+        
+        build_ext.build_extensions(self)
+        pass
+    pass
 
 
 class install_lib_save_version(install_lib):
@@ -75,9 +117,6 @@ ext_modules=cythonize("crackclosuresim2/*.pyx")
 em_dict=dict([ (module.name,module) for module in ext_modules])
 sca_pyx_ext=em_dict["crackclosuresim2.soft_closure_accel"]
 sca_pyx_ext.include_dirs=[".", np.get_include() ]
-#sca_pyx_ext.extra_compile_args=['-O0','-g','-Wno-uninitialized']
-sca_pyx_ext.extra_compile_args=['-fopenmp','-O5','-Wno-uninitialized']
-sca_pyx_ext.libraries=['gomp']
 
 
 
@@ -94,7 +133,8 @@ setup(name="crackclosuresim2",
       zip_safe=False,
       ext_modules=ext_modules,
       packages=["crackclosuresim2","crackclosuresim2.bin"],
-      cmdclass={"install_lib": install_lib_save_version },
+      cmdclass={"install_lib": install_lib_save_version,
+                "build_ext": build_ext_compile_args},
       package_data={"crackclosuresim2": crackclosuresim2_package_files},
       entry_points={ "limatix.processtrak.step_url_search_path": [ "limatix.share.pt_steps = crackclosuresim2:getstepurlpath" ],
                      "console_scripts": console_scripts_entrypoints,
