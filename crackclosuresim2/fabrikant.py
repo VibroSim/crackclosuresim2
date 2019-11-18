@@ -1,6 +1,8 @@
 #Penny-shaped crack revisited: Closed-form solutions; V. I. Fabrikant
 #https://www.tandfonline.com/loi/tpha20
 
+import sys
+
 import numpy as np
 from scipy.integrate import quad
 from scipy.interpolate import splrep,splev
@@ -89,7 +91,7 @@ def u_nondim(rho,phi,nu):
 # Surrogate index: phi, nu
 # Surrogate value: splrep (t,c,k)
 # u_surrogate filled by putting different values
-# of nu into the main routine below,
+# of nu into the fabrikant_example.py,
 # and pasting in the generated output
 u_surrogate = {
 (0.0,0.33): (np.array([0.                 ,0.                 ,0.                 ,
@@ -115,6 +117,30 @@ u_surrogate = {
  0.4577155876926318,0.3546653360526447,0.                ,
  0.                ,0.                ,0.                ,
  0.                ],dtype=np.dtype('float64')),3),
+(0.0,0.342): (np.array([0.                 ,0.                 ,0.                 ,
+ 0.                 ,0.06896551724137931,0.10344827586206896,
+ 0.13793103448275862,0.1724137931034483 ,0.20689655172413793,
+ 0.24137931034482757,0.27586206896551724,0.3103448275862069 ,
+ 0.3448275862068966 ,0.3793103448275862 ,0.41379310344827586,
+ 0.4482758620689655 ,0.48275862068965514,0.5172413793103449 ,
+ 0.5517241379310345 ,0.5862068965517241 ,0.6206896551724138 ,
+ 0.6551724137931034 ,0.6896551724137931 ,0.7241379310344828 ,
+ 0.7586206896551724 ,0.7931034482758621 ,0.8275862068965517 ,
+ 0.8620689655172413 ,0.896551724137931  ,0.9310344827586207 ,
+ 1.                 ,1.                 ,1.                 ,
+ 1.                 ],dtype=np.dtype('float64')),np.array([1.3562320321167172 ,1.3562313373402777 ,1.3546217423066627 ,
+ 1.349228694654256  ,1.3435454787589198 ,1.336203050732343  ,
+ 1.3271738961276869 ,1.3164233766705706 ,1.3039089939707074 ,
+ 1.2895794994830823 ,1.2733737459613184 ,1.2552192270701654 ,
+ 1.2350302157796056 ,1.2127053749696386 ,1.1881246653119226 ,
+ 1.1611452921704783 ,1.131596334325048  ,1.0992714315366818 ,
+ 1.0639188922176375 ,1.0252269791235693 ,0.9828052784945346 ,
+ 0.9361462533695286 ,0.8846043236988804 ,0.82721224709275   ,
+ 0.7629261308084664 ,0.6889159064171179 ,0.6053672178129533 ,
+ 0.45685629506087994,0.35399950487338433,0.                 ,
+ 0.                 ,0.                 ,0.                 ,
+ 0.                 ],dtype=np.dtype('float64')),3),
+
 }
 
 def array_repr(array):
@@ -127,8 +153,7 @@ def u(rho,phi,a,tauext,E,nu,use_surrogate=True):
         return splev(rho/a,(t,c,k))*a*tauext/E
 
     if use_surrogate:
-        sys.stderr.write("crackclosuresim2.fabrikant: WARNING: Surrogate not available for u; computation will be extremely slow\n")
-        pass
+        raise ValueError("crackclosuresim2.fabrikant: WARNING: Surrogate not available for u(phi=%.20e,nu=%.20e); computation will be extremely slow. Pass use_surrogate=False if you really want this!\n" % (phi,nu))
     
     
     return u_nondim(rho/a,phi,nu)*a*tauext/E
@@ -189,10 +214,11 @@ def K_nondim(phi,nu):
     return K.real  # Interested in K_II only
 
 # K_surrogate filled by putting different values
-# of nu into the main routine below,
+# of nu into the fabrikant_example.py,
 # and pasting in the generated output
 K_surrogate={
     (np.pi,0.33): 0.5391115671127011,
+    (np.pi,0.342): 0.540547836093071,
     }
 
 def K(phi,a,tauext,nu,use_surrogate=True):

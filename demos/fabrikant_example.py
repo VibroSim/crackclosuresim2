@@ -2,7 +2,7 @@ import numpy as np
 from scipy.integrate import quad
 from scipy.interpolate import splrep,splev
 
-from crackclosuresim2.fabrikant import K_nondim,u_nondim,u,K
+from crackclosuresim2.fabrikant import K_nondim,u_nondim,u,K,array_repr
 
 #Penny-shaped crack revisited: Closed-form solutions; V. I. Fabrikant
 #https://www.tandfonline.com/loi/tpha20
