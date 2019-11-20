@@ -546,7 +546,7 @@ def calc_contact(scp,sigma_ext):
             res = scipy.optimize.minimize(soft_closure_goal_function_accel,starting_value,args=(scp,closure_index),
                                           constraints = [ load_constraint ], #[ nonnegative_constraint, load_constraint ],
                                           method="SLSQP",
-                                          options={"eps": 100000000.0,
+                                          options={"eps": 200000000.0,
                                                    "maxiter": this_niter,
                                                    "ftol": scp.afull_idx_fine*(np.abs(sigma_ext)+20e6)**2.0/1e14})
             if res.status != 9:  # anything but reached iteration limit
@@ -614,7 +614,7 @@ def calc_contact(scp,sigma_ext):
             res = scipy.optimize.minimize(soft_closure_goal_function_accel,starting_value,args=(scp,closure_index),
                                           constraints = constraints,
                                           method="SLSQP",
-                                          options={"eps": 100000000.0,
+                                          options={"eps": 200000000.0,
                                                    "maxiter": this_niter,
                                                    "ftol": scp.afull_idx_fine*(np.abs(sigma_ext)+20e6)**2.0/1e14})
             if res.status != 9: # anything but reached iteration limit
