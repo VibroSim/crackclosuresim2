@@ -3,6 +3,7 @@ import os.path
 import csv
 import sys
 import copy
+import re
 import numpy as np
 from numpy import sqrt,log,pi,cos,arctan
 import scipy.optimize
@@ -1911,10 +1912,10 @@ def perform_inverse_closure(inputfilename,E,nu,sigma_yield,CrackCenterX,dx,speci
 def save_closurestress(filename,x,sigma_closure,a,crackopening=None):
     import pandas as pd
 
-    nrows = np.count_nonzero(x <= a)
+    nrows = np.count_nonzero(x <= a)+1
     
-    out_frame = pd.DataFrame(index=pd.Float64Index(data=x[:nrows],dtype='d',name="Crack radius (m)"))
-
+    out_frame = pd.DataFrame(index=pd.Float64Index(data=x[:nrows],dtype='d',name="Crack radius (m) compared to crack length a=%.8g m" % (a)))
+    
     out_frame.insert(len(out_frame.columns),"Closure stress (Pa)", sigma_closure[:nrows])
     if crackopening is not None:
         out_frame.insert(len(out_frame.columns),"Crack opening (m)", crackopening[:nrows])
@@ -1943,3 +1944,56 @@ def save_closurestress(filename,x,sigma_closure,a,crackopening=None):
     #    pass
     pass
 
+
+
+def load_closurestress(filename):
+    import pandas as pd
+    
+    closurestress_dataframe = pd.read_csv(filename,index_col=0)
+    
+    # determine crack length a from index title if possible
+    if closurestress_dataframe.index.name=="Crack radius (m)":
+        a = None # Not encoded
+    else: 
+        matchobj = re.match(r"""Crack radius \(m\) compared to crack length a=([-+]?(\d+(\.\d*)?|\.\d+)([eE][-+]?\d+)?) m""",closurestress_dataframe.index.name)
+        if matchobj is None: 
+            raise ValueError("Failed to parse crack length from index title \"%s\"" % (closurestress_dataframe.index.name))
+        
+        a = float(matchobj.group(1))
+        pass
+    
+    x = np.array(closurestress_dataframe.index)
+    xstep = x[1]-x[0]
+
+    if a is None: 
+        # Old version of save_closurestress that
+        # didn't include crack length in header didn't go 
+        # at all beyond crack length... but we need 
+        # at least one sample beyond
+        x = np.concatenate((x,(x[-1]+xstep,)))
+        pass
+    x_bnd = np.concatenate(((x[0]-xstep/2.0,),x+xstep/2.0))
+    if x_bnd[0] < 0.0:
+        x_bnd[0]=0.0
+        pass
+        
+    sigma_closure = np.array(closurestress_dataframe["Closure stress (Pa)"])
+    if a is None: 
+        # expand out sigma_closure by one sample
+        sigma_closure = np.concatenate((sigma_closure,(0.0,)))
+        pass
+
+    if "Crack opening (m)" in closurestress_dataframe.keys():
+        crack_opening = np.array(closurestress_dataframe["Crack opening (m)"])
+        if a is None: 
+            # expand out crack_opening by one sample
+            crack_opening = np.concatenate((crack_opening,(0.0,)))
+            pass
+        pass
+    else:
+        crack_opening = None
+        pass
+
+
+
+    return (x,x_bnd,xstep,a,sigma_closure,crack_opening) 

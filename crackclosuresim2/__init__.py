@@ -47,6 +47,7 @@ from .crackclosure import ModeI_throughcrack_CODformula
 from .crackclosure import Tada_ModeI_CircularCrack_along_midline
 from .crackclosure import perform_inverse_closure
 from .crackclosure import save_closurestress
+from .crackclosure import load_closurestress
 
 
 
