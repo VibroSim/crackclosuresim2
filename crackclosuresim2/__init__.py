@@ -47,6 +47,7 @@ from .crackclosure import ModeI_throughcrack_CODformula
 from .crackclosure import Tada_ModeI_CircularCrack_along_midline
 from .crackclosure import perform_inverse_closure
 from .crackclosure import save_closurestress
+from .crackclosure import crack_model_normal_by_name
 
 
 
@@ -54,5 +55,6 @@ from .shear_stickslip import ModeII_crack_model
 from .shear_stickslip import ModeII_Beta_CSD_Formula
 from .shear_stickslip import solve_shearstress
 from .shear_stickslip import ModeII_throughcrack_CSDformula
+from .shear_stickslip import crack_model_shear_by_name
 
 

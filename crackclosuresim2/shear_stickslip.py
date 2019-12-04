@@ -608,3 +608,16 @@ def ModeII_throughcrack_CSDformula(E,nu):
 
     
     
+def crack_model_shear_by_name(crack_model_shear_name,YoungsModulus,PoissonsRatio):
+    if crack_model_shear_name == "ModeII_throughcrack_CSDformula":
+        crack_model_shear = ModeII_throughcrack_CSDformula(YoungsModulus,PoissonsRatio)
+        pass
+    elif crack_model_shear_name == "Fabrikant_ModeII_CircularCrack_along_midline":
+        crack_model_shear = Fabrikant_ModeII_CircularCrack_along_midline(YoungsModulus,PoissonsRatio)
+        pass
+    else:
+        raise ValueError("Unknown shear stress crack model %s" % (crack_model_shear_name))
+
+    return crack_model_shear
+
+

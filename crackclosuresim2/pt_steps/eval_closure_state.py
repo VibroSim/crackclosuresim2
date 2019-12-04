@@ -20,6 +20,11 @@ from crackclosuresim2 import inverse_closure,solve_normalstress
 from crackclosuresim2 import Tada_ModeI_CircularCrack_along_midline
 from crackclosuresim2 import perform_inverse_closure,save_closurestress
 
+# This processtrak step is used in evaluating
+# crack closure state from DIC (digital image correlation)
+# results. The DIC process yields a file with closure profile
+# data indicating the effective crack tip position as a function
+# of tensile load on the crack
 
 def run(_xmldoc,_element,
         _dest_href,

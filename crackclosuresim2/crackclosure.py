@@ -1908,14 +1908,51 @@ def perform_inverse_closure(inputfilename,E,nu,sigma_yield,CrackCenterX,dx,speci
 
     return (x,x_bnd,a_side1,a_side2,sigma_closure_side1,sigma_closure_side2,side1fig,side2fig)
 
-def save_closurestress(filename,x,sigma_closure,a):
+def save_closurestress(filename,x,sigma_closure,a,crackopening=None):
+    import pandas as pd
 
-    with open(filename,"wb") as csvfile:
-        cpwriter = csv.writer(csvfile)
-        cpwriter.writerow(["Crack radius (m)","Closure stress (Pa)"])
-        for poscnt in range(np.count_nonzero(x < a)):
-            cpwriter.writerow([ x[poscnt], sigma_closure[poscnt]])
-            pass
+    nrows = np.count_nonzero(x <= a)
+    
+    out_frame = pd.DataFrame(index=pd.Float64Index(data=x[:nrows],dtype='d',name="Crack radius (m)"))
+
+    out_frame.insert(len(out_frame.columns),"Closure stress (Pa)", sigma_closure[:nrows])
+    if crackopening is not None:
+        out_frame.insert(len(out_frame.columns),"Crack opening (m)", crackopening[:nrows])
         pass
+    out_frame.to_csv(filename)
+
+    #
+    #with open(filename,"wb") as csvfile:
+    #    cpwriter = csv.writer(csvfile)
+    #    columntitles = ["Crack radius (m)","Closure stress (Pa)"]
+    #    if crackopening is not None:
+    #        columntitles.append("Crack opening (m)")
+    #        pass
+    #    cpwriter.writerow(columntitles)
+    #
+    #    if crackopening is None:
+    #        for poscnt in range(np.count_nonzero(x <= a)):
+    #            cpwriter.writerow([ x[poscnt], sigma_closure[poscnt]])
+    #            pass
+    #        pass
+    #    else:
+    #        for poscnt in range(np.count_nonzero(x <= a)):
+    #            cpwriter.writerow([ x[poscnt], sigma_closure[poscnt], crackopening[poscnt]])
+    #            pass
+    #        pass
+    #    pass
     pass
+
+def crack_model_normal_by_name(crack_model_normal_name,YoungsModulus,PoissonsRatio):
+    if crack_model_normal_name == "ModeI_throughcrack_CODformula":
+        crack_model_normal = ModeI_throughcrack_CODformula(YoungsModulus,PoissonsRatio)
+        pass
+    elif crack_model_normal_name == "Tada_ModeI_CircularCrack_along_midline":
+        crack_model_normal = Tada_ModeI_CircularCrack_along_midline(YoungsModulus,PoissonsRatio)
+        pass
+    else:
+        raise ValueError("Unknown normal stress crack model %s" % (crack_model_normal_name))
+
+    return crack_model_normal
+
 
