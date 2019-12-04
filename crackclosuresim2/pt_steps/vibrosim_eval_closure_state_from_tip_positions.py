@@ -3,6 +3,22 @@ import csv
 import ast
 import copy
 import posixpath
+
+try:
+    # py2.x
+    from urllib import pathname2url
+    from urllib import url2pathname
+    from urllib import quote
+    from urllib import unquote
+    pass
+except ImportError:
+    # py3.x
+    from urllib.request import pathname2url
+    from urllib.request import url2pathname
+    from urllib.parse import quote
+    from urllib.parse import unquote
+    pass
+
 import numpy as np
 
 from matplotlib import pyplot as pl
@@ -19,6 +35,7 @@ from limatix.dc_value import xmltreevalue as xmltreev
 from crackclosuresim2 import inverse_closure,solve_normalstress
 from crackclosuresim2 import Tada_ModeI_CircularCrack_along_midline
 from crackclosuresim2 import perform_inverse_closure,save_closurestress
+from crackclosuresim2 import crackopening_from_tensile_closure
 from crackclosuresim2 import crack_model_normal_by_name
 from crackclosuresim2 import crack_model_shear_by_name
 
@@ -61,8 +78,8 @@ from crackclosuresim2 import crack_model_shear_by_name
 # correspond to the length of that side of the crack. 
 
 def run(_xmldoc,_element,
-        _dest_href,
-        _inputfilename,
+        dc_dest_href,
+        dc_measident_str,
         dc_measnum_int,
         dc_YoungsModulus_numericunits,
         dc_PoissonsRatio_float,
@@ -75,15 +92,16 @@ def run(_xmldoc,_element,
         dc_crack_model_normal_str="Tada_ModeI_CircularCrack_along_midline",
         dc_crack_model_shear_str="Fabrikant_ModeII_CircularCrack_along_midline",
         
-        dx=5e-6,
-        dc_symmetric_cod_bool=True,
-        debug_bool=False):
+        dx=5e-6):
+
+    verbose=False
 
 
-    crack_model_normal = crack_model_normal_by_name(dc_crack_model_normal_str,YoungsModulus,PoissonsRatio)
-    crack_model_shear = crack_model_shear_by_name(dc_crack_model_shear_str,YoungsModulus,PoissonsRatio)
-                                                    
 
+    crack_model_normal = crack_model_normal_by_name(dc_crack_model_normal_str,dc_YoungsModulus_numericunits.value("Pa"),dc_PoissonsRatio_float)
+    crack_model_shear = crack_model_shear_by_name(dc_crack_model_shear_str,dc_YoungsModulus_numericunits.value("Pa"),dc_PoissonsRatio_float)
+    
+    sigma_yield = dc_YieldStrength_numericunits.value("Pa")
 
     reff_side1 = dc_reff_side1_array.value()
     seff_side1 = dc_seff_side1_array.value()
@@ -93,13 +111,13 @@ def run(_xmldoc,_element,
 
 
     # Fully open crack lengths for left and right side
-    aside1 = np.max(reff_side1) 
-    aside2 = np.max(reff_side2)
+    a_side1 = np.max(reff_side1) 
+    a_side2 = np.max(reff_side2)
 
     # Desired approximate step size for calculations
     approximate_xstep=25e-6 # 25um
 
-    num_boundary_steps=np.floor((max(aside1,aside2)+approximate_xstep)/approximate_xstep)
+    num_boundary_steps=np.floor((max(a_side1,a_side2)+approximate_xstep)/approximate_xstep)
     xmax = num_boundary_steps*approximate_xstep  # Maximum position from center to calculate to;
     # should exceed half-crack lengths 
 
@@ -110,23 +128,23 @@ def run(_xmldoc,_element,
     xrange = (x_bnd[1:] + x_bnd[:-1])/2.0 # Position of element centers
 
     # Determine closure stress field from observed crack length data
-    closure_stress_side1=inverse_closure(reff_side1,seff_side1,xrange,x_bnd,xstep,aside1,sigma_yield,crack_model_normal,verbose=verbose)
+    closure_stress_side1=inverse_closure(reff_side1,seff_side1,xrange,x_bnd,xstep,a_side1,sigma_yield,crack_model_normal,verbose=verbose)
     
-    closure_stress_side2=inverse_closure(reff_side2,seff_side2,xrange,x_bnd,xstep,aside2,sigma_yield,crack_model_normal,verbose=verbose)
+    closure_stress_side2=inverse_closure(reff_side2,seff_side2,xrange,x_bnd,xstep,a_side2,sigma_yield,crack_model_normal,verbose=verbose)
     
     
     # Evaluate initial crack opening gaps from extrapolated tensile closure field
-    crack_initial_opening_side1 = crackopening_from_tensile_closure(xrange,x_bnd,closure_stress_side1,xstep,aside1,sigma_yield,crack_model_normal)
+    crack_initial_opening_side1 = crackopening_from_tensile_closure(xrange,x_bnd,closure_stress_side1,xstep,a_side1,sigma_yield,crack_model_normal)
     
-    crack_initial_opening_side2 = crackopening_from_tensile_closure(xrange,x_bnd,closure_stress_side2,xstep,aside2,sigma_yield,crack_model_normal)
+    crack_initial_opening_side2 = crackopening_from_tensile_closure(xrange,x_bnd,closure_stress_side2,xstep,a_side2,sigma_yield,crack_model_normal)
     
 
     # Plot the evaluated closure state (side1)
     pl.figure()
-    pl.plot(xrange[xrange < aside1]*1e3,closure_stress_side1[xrange < aside1]/1e6,'-',
+    pl.plot(xrange[xrange < a_side1]*1e3,closure_stress_side1[xrange < a_side1]/1e6,'-',
             reff_side1*1e3,seff_side1/1e6,'x')
     for observcnt in range(len(reff_side1)):        
-        (effective_length, sigma, tensile_displ, dsigmaext_dxt) = solve_normalstress(xrange,x_bnd,closure_stress_side1,xstep,seff_side1[observcnt],aside1,sigma_yield,crack_model_normal)
+        (effective_length, sigma, tensile_displ, dsigmaext_dxt) = solve_normalstress(xrange,x_bnd,closure_stress_side1,xstep,seff_side1[observcnt],a_side1,sigma_yield,crack_model_normal)
         pl.plot(effective_length*1e3,seff_side1[observcnt]/1e6,'.')
         pass
     pl.grid(True)
@@ -140,10 +158,10 @@ def run(_xmldoc,_element,
 
         # Plot the evaluated closure state (side2)
     pl.figure()
-    pl.plot(xrange[xrange < aside2]*1e3,closure_stress_side2[xrange < aside2]/1e6,'-',
+    pl.plot(xrange[xrange < a_side2]*1e3,closure_stress_side2[xrange < a_side2]/1e6,'-',
             reff_side2*1e3,seff_side2/1e6,'x')
     for observcnt in range(len(reff_side2)):        
-        (effective_length, sigma, tensile_displ, dsigmaext_dxt) = solve_normalstress(xrange,x_bnd,closure_stress_side2,xstep,seff_side2[observcnt],aside2,sigma_yield,crack_model_normal)
+        (effective_length, sigma, tensile_displ, dsigmaext_dxt) = solve_normalstress(xrange,x_bnd,closure_stress_side2,xstep,seff_side2[observcnt],a_side2,sigma_yield,crack_model_normal)
         pl.plot(effective_length*1e3,seff_side2[observcnt]/1e6,'.')
         pass
     pl.grid(True)
@@ -158,10 +176,10 @@ def run(_xmldoc,_element,
 
 
     closurestate_side1_href = hrefv(quote(dc_measident_str+"_closurestate_side1.csv"),dc_dest_href)
-    save_closurestress(closurestate_side1_href.getpath(),x,closure_stress_side1,a_side1,crackopening=crack_initial_opening_side1)
+    save_closurestress(closurestate_side1_href.getpath(),xrange,closure_stress_side1,a_side1,crackopening=crack_initial_opening_side1)
     
     closurestate_side2_href = hrefv(quote(dc_measident_str+"_closurestate_side2.csv"),dc_dest_href)
-    save_closurestress(closurestate_side2_href.getpath(),x,closure_stress_side2,a_side2,crackopening=crack_initial_opening_side2)
+    save_closurestress(closurestate_side2_href.getpath(),xrange,closure_stress_side2,a_side2,crackopening=crack_initial_opening_side2)
     
 
     ret = {

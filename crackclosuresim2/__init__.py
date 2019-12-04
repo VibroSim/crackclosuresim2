@@ -47,7 +47,6 @@ from .crackclosure import ModeI_throughcrack_CODformula
 from .crackclosure import Tada_ModeI_CircularCrack_along_midline
 from .crackclosure import perform_inverse_closure
 from .crackclosure import save_closurestress
-from .crackclosure import crack_model_normal_by_name
 
 
 
@@ -55,6 +54,34 @@ from .shear_stickslip import ModeII_crack_model
 from .shear_stickslip import ModeII_Beta_CSD_Formula
 from .shear_stickslip import solve_shearstress
 from .shear_stickslip import ModeII_throughcrack_CSDformula
-from .shear_stickslip import crack_model_shear_by_name
+
+from .fabrikant import Fabrikant_ModeII_CircularCrack_along_midline
+
+def crack_model_normal_by_name(crack_model_normal_name,YoungsModulus,PoissonsRatio):
+    if crack_model_normal_name == "ModeI_throughcrack_CODformula":
+        crack_model_normal = ModeI_throughcrack_CODformula(YoungsModulus,PoissonsRatio)
+        pass
+    elif crack_model_normal_name == "Tada_ModeI_CircularCrack_along_midline":
+        crack_model_normal = Tada_ModeI_CircularCrack_along_midline(YoungsModulus,PoissonsRatio)
+        pass
+    else:
+        raise ValueError("Unknown normal stress crack model %s" % (crack_model_normal_name))
+
+    return crack_model_normal
+
+
+
+
+def crack_model_shear_by_name(crack_model_shear_name,YoungsModulus,PoissonsRatio):
+    if crack_model_shear_name == "ModeII_throughcrack_CSDformula":
+        crack_model_shear = ModeII_throughcrack_CSDformula(YoungsModulus,PoissonsRatio)
+        pass
+    elif crack_model_shear_name == "Fabrikant_ModeII_CircularCrack_along_midline":
+        crack_model_shear = Fabrikant_ModeII_CircularCrack_along_midline(YoungsModulus,PoissonsRatio)
+        pass
+    else:
+        raise ValueError("Unknown shear stress crack model %s" % (crack_model_shear_name))
+
+    return crack_model_shear
 
 

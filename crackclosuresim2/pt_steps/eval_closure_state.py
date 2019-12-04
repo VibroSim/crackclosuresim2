@@ -38,7 +38,7 @@ def run(_xmldoc,_element,
         dc_coordinatetransform,
         dc_specimen_str,
         dx=5e-6,
-        dc_symmetric_cod_bool=True,
+        dc_symmetric_cod_bool=True,  # No longer seems to be used... probably redundant with (currently hardwired) choice of crack_model
         debug_bool=False):
     
     E=dc_spcYoungsModulus_numericunits.value("Pa")

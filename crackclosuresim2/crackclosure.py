@@ -1943,16 +1943,3 @@ def save_closurestress(filename,x,sigma_closure,a,crackopening=None):
     #    pass
     pass
 
-def crack_model_normal_by_name(crack_model_normal_name,YoungsModulus,PoissonsRatio):
-    if crack_model_normal_name == "ModeI_throughcrack_CODformula":
-        crack_model_normal = ModeI_throughcrack_CODformula(YoungsModulus,PoissonsRatio)
-        pass
-    elif crack_model_normal_name == "Tada_ModeI_CircularCrack_along_midline":
-        crack_model_normal = Tada_ModeI_CircularCrack_along_midline(YoungsModulus,PoissonsRatio)
-        pass
-    else:
-        raise ValueError("Unknown normal stress crack model %s" % (crack_model_normal_name))
-
-    return crack_model_normal
-
-
