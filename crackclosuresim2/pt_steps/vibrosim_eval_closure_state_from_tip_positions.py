@@ -80,7 +80,6 @@ from crackclosuresim2 import crack_model_shear_by_name
 def run(_xmldoc,_element,
         dc_dest_href,
         dc_measident_str,
-        dc_measnum_int,
         dc_YoungsModulus_numericunits,
         dc_PoissonsRatio_float,
         dc_YieldStrength_numericunits,
