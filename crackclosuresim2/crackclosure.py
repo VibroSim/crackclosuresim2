@@ -1914,7 +1914,7 @@ def save_closurestress(filename,x,sigma_closure,a,crackopening=None):
 
     nrows = np.count_nonzero(x <= a)+1
     
-    out_frame = pd.DataFrame(index=pd.Float64Index(data=x[:nrows],dtype='d',name="Crack radius (m) compared to crack length a=%.8g m" % (a)))
+    out_frame = pd.DataFrame(index=pd.Float64Index(data=x[:nrows],dtype='d',name="Crack radius (m) compared to crack (half) length a=%.8g m" % (a)))
     
     out_frame.insert(len(out_frame.columns),"Closure stress (Pa)", sigma_closure[:nrows])
     if crackopening is not None:
@@ -1955,7 +1955,7 @@ def load_closurestress(filename):
     if closurestress_dataframe.index.name=="Crack radius (m)":
         a = None # Not encoded
     else: 
-        matchobj = re.match(r"""Crack radius \(m\) compared to crack length a=([-+]?(\d+(\.\d*)?|\.\d+)([eE][-+]?\d+)?) m""",closurestress_dataframe.index.name)
+        matchobj = re.match(r"""Crack radius \(m\) compared to crack \(half\) length a=([-+]?(\d+(\.\d*)?|\.\d+)([eE][-+]?\d+)?) m""",closurestress_dataframe.index.name)
         if matchobj is None: 
             raise ValueError("Failed to parse crack length from index title \"%s\"" % (closurestress_dataframe.index.name))
         
