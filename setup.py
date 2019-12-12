@@ -16,20 +16,26 @@ from Cython.Build import cythonize
 
 extra_compile_args = {
     "msvc": ["/openmp"],
-    #"gcc": ["-O0", "-g", "-Wno-uninitialized"),    # Replace the line below with this line to enable debugging of the compiled extension
-    "gcc": ["-fopenmp","-O5","-Wno-uninitialized"],
+    #"unix": ["-O0", "-g", "-Wno-uninitialized"),    # Replace the line below with this line to enable debugging of the compiled extension
+    "unix": ["-fopenmp","-O5","-Wno-uninitialized"],
     "clang": ["-fopenmp","-O5","-Wno-uninitialized"],
+}
+
+extra_include_dirs = {
+    "msvc": [".", np.get_include() ],
+    "unix": [".", np.get_include() ],
+    "clang": [".", np.get_include() ],
 }
 
 extra_libraries = {
     "msvc": [],
-    "gcc": ["gomp",],
+    "unix": ["gomp",],
     "clang": [],
 }
 
 extra_link_args = {
     "msvc": [],
-    "gcc": [],
+    "unix": [],
     "clang": ["-fopenmp=libomp"],
 }
 
@@ -40,13 +46,15 @@ class build_ext_compile_args(build_ext):
             if compiler in extra_compile_args:
                 ext.extra_compile_args=extra_compile_args[compiler]
                 ext.extra_link_args=extra_link_args[compiler]
+                ext.include_dirs.extend(list(extra_include_dirs[compiler]))
                 ext.libraries.extend(list(extra_libraries[compiler]))
                 pass
             else:
-                # use gcc parameters as default
-                ext.extra_compile_args=extra_compile_args["gcc"]
-                ext.extra_link_args=extra_link_args["gcc"]
-                ext.libraries.extend(extra_libraries["gcc"])
+                # use unix parameters as default
+                ext.extra_compile_args=extra_compile_args["unix"]
+                ext.extra_link_args=extra_link_args["unix"]
+                ext.include_dirs.extend(list(extra_include_dirs["unix"]))
+                ext.libraries.extend(extra_libraries["unix"])
                 pass
                 
             pass
@@ -115,8 +123,8 @@ crackclosuresim2_package_files = [ "pt_steps/*" ]
 
 ext_modules=cythonize("crackclosuresim2/*.pyx")
 em_dict=dict([ (module.name,module) for module in ext_modules])
-sca_pyx_ext=em_dict["crackclosuresim2.soft_closure_accel"]
-sca_pyx_ext.include_dirs=[".", np.get_include() ]
+#sca_pyx_ext=em_dict["crackclosuresim2.soft_closure_accel"]
+#sca_pyx_ext.include_dirs=[".", np.get_include() ]
 
 
 
