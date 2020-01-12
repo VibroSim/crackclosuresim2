@@ -42,12 +42,12 @@ if __name__=="__main__":
     #fine_refinement=int(4)
     fine_refinement=int(1)
 
-    # 1/Hm has units of m^(3/2)/Pascal
-    # Hm has units of Pa/m^(3/2)
-    Hm = 10e6/(100e-9**(3.0/2.0))  # rough order of magnitude guess
+    # 1/Lm has units of m^(3/2)/Pascal
+    # Lm has units of Pa/m^(3/2)
+    Lm = 10e6/(100e-9**(3.0/2.0))  # rough order of magnitude guess
 
-    # Hm can also be calculated with angled_friction_model.asperity_stiffness()
-    # Hm = asperity_stiffness(msqrtR,E,nu,angular_stddev)
+    # Lm can also be calculated with angled_friction_model.asperity_stiffness()
+    # Lm = asperity_stiffness(msqrtR,E,nu,angular_stddev)
 
 
     
@@ -57,7 +57,7 @@ if __name__=="__main__":
     #crack_model = Tada_ModeI_CircularCrack_along_midline(E,nu)
     
 
-    scp = sc_params.fromcrackgeom(crack_model,xmax,xsteps,a_input,fine_refinement,Hm)
+    scp = sc_params.fromcrackgeom(crack_model,xmax,xsteps,a_input,fine_refinement,Lm)
     
 
     observed_reff = np.array([  0.0e-3,  1e-3, 1.5e-3,

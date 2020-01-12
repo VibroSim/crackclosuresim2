@@ -32,7 +32,7 @@ static void sigmacontact_from_displacement(double *du_da_short,
 					   double *sigma_closure_interp,
 					   double xfine0,
 					   double dx_fine,
-					   double Hm,
+					   double Lm,
 					   struct crack_model_t crack_model,
 					   // Output parameters
 					   double *from_displacement,
@@ -43,7 +43,7 @@ static void sigmacontact_from_displacement(double *du_da_short,
   int aidx;
   
   for (cnt=0;cnt < du_da_short_len;cnt++) {
-    displacement[cnt] = crack_initial_opening_interp[cnt] - pow(sigma_closure_interp[cnt]/Hm,2.0/3.0);
+    displacement[cnt] = crack_initial_opening_interp[cnt] - pow(sigma_closure_interp[cnt]/Lm,2.0/3.0);
 
   }
 
@@ -70,7 +70,7 @@ static void sigmacontact_from_displacement(double *du_da_short,
   
   for (cnt=0;cnt < du_da_short_len;cnt++) {
     if (displacement[cnt] < 0.0) {
-      from_displacement[cnt] = pow(-displacement[cnt],3.0/2.0) * Hm;
+      from_displacement[cnt] = pow(-displacement[cnt],3.0/2.0) * Lm;
       
     } else {
       from_displacement[cnt] = 0.0;
@@ -119,7 +119,7 @@ static void sigmacontact_from_stress(double *du_da_short,
 
 
 
-static double initialize_contact_goal_function_c(double *du_da_shortened,int du_da_shortened_len,int closure_index,unsigned xsteps,unsigned fine_refinement,int afull_idx_fine,double *sigma_closure_interp,double xfine0,double dx_fine,double Hm,struct crack_model_t crack_model)
+static double initialize_contact_goal_function_c(double *du_da_shortened,int du_da_shortened_len,int closure_index,unsigned xsteps,unsigned fine_refinement,int afull_idx_fine,double *sigma_closure_interp,double xfine0,double dx_fine,double Lm,struct crack_model_t crack_model)
 // NOTE: This should be kept identical functionally to initialize_contact_goal_function in soft_closure_accel.py
 {
   double *du_da_short;
@@ -163,7 +163,7 @@ static double initialize_contact_goal_function_c(double *du_da_shortened,int du_
 
 
 
-static double soft_closure_goal_function_c(double *du_da_shortened,int du_da_shortened_len,int closure_index,unsigned xsteps,unsigned fine_refinement,int afull_idx_fine,double *crack_initial_opening_interp,double *sigma_closure_interp,double xfine0,double dx_fine,double Hm,struct crack_model_t crack_model)
+static double soft_closure_goal_function_c(double *du_da_shortened,int du_da_shortened_len,int closure_index,unsigned xsteps,unsigned fine_refinement,int afull_idx_fine,double *crack_initial_opening_interp,double *sigma_closure_interp,double xfine0,double dx_fine,double Lm,struct crack_model_t crack_model)
 // NOTE: This should be kept identical functionally to soft_closure_goal_function in soft_closure_accel.py
 {
   double *du_da_short;
@@ -205,7 +205,7 @@ static double soft_closure_goal_function_c(double *du_da_shortened,int du_da_sho
 				       sigma_closure_interp,
 				       xfine0,
 				       dx_fine,
-				       Hm,
+				       Lm,
 				       crack_model,
 				       from_displacement,
 				       displacement);

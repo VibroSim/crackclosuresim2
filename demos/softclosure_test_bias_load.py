@@ -48,9 +48,9 @@ if __name__=="__main__":
     #fine_refinement=int(4)
     fine_refinement=int(1)
 
-    # 1/Hm has units of m^(3/2)/Pascal
-    # Hm has units of Pa/m^(3/2)
-    Hm = 10e6/(100e-9**(3.0/2.0))  # rough order of magnitude guess
+    # 1/Lm has units of m^(3/2)/Pascal
+    # Lm has units of Pa/m^(3/2)
+    Lm = 10e6/(100e-9**(3.0/2.0))  # rough order of magnitude guess
 
     
     # Closure state (function of position; positive compression)
@@ -59,7 +59,7 @@ if __name__=="__main__":
     #crack_model = Tada_ModeI_CircularCrack_along_midline(E,nu)
     
 
-    scp = sc_params.fromcrackgeom(crack_model,xmax,xsteps,a_input,fine_refinement,Hm)
+    scp = sc_params.fromcrackgeom(crack_model,xmax,xsteps,a_input,fine_refinement,Lm)
     
 
     observed_reff = np.array([  0.5e-3,  1e-3, 1.5e-3,
@@ -119,11 +119,12 @@ if __name__=="__main__":
     soft_closure_plots(scp,du_da_bias,titleprefix="Bias: ")
 
     # Step #2: Assign the new crack state. The applied 'crack_initial_opening'
-    # should have (contact_stress_bias/scp.Hm)**(2.0/3.0) added in because
+    # should have (contact_stress_bias/scp.Lm)**(2.0/3.0) added in because
     # the sigmacontact_from_displacement() calculation routine starts
-    # by subtracting out (sigma_closure/scp.Hm)**(2.0/3.0) where
-    # the new sigma_closure will be contact_stress_bias.     
-    scp.setcrackstate(contact_stress_bias,displacement_bias + (contact_stress_bias/scp.Hm)**(2.0/3.0))
+    # by subtracting out (sigma_closure/scp.Lm)**(2.0/3.0) where
+    # the new sigma_closure will be contact_stress_bias.
+    # !!!*** NOTE: This technique is relied on in the angledfrictionmodel !!!***
+    scp.setcrackstate(contact_stress_bias,displacement_bias + (contact_stress_bias/scp.Lm)**(2.0/3.0))
 
     du_da_bias_applied=np.zeros(scp.x.shape[0],dtype='d')
 

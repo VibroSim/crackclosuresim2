@@ -30,8 +30,8 @@ cdef extern from "soft_closure_accel_ops.h":
     cdef int CMT_TADA
     pass
 
-    cdef double initialize_contact_goal_function_c(double *du_da_shortened,int du_da_shortened_len,int closure_index,unsigned xsteps,unsigned fine_refinement,int afull_idx_fine,double *sigma_closure_interp,double xfine0,double dx_fine,double Hm,crack_model_t crack_model)
-    cdef double soft_closure_goal_function_c(double *du_da_shortened,int du_da_shortened_len,int closure_index,unsigned xsteps,unsigned fine_refinement,int afull_idx_fine,double *crack_initial_opening_interp,double *sigma_closure_interp,double xfine0,double dx_fine,double Hm,crack_model_t crack_model)
+    cdef double initialize_contact_goal_function_c(double *du_da_shortened,int du_da_shortened_len,int closure_index,unsigned xsteps,unsigned fine_refinement,int afull_idx_fine,double *sigma_closure_interp,double xfine0,double dx_fine,double Lm,crack_model_t crack_model)
+    cdef double soft_closure_goal_function_c(double *du_da_shortened,int du_da_shortened_len,int closure_index,unsigned xsteps,unsigned fine_refinement,int afull_idx_fine,double *crack_initial_opening_interp,double *sigma_closure_interp,double xfine0,double dx_fine,double Lm,crack_model_t crack_model)
 
 def initialize_contact_goal_function_accel(np.ndarray[np.float64_t,ndim=1] du_da_shortened,scp,np.ndarray[np.float64_t,ndim=1] sigma_closure_interp,int closure_index):
     """ NOTE: This should be kept identical functionally to initialize_contact_goal_function in soft_closure.py"""
@@ -46,7 +46,7 @@ def initialize_contact_goal_function_accel(np.ndarray[np.float64_t,ndim=1] du_da
     cdef double xfine0  # first refined x position
     cdef double dx_fine
     cdef crack_model_t crack_model;
-    cdef double Hm
+    cdef double Lm
     
     
     xsteps = scp.xsteps
@@ -54,7 +54,7 @@ def initialize_contact_goal_function_accel(np.ndarray[np.float64_t,ndim=1] du_da
     afull_idx_fine = scp.afull_idx_fine
     xfine0 = scp.x_fine[0]
     dx_fine = scp.dx_fine
-    Hm = scp.Hm
+    Lm = scp.Lm
 
     if isinstance(scp.crack_model,ModeI_throughcrack_CODformula):
 
@@ -70,7 +70,7 @@ def initialize_contact_goal_function_accel(np.ndarray[np.float64_t,ndim=1] du_da
         pass
     
 
-    return initialize_contact_goal_function_c(<double *>du_da_shortened.data,du_da_shortened.shape[0],closure_index,xsteps,fine_refinement,afull_idx_fine,<double *>sigma_closure_interp.data,xfine0,dx_fine,Hm,crack_model)
+    return initialize_contact_goal_function_c(<double *>du_da_shortened.data,du_da_shortened.shape[0],closure_index,xsteps,fine_refinement,afull_idx_fine,<double *>sigma_closure_interp.data,xfine0,dx_fine,Lm,crack_model)
 
 
 def soft_closure_goal_function_accel(np.ndarray[np.float64_t,ndim=1] du_da_shortened,scp,int closure_index):
@@ -87,7 +87,7 @@ def soft_closure_goal_function_accel(np.ndarray[np.float64_t,ndim=1] du_da_short
     cdef double xfine0  # first refined x position
     cdef double dx_fine
     cdef crack_model_t crack_model;
-    cdef double Hm
+    cdef double Lm
     
     
     xsteps = scp.xsteps
@@ -97,7 +97,7 @@ def soft_closure_goal_function_accel(np.ndarray[np.float64_t,ndim=1] du_da_short
     sigma_closure_interp = scp.sigma_closure_interp
     xfine0 = scp.x_fine[0]
     dx_fine = scp.dx_fine
-    Hm = scp.Hm 
+    Lm = scp.Lm 
 
     if isinstance(scp.crack_model,ModeI_throughcrack_CODformula):
 
@@ -117,4 +117,4 @@ def soft_closure_goal_function_accel(np.ndarray[np.float64_t,ndim=1] du_da_short
         raise ValueError("Invalid crack model class")
     
     
-    return soft_closure_goal_function_c(<double *>du_da_shortened.data,du_da_shortened.shape[0],closure_index,xsteps,fine_refinement,afull_idx_fine,<double *>crack_initial_opening_interp.data,<double *>sigma_closure_interp.data,xfine0,dx_fine,Hm,crack_model)
+    return soft_closure_goal_function_c(<double *>du_da_shortened.data,du_da_shortened.shape[0],closure_index,xsteps,fine_refinement,afull_idx_fine,<double *>crack_initial_opening_interp.data,<double *>sigma_closure_interp.data,xfine0,dx_fine,Lm,crack_model)
