@@ -1810,37 +1810,62 @@ class Tada_ModeI_CircularCrack_along_midline(ModeI_Beta_COD_Formula):
 
 
 
-def perform_inverse_closure(inputfilename,E,nu,sigma_yield,CrackCenterX,dx,specimen_id):
+def perform_inverse_closure(inputfilename,E,nu,sigma_yield,CrackCenterX,dx,specimen_id,hascrackside1=True,hascrackside2=True):
     from matplotlib import pyplot as pl
+    import pandas as pd
 
     #tau_yield = sigma_yield/2.0 # limits stress concentration around singularity
 
 
     # read closure profile
-    cpdata = np.loadtxt(inputfilename,skiprows=1,delimiter=',')
-    assert(cpdata.shape[1]==3)
+
+    cpdata = pd.read_csv(inputfilename,index_col="Opening load (Pa)")
     
-    loads = cpdata[:,0]
-    tippos_side1 = cpdata[:,1]
-    tippos_side2 = cpdata[:,2]
+    loads = np.array(cpdata.index)
+
+    tippos_side1 = None
+    tippos_side2 = None
+
+    if "xt (side 1, m)" in cpdata:
+        tippos_side1 = np.array(cpdata["xt (side 1, m)"])
+        assert(hascrackside1)
+        pass
+    
+    if "xt (side 2, m)" in cpdata:
+        tippos_side2 = np.array(cpdata["xt (side 2, m)"])
+        assert(hascrackside2)
+        pass
+    #cpdata = np.loadtxt(inputfilename,skiprows=1,delimiter=',')
+    #assert(cpdata.shape[1]==3)
+    
+    #loads = cpdata[:,0]
+    #tippos_side1 = cpdata[:,1]
+    #tippos_side2 = cpdata[:,2]
     
     sigmaext_max=np.max(loads)
     
-    # side 1 (left side)
-    observed_reff_side1 = CrackCenterX - tippos_side1
-    observed_seff_side1 = loads
+    a_side1=0.0
+    a_side2=0.0
 
-    a_side1=np.max(observed_reff_side1)
+    # side 1 (left side)
+    if tippos_side1 is not None:
+        observed_reff_side1 = CrackCenterX - tippos_side1
+        observed_seff_side1 = loads
+        
+        a_side1=np.max(observed_reff_side1)
+        pass
 
     # side 2 (right side)
-    observed_reff_side2 = tippos_side2 - CrackCenterX
-    observed_seff_side2 = loads
-
-    a_side2=np.max(observed_reff_side2)
+    if tippos_side2 is not None:
+        observed_reff_side2 = tippos_side2 - CrackCenterX
+        observed_seff_side2 = loads
+        
+        a_side2=np.max(observed_reff_side2)
+        pass
 
 
     # here, x really measures radius past crack center
-    xmax_approx = 2.0*max(np.max(a_side1),np.max(a_side2))  # x array goes past tip position (twice half-length)
+    xmax_approx = 2.0*max(a_side1,a_side2)  # x array goes past tip position (twice half-length)
     #dx = 25e-6
     xsteps = int(xmax_approx//dx)
     xmax = dx*xsteps
@@ -1852,61 +1877,72 @@ def perform_inverse_closure(inputfilename,E,nu,sigma_yield,CrackCenterX,dx,speci
     crack_model = Tada_ModeI_CircularCrack_along_midline(E,nu)
 
 
+    sigma_closure_side1 = None
+    sigma_closure_side2 = None
 
     
-    sigma_closure_side1 = inverse_closure(observed_reff_side1[observed_reff_side1 >= 0.0],
-                                          observed_seff_side1[observed_reff_side1 >= 0.0],
-                                          x,x_bnd,dx,a_side1,sigma_yield,
-                                          crack_model)
+    if tippos_side1 is not None:
+        sigma_closure_side1 = inverse_closure(observed_reff_side1[observed_reff_side1 >= 0.0],
+                                              observed_seff_side1[observed_reff_side1 >= 0.0],
+                                              x,x_bnd,dx,a_side1,sigma_yield,
+                                              crack_model)
+        pass
 
 
 
     
-    sigma_closure_side2 = inverse_closure(observed_reff_side2[observed_reff_side2 >= 0.0],
-                                          observed_seff_side2[observed_reff_side2 >= 0.0],
-                                          x,x_bnd,dx,a_side2,sigma_yield,
-                                          crack_model)
+    if tippos_side2 is not None:
+        sigma_closure_side2 = inverse_closure(observed_reff_side2[observed_reff_side2 >= 0.0],
+                                              observed_seff_side2[observed_reff_side2 >= 0.0],
+                                              x,x_bnd,dx,a_side2,sigma_yield,
+                                              crack_model)
+        pass
+
+    side1fig = None
+    side2fig = None
 
     
     # Forward cross-check of closure
-    side1fig=pl.figure()
-    pl.plot(x[x < a_side1]*1e6,sigma_closure_side1[x < a_side1]/1e6,'-',
-            observed_reff_side1*1e6,observed_seff_side1/1e6,'x')
-    for observcnt in range(len(observed_reff_side1)):        
-        (effective_length, sigma, tensile_displ, dsigmaext_dxt) = solve_normalstress(x,x_bnd,sigma_closure_side1,dx,observed_seff_side1[observcnt],a_side1,sigma_yield,crack_model)
-        pl.plot(effective_length*1e6,observed_seff_side1[observcnt]/1e6,'.')
-        #pl.plot(x*1e3,tensile_displ*1e15,'-')
+    if tippos_side1 is not None:
+        side1fig=pl.figure()
+        pl.plot(x[x < a_side1]*1e6,sigma_closure_side1[x < a_side1]/1e6,'-',
+                observed_reff_side1*1e6,observed_seff_side1/1e6,'x')
+        for observcnt in range(len(observed_reff_side1)):        
+            (effective_length, sigma, tensile_displ, dsigmaext_dxt) = solve_normalstress(x,x_bnd,sigma_closure_side1,dx,observed_seff_side1[observcnt],a_side1,sigma_yield,crack_model)
+            pl.plot(effective_length*1e6,observed_seff_side1[observcnt]/1e6,'.')
+            #pl.plot(x*1e3,tensile_displ*1e15,'-')
+            pass
+        pl.grid()
+        pl.legend(('Closure stress field','Observed crack tip posn','Recon. crack tip posn'),loc="best")
+        pl.xlabel('Radius from crack center (um)')
+        pl.ylabel('Stress (MPa)')
+        if specimen_id is not None:
+            pl.title('%s: Side 1 (left)' % (specimen_id))
+            pass
+        else:
+            pl.title('Side 1 (left)')        
+            pass
+        
+        side2fig=pl.figure()
+        pl.plot(x[x < a_side2]*1e6,sigma_closure_side2[x < a_side2]/1e6,'-',
+                observed_reff_side2*1e6,observed_seff_side2/1e6,'x')
+        for observcnt in range(len(observed_reff_side2)):        
+            (effective_length, sigma, tensile_displ, dsigmaext_dxt) = solve_normalstress(x,x_bnd,sigma_closure_side2,dx,observed_seff_side2[observcnt],a_side2,sigma_yield,crack_model)
+            pl.plot(effective_length*1e6,observed_seff_side2[observcnt]/1e6,'.')
+            #pl.plot(x*1e3,tensile_displ*1e15,'-')
+            pass
+        pl.grid()
+        pl.legend(('Closure stress field','Observed crack tip posn','Recon. crack tip posn'),loc="best")
+        if specimen_id is not None:
+            pl.title('%s: Side 2 (right)' % (specimen_id))
+            pass
+        else:
+            pl.title('Side 2 (right)')        
+            pass
+        pl.xlabel('Radius from crack center (um)')
+        pl.ylabel('Stress (MPa)')
         pass
-    pl.grid()
-    pl.legend(('Closure stress field','Observed crack tip posn','Recon. crack tip posn'),loc="best")
-    pl.xlabel('Radius from crack center (um)')
-    pl.ylabel('Stress (MPa)')
-    if specimen_id is not None:
-        pl.title('%s: Side 1 (left)' % (specimen_id))
-        pass
-    else:
-        pl.title('Side 1 (left)')        
-        pass
-
-    side2fig=pl.figure()
-    pl.plot(x[x < a_side2]*1e6,sigma_closure_side2[x < a_side2]/1e6,'-',
-            observed_reff_side2*1e6,observed_seff_side2/1e6,'x')
-    for observcnt in range(len(observed_reff_side2)):        
-        (effective_length, sigma, tensile_displ, dsigmaext_dxt) = solve_normalstress(x,x_bnd,sigma_closure_side2,dx,observed_seff_side2[observcnt],a_side2,sigma_yield,crack_model)
-        pl.plot(effective_length*1e6,observed_seff_side2[observcnt]/1e6,'.')
-        #pl.plot(x*1e3,tensile_displ*1e15,'-')
-        pass
-    pl.grid()
-    pl.legend(('Closure stress field','Observed crack tip posn','Recon. crack tip posn'),loc="best")
-    if specimen_id is not None:
-        pl.title('%s: Side 2 (right)' % (specimen_id))
-        pass
-    else:
-        pl.title('Side 2 (right)')        
-        pass
-    pl.xlabel('Radius from crack center (um)')
-    pl.ylabel('Stress (MPa)')
-
+    
     return (x,x_bnd,a_side1,a_side2,sigma_closure_side1,sigma_closure_side2,side1fig,side2fig)
 
 def save_closurestress(filename,x,sigma_closure,a,crackopening=None):
