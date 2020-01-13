@@ -403,6 +403,8 @@ def solve_incremental_shearstress(x,x_bnd,tau,sigma_closure,shear_displ,xt_idx,d
 #sufficient because something is wrong at that point.
 # sdh 11/4/18 -- we're really interested here in theta=pi
 #                here, I think... (verified)
+# NOTE: returns shear displacement of each crack flank
+# relative displacement between both flanks is double this
 def shear_displacement(tau_applied,x,xt,crack_model):
     ##plane stress is considered
     #Kappa = (3.0-nu)/(1.0+nu)
@@ -592,6 +594,9 @@ def ModeII_throughcrack_CSDformula(E,nu):
         # the entire crack, not the near-tip formula
         # used below
         
+        # NOTE: returns shear displacement of each crack flank
+        # relative displacement between both flanks is double this
+
         #plane stress is considered
         Kappa = (3.0-nu)/(1.0+nu)
         KII = tau_applied*np.sqrt(np.pi*(xt))

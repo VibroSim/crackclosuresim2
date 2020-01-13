@@ -170,7 +170,10 @@ def array_repr(array):
     return "np.array(%s,dtype=np.%s)" % (np.array2string(array,separator=',',suppress_small=False,threshold=np.inf,floatmode='unique'),repr(array.dtype))
 
 def u(rho,phi,a,tauext,E,nu,use_surrogate=True):
+    # NOTE: returns shear displacement of each crack flank
+    # relative displacement between both flanks is double this
 
+    
     if use_surrogate and (phi,nu) in u_surrogate:
         (t,c,k) = u_surrogate[(phi,nu)]
         return splev(rho/a,(t,c,k))*a*tauext/E
