@@ -692,8 +692,8 @@ def soft_closure_plots(scp,du_da,titleprefix=""):
     #pl.plot(scp.x_fine,u)
     #pl.title("distributed stress concentration")
     #pl.grid()
-
-    pl.figure()
+    
+    sigmacontact_plot=pl.figure()
     pl.clf()
     pl.plot(scp.x_fine*1e3,from_displacement/1e6,'-',
             scp.x_fine*1e3,from_stress/1e6,'-'),
@@ -706,15 +706,15 @@ def soft_closure_plots(scp,du_da,titleprefix=""):
     u = np.cumsum(du_da)*scp.dx_fine
     # u nominally on position basis x_fine+dx_fine/2.0
 
-    pl.figure()
+    duda_plot = pl.figure()
     pl.clf()
-    pl.plot(scp.x_fine*1e3,du_da/1e6,'-')
+    pl.plot(scp.x_fine*1e3,du_da/1e12,'-')
     pl.grid()
-    pl.title(titleprefix+"distributed stress concentration derivative (corrected)\ntotal load=%g" % (u[scp.afull_idx_fine]))
+    pl.title(titleprefix+"distributed stress concentration derivative\ntotal load=%f MPa" % (u[scp.afull_idx_fine]/1e6))
     pl.xlabel('Position (mm)')
-    pl.ylabel("Distributed stress concentration (MPa/m)")
+    pl.ylabel("Distributed stress concentration (TPa/m)")
 
-    pl.figure()
+    displacement_plot=pl.figure()
     pl.clf()
     pl.plot(scp.x*1e3,(scp.crack_initial_opening-(scp.sigma_closure/scp.Lm)**(2.0/3.0))*1e6,'-')
     pl.plot(scp.x_fine*1e3,displacement*1e6,'-')
@@ -723,7 +723,8 @@ def soft_closure_plots(scp,du_da,titleprefix=""):
     pl.xlabel('Position (mm)')
     pl.ylabel('Displacement (um)')
     pl.title(titleprefix+"displacement")
-    pass
+
+    return (sigmacontact_plot,duda_plot,displacement_plot)
     
 
 

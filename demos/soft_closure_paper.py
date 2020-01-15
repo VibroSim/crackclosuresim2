@@ -30,11 +30,11 @@ if __name__=="__main__":
     tau_yield = sigma_yield/2.0 # limits stress concentration around singularity
     nu = 0.32   #Poisson's Ratio
 
-    AFVT_018J_heating = pd.read_csv("0000-C18-AFVT-018J_optical_collect_optical_data_dic_closureprofile_closurestress_side1.csv")
+    AFVT_018J_closure = pd.read_csv("0000-C18-AFVT-018J_optical_collect_optical_data_dic_closureprofile_closurestress_side1.csv")
 
-    dx=AFVT_018J_heating["Crack radius (m)"].values[1]-AFVT_018J_heating["Crack radius (m)"].values[0]
-    #x = np.concatenate((AFVT_018J_heating["Crack radius (m)"].values,np.array((AFVT_018J_heating["Crack radius (m)"].values[-1]+dx,))))
-    x=AFVT_018J_heating["Crack radius (m)"].values
+    dx=AFVT_018J_closure["Crack radius (m)"].values[1]-AFVT_018J_closure["Crack radius (m)"].values[0]
+    #x = np.concatenate((AFVT_018J_closure["Crack radius (m)"].values,np.array((AFVT_018J_closure["Crack radius (m)"].values[-1]+dx,))))
+    x=AFVT_018J_closure["Crack radius (m)"].values
     # expand out position base to one sample beyond crack end
 
     a_input=.495e-3  # half-crack length (m)
@@ -44,8 +44,8 @@ if __name__=="__main__":
         x_bnd[0]=0.0
         pass
 
-    #sigma_closure = np.concatenate((AFVT_018J_heating["Closure stress (Pa)"].values,np.array((0.0,))))
-    sigma_closure = AFVT_018J_heating["Closure stress (Pa)"].values
+    #sigma_closure = np.concatenate((AFVT_018J_closure["Closure stress (Pa)"].values,np.array((0.0,))))
+    sigma_closure = AFVT_018J_closure["Closure stress (Pa)"].values
 
     # Remove drop in sigma_closure after peak, as this is probably non-physical
     sc_maxidx=np.argmax(sigma_closure)
@@ -83,8 +83,14 @@ if __name__=="__main__":
     sigma_closure_softmodel[sigma_closure_softmodel < 0.0]=0.0
     scp.initialize_contact(sigma_closure_softmodel,crack_initial_opening)
     
+    pl.figure()
+    pl.plot(x*1e3,sigma_closure/1e6,'-')
+    pl.title("Closure stress distribution")
+    pl.xlabel("Position (mm)")
+    pl.ylabel("Compressive stress (MPa)")
+    pl.grid()
+    pl.savefig('/tmp/closurestress.png',dpi=300)
     
-
     du_da=np.zeros(scp.x.shape[0],dtype='d')
 
     soft_closure_plots(scp,du_da,titleprefix="Initial: ")
@@ -94,7 +100,16 @@ if __name__=="__main__":
 
     (du_da_compressive,contact_stress_compressive,displacement_compressive) = calc_contact(scp,sigma_ext_compressive)
 
-    soft_closure_plots(scp,du_da_compressive,titleprefix="Compressive: ")
+    (sigmacontact_plot_compressive,duda_plot_compressive,displacement_plot_compressive) = soft_closure_plots(scp,du_da_compressive,titleprefix="Compressive: ")
+
+    pl.figure(sigmacontact_plot_compressive.number)
+    pl.savefig('/tmp/compressive_sigmacontact.png',dpi=300)
+
+    pl.figure(duda_plot_compressive.number)
+    pl.savefig('/tmp/compressive_duda.png',dpi=300)
+
+    pl.figure(displacement_plot_compressive.number)
+    pl.savefig('/tmp/compressive_displacement.png',dpi=300)
 
 
     sigma_ext_tensile=50e6
@@ -102,7 +117,17 @@ if __name__=="__main__":
 
     (du_da_tensile,contact_stress_tensile,displacement_tensile) = calc_contact(scp,sigma_ext_tensile)
 
-    soft_closure_plots(scp,du_da_tensile,titleprefix="Tensile: ")
+    (sigmacontact_plot_tensile,duda_plot_tensile,displacement_plot_tensile) = soft_closure_plots(scp,du_da_tensile,titleprefix="Tensile: ")
+
+
+    pl.figure(sigmacontact_plot_tensile.number)
+    pl.savefig('/tmp/tensile_sigmacontact.png',dpi=300)
+
+    pl.figure(duda_plot_tensile.number)
+    pl.savefig('/tmp/tensile_duda.png',dpi=300)
+
+    pl.figure(displacement_plot_tensile.number)
+    pl.savefig('/tmp/tensile_displacement.png',dpi=300)
 
     # What if we do a second tensile step? 
 
