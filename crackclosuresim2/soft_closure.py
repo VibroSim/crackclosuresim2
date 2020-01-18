@@ -154,8 +154,8 @@ class sc_params(object):
         # (for some reason, restarting the minimizer where it left off seems to help get it to the goal)
         total_maxiter=100000
         niter = 0
-        epsval1 = 50e6/scp.a/5000.0
-        epsval2 = np.max(np.abs(sigma_closure))/scp.a/5000.0)
+        epsval1 = 50e6/self.a/5000.0
+        epsval2 = np.max(np.abs(sigma_closure))/self.a/5000.0
         epsval = max(epsval1,epsval2)
         epsvalscaled = epsval
         terminate=False
@@ -574,7 +574,7 @@ def calc_contact(scp,sigma_ext):
         total_maxiter=100000
         niter = 0
         epsval1 = np.abs(sigma_ext)/scp.a/5000.0
-        epsval2 = np.max(np.abs(scp.sigma_closure))/scp.a/5000.0)
+        epsval2 = np.max(np.abs(scp.sigma_closure))/scp.a/5000.0
         epsval = max(epsval1,epsval2)
         epsvalscaled = epsval
         terminate=False
@@ -658,7 +658,7 @@ def calc_contact(scp,sigma_ext):
         total_maxiter=100000
         niter = 0
         epsval1 = np.abs(sigma_ext)/scp.a/5000.0
-        epsval2 = np.max(np.abs(scp.sigma_closure))/scp.a/5000.0)
+        epsval2 = np.max(np.abs(scp.sigma_closure))/scp.a/5000.0
         epsval = max(epsval1,epsval2)
         epsvalscaled = epsval
         terminate=False
