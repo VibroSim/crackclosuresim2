@@ -150,12 +150,46 @@ class sc_params(object):
 
         constraints = [] #[ load_constraint, crack_open_constraint ]
         
-        res = scipy.optimize.minimize(initialize_contact_goal_function_accel,du_da_shortened_iniguess,args=(self,sigma_closure_interp,closure_index),
-                                      constraints = constraints,
-                                      method="SLSQP",
-                                      options={"eps": 10000.0,
-                                               "maxiter": 10000,
-                                               "ftol": self.afull_idx_fine*(abs(np.mean(sigma_closure))+20e6)**2.0/1e19})
+        # Allow total iterations to be broken into pieces separated by failures with minimize error 9 (Iteration limit exceeded)
+        # (for some reason, restarting the minimizer where it left off seems to help get it to the goal)
+        total_maxiter=100000
+        niter = 0
+        epsval1 = 50e6/scp.a/5000.0
+        epsval2 = np.max(np.abs(sigma_closure))/scp.a/5000.0)
+        epsval = max(epsval1,epsval2)
+        epsvalscaled = epsval
+        terminate=False
+        starting_value=du_da_shortened_iniguess
+
+
+        while niter < total_maxiter and not terminate: 
+            this_niter=10000
+            res = scipy.optimize.minimize(initialize_contact_goal_function_accel,starting_value,args=(self,sigma_closure_interp,closure_index),
+                                          constraints = constraints,
+                                          method="SLSQP",
+                                          options={"eps": epsvalscaled,
+                                               "maxiter": this_niter,
+                                                   "ftol": self.afull_idx_fine*(abs(np.mean(sigma_closure))+20e6)**2.0/1e14})
+            if res.status != 9 and res.status != 7:  # anything but reached iteration limit or eps increase
+                terminate=True
+                pass
+            elif res.status==7:
+                # Rank-deficient equality constraint subproblem HFTI 
+                # Generally indicates too fine epsilon...
+                if epsvalscaled/epsval < 10:
+                    epsvalscaled *= 2 
+                    starting_value = res.x # Next iteration starts where this one left off
+                    pass
+                else:
+                    terminate=True  # Don't allow eps to grow too much
+                    pass
+                pass
+            else:
+                epsvalscaled = epsval # reset eps to nominal value
+                starting_value = res.x # Next iteration starts where this one left off
+                pass
+            niter += this_niter
+            pass
         
         if not res.success: #  and res.status != 4:
             # (ignore incompatible constraint, because our constraints are
@@ -539,6 +573,10 @@ def calc_contact(scp,sigma_ext):
         # (for some reason, restarting the minimizer where it left off seems to help get it to the goal)
         total_maxiter=100000
         niter = 0
+        epsval1 = np.abs(sigma_ext)/scp.a/5000.0
+        epsval2 = np.max(np.abs(scp.sigma_closure))/scp.a/5000.0)
+        epsval = max(epsval1,epsval2)
+        epsvalscaled = epsval
         terminate=False
         starting_value=du_da_shortened_iniguess
         while niter < total_maxiter and not terminate: 
@@ -546,13 +584,25 @@ def calc_contact(scp,sigma_ext):
             res = scipy.optimize.minimize(soft_closure_goal_function_accel,starting_value,args=(scp,closure_index),
                                           constraints = [ load_constraint ], #[ nonnegative_constraint, load_constraint ],
                                           method="SLSQP",
-                                          options={"eps": 200000000.0,
+                                          options={"eps": epsvalscaled,
                                                    "maxiter": this_niter,
                                                    "ftol": scp.afull_idx_fine*(np.abs(sigma_ext)+20e6)**2.0/1e14})
-            if res.status != 9:  # anything but reached iteration limit
+            if res.status != 9 and res.status != 7:  # anything but reached iteration limit or eps increase
                 terminate=True
                 pass
+            elif res.status==7:
+                # Rank-deficient equality constraint subproblem HFTI 
+                # Generally indicates too fine epsilon...
+                if epsvalscaled/epsval < 10:
+                    epsvalscaled *= 2 
+                    starting_value = res.x # Next iteration starts where this one left off
+                    pass
+                else:
+                    terminate=True  # Don't allow eps to grow too much
+                    pass
+                pass
             else:
+                epsvalscaled = epsval # reset eps to nominal value
                 starting_value = res.x # Next iteration starts where this one left off
                 pass
             niter += this_niter
@@ -607,6 +657,10 @@ def calc_contact(scp,sigma_ext):
 
         total_maxiter=100000
         niter = 0
+        epsval1 = np.abs(sigma_ext)/scp.a/5000.0
+        epsval2 = np.max(np.abs(scp.sigma_closure))/scp.a/5000.0)
+        epsval = max(epsval1,epsval2)
+        epsvalscaled = epsval
         terminate=False
         starting_value=du_da_shortened_iniguess
         while niter < total_maxiter and not terminate: 
@@ -614,13 +668,25 @@ def calc_contact(scp,sigma_ext):
             res = scipy.optimize.minimize(soft_closure_goal_function_accel,starting_value,args=(scp,closure_index),
                                           constraints = constraints,
                                           method="SLSQP",
-                                          options={"eps": 200000000.0,
+                                          options={"eps": epsvalscaled,
                                                    "maxiter": this_niter,
                                                    "ftol": scp.afull_idx_fine*(np.abs(sigma_ext)+20e6)**2.0/1e14})
-            if res.status != 9: # anything but reached iteration limit
+            if res.status != 9 and res.status != 7: # anything but reached iteration limit or eps increase needed
                 terminate=True
                 pass
+            elif res.status==7:
+                # Rank-deficient equality constraint subproblem HFTI 
+                # Generally indicates too fine epsilon...
+                if epsvalscaled/epsval < 10:
+                    epsvalscaled *= 2 
+                    starting_value = res.x # Next iteration starts where this one left off
+                    pass
+                else:
+                    terminate=True  # Don't allow eps to grow too much
+                    pass
+                pass
             else:
+                epsvalscaled = epsval # reset eps to nominal value
                 starting_value = res.x # Next iteration starts where this one left off
                 pass
             niter += this_niter
