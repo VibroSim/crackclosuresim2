@@ -61,7 +61,7 @@ from .fabrikant import Fabrikant_ModeII_CircularCrack_along_midline
 
 def crack_model_normal_by_name(crack_model_normal_name,YoungsModulus,PoissonsRatio):
     if crack_model_normal_name == "ModeI_throughcrack_CODformula":
-        crack_model_normal = ModeI_throughcrack_CODformula(YoungsModulus,PoissonsRatio)
+        crack_model_normal = ModeI_throughcrack_CODformula(YoungsModulus)# ,PoissonsRatio)
         pass
     elif crack_model_normal_name == "Tada_ModeI_CircularCrack_along_midline":
         crack_model_normal = Tada_ModeI_CircularCrack_along_midline(YoungsModulus,PoissonsRatio)
