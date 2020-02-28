@@ -56,6 +56,7 @@ from .shear_stickslip import ModeII_crack_model
 from .shear_stickslip import ModeII_Beta_CSD_Formula
 from .shear_stickslip import solve_shearstress
 from .shear_stickslip import ModeII_throughcrack_CSDformula
+from .shear_stickslip import ModeIII_throughcrack_CSDformula
 
 from .fabrikant import Fabrikant_ModeII_CircularCrack_along_midline
 
@@ -80,6 +81,9 @@ def crack_model_shear_by_name(crack_model_shear_name,YoungsModulus,PoissonsRatio
         pass
     elif crack_model_shear_name == "Fabrikant_ModeII_CircularCrack_along_midline":
         crack_model_shear = Fabrikant_ModeII_CircularCrack_along_midline(YoungsModulus,PoissonsRatio)
+        pass
+    elif crack_model_shear_name == "ModeIII_throughcrack_CSDformula":
+        crack_model_shear = ModeIII_throughcrack_CSDformula(YoungsModulus,PoissonsRatio)
         pass
     else:
         raise ValueError("Unknown shear stress crack model %s" % (crack_model_shear_name))

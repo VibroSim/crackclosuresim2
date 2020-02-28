@@ -614,3 +614,25 @@ def ModeII_throughcrack_CSDformula(E,nu):
     
     
 
+def ModeIII_throughcrack_CSDformula(E,nu):
+    def ut(E,nu,tau_applied,x,xt):
+        #For a 1D problem based on the Westergaard stress functions, since the
+        #models are only valid in the region near the crack tip, This can be 
+        #taken as the same for both an edge and an center crack. This is 
+        #unique to mode III as the KIII is identical for the edge and center 
+        #case (i.e. beta = 1.0)[Tada 2000, Section 8.1]. (Unlike the Mode I and
+        #II case where, beta=~1.12
+        
+        #plane stress is considered however, the Kappa value is not used.
+        #Kappa = (3.0-nu)/(1.0+nu)
+        KIII = tau_applied*np.sqrt(np.pi*(xt))
+        theta = np.pi
+        ut = (KIII/(2.0*E))*(np.sqrt((xt-x)/(2.0*np.pi)))*((1.0+nu)*(np.sin(3.0*theta/2.0)))
+        
+        return ut
+    
+    return ModeII_Beta_CSD_Formula(E=E,
+                                   nu=nu,
+                                   beta=lambda obj: 1.0,
+                                   ut = lambda obj,tau_applied,x,xt: ut(obj.E,obj.nu,tau_applied,x,xt))
+
