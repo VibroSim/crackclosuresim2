@@ -581,12 +581,14 @@ def calc_contact(scp,sigma_ext):
         starting_value=du_da_shortened_iniguess
         while niter < total_maxiter and not terminate: 
             this_niter=10000
+            print("calling scipy.optimize.minimize; sigma_ext=%g; eps=%g maxiter=%d ftol=%g" % (sigma_ext,epsvalscaled,this_niter,scp.afull_idx_fine*(np.abs(sigma_ext)+20e6)**2.0/1e14))
             res = scipy.optimize.minimize(soft_closure_goal_function_accel,starting_value,args=(scp,closure_index),
                                           constraints = [ load_constraint ], #[ nonnegative_constraint, load_constraint ],
                                           method="SLSQP",
                                           options={"eps": epsvalscaled,
                                                    "maxiter": this_niter,
                                                    "ftol": scp.afull_idx_fine*(np.abs(sigma_ext)+20e6)**2.0/1e14})
+            print("res=%s" % (str(res)))
             if res.status != 9 and res.status != 7:  # anything but reached iteration limit or eps increase
                 terminate=True
                 pass
