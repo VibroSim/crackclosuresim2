@@ -85,8 +85,8 @@ class sc_params(object):
         #sigma_closure_avg_stress = np.sum(sigma_closure[sigma_closure > 0.0])*self.dx*thickness/(self.a*thickness)
         
         # now we use du_da_shortened
-        # which is  afull_idx_fine+1 numbers representing
-        # the distributed stress concentration
+        # which is  afull_idx_fine+2 numbers representing
+        # a uniform load followed by the distributed stress concentration
         # ... Note that the distributed stress concentration indices
         # have no effect to the left of the closure point 
 
@@ -96,8 +96,8 @@ class sc_params(object):
         # du_da_shortened has the initial open region removed, as we
         # disallow any concentration in this open region --
         # crack should not close. 
-        du_da_shortened_iniguess=np.zeros(self.afull_idx_fine+1-(closure_index+1),dtype='d')*(1.0/(self.afull_idx+1)) # * (-sigma_closure_avg_stress)/self.dx_fine  #
-        du_da_shortened_iniguess[:(self.afull_idx_fine+1-(closure_index+1))] = -sigma_closure_interp[(closure_index+1):(self.afull_idx_fine+1)]
+        du_da_shortened_iniguess=np.zeros(self.afull_idx_fine+2-(closure_index+1),dtype='d')*(1.0/(self.afull_idx+1)) # * (-sigma_closure_avg_stress)/self.dx_fine  #
+        du_da_shortened_iniguess[1:(self.afull_idx_fine+2-(closure_index+1))] = -sigma_closure_interp[(closure_index+1):(self.afull_idx_fine+1)]
 
         
         
@@ -201,7 +201,7 @@ class sc_params(object):
             pass
         
         du_da_shortened=res.x
-        du_da = np.concatenate((np.zeros(closure_index+1,dtype='d'),du_da_shortened,np.zeros(self.xsteps*self.fine_refinement - self.afull_idx_fine - 2 ,dtype='d')))
+        du_da = np.concatenate(((du_da_shortened[0],),np.zeros(closure_index+1,dtype='d'),du_da_shortened[1:],np.zeros(self.xsteps*self.fine_refinement - self.afull_idx_fine - 2 ,dtype='d')))
         
         (contact_stress,displacement) = sigmacontact_from_displacement(self,du_da)
 
@@ -294,7 +294,7 @@ def initialize_contact_goal_function(du_da_shortened,scp,sigma_closure_interp,cl
     """ NOTE: This should be kept identical functionally to initialize_contact_goal_function_accel in soft_closure_accel.pyx"""
 
     #du_da = np.concatenate((np.zeros(closure_index+1,dtype='d'),du_da_shortened,np.zeros(scp.xsteps*scp.fine_refinement - scp.afull_idx_fine - 2 ,dtype='d')))
-    du_da_short = np.concatenate((np.zeros(closure_index+1,dtype='d'),du_da_shortened))  # short version goes only up to afull_idx_fine as last element (afull_idx_fine+1 elements total)
+    du_da_short = np.concatenate(((du_da_shortened[0],),np.zeros(closure_index+1,dtype='d'),du_da_shortened[1:]))  # short version goes only up to afull_idx_fine as last element (afull_idx_fine+1 elements total)
     
 
     #last_closureidx = np.where(x_bnd >= a)[0][0]
@@ -327,7 +327,7 @@ def sigmacontact_from_displacement(scp,du_da):
     # 
     da = scp.dx_fine # same step size
 
-    x_fine = scp.x_fine[:du_da.shape[0]]
+    x_fine = scp.x_fine[:(du_da.shape[0]-1)]
 
     # integral starts at a0, where sigma_closure > 0 (compressive)
     #first_closureidx = np.where(sigma_closure >0)[0][0]
@@ -356,7 +356,7 @@ def sigmacontact_from_displacement(scp,du_da):
             #   in next line: sqrt( (a+x) * (a-x) where x >= 0 and
             #   throw out where x >= a
             # diplacement defined on x_fine
-            displacement[:aidx] += (4.0/scp.crack_model.Eeff)*du_da[aidx]*np.sqrt((x_fine[aidx]+x_fine[:aidx])*(x_fine[aidx]-x_fine[:aidx]))*da
+            displacement[:aidx] += (4.0/scp.crack_model.Eeff)*du_da[aidx+1]*np.sqrt((x_fine[aidx]+x_fine[:aidx])*(x_fine[aidx]-x_fine[:aidx]))*da
             # Add in the x=a position
             # Here we have the integral of (4/E)*(du/da)*sqrt( (a+x)* (a-x) )da
             # as a goes from x[aidx] to x[aidx]+da/2
@@ -364,7 +364,7 @@ def sigmacontact_from_displacement(scp,du_da):
             #  (4/E)*(du/da)*sqrt(a+x) * integral of sqrt(a-x) da
             # = (4/E)*(du/da)*sqrt(a+x) * (2/3) * (  (x[aidx]+da/2-x[aidx])^(3/2) - (x[aidx]-x[aidx])^(3/2) )
             # = (4/E)*(du/da)*sqrt(a+x) * (2/3) * ( (da/2)^(3/2) )
-            displacement[aidx] += (4.0/scp.crack_model.Eeff)*du_da[aidx]*np.sqrt(2.0*x_fine[aidx])*(da/2.0)**(3.0/2.0)
+            displacement[aidx] += (4.0/scp.crack_model.Eeff)*du_da[aidx+1]*np.sqrt(2.0*x_fine[aidx])*(da/2.0)**(3.0/2.0)
             
             pass
         pass
@@ -379,7 +379,7 @@ def sigmacontact_from_displacement(scp,du_da):
             # Tada turns out to have sqrt(xt^2-x^2) === sqrt((xt-x)(xt+x)) form
             # as throughcrack, so same integral calculation applies.
             # We just change the leading factors
-            displacement[:aidx] += (8.0*(1.0-scp.crack_model.nu**2.0)/(np.pi*scp.crack_model.E))*du_da[aidx]*np.sqrt((x_fine[aidx]+x_fine[:aidx])*(x_fine[aidx]-x_fine[:aidx]))*da
+            displacement[:aidx] += (8.0*(1.0-scp.crack_model.nu**2.0)/(np.pi*scp.crack_model.E))*du_da[aidx+1]*np.sqrt((x_fine[aidx]+x_fine[:aidx])*(x_fine[aidx]-x_fine[:aidx]))*da
             # Add in the x=a position
             # Here we have the integral of (4/E)*(du/da)*sqrt( (a+x)* (a-x) )da
             # as a goes from x[aidx] to x[aidx]+da/2
@@ -387,7 +387,7 @@ def sigmacontact_from_displacement(scp,du_da):
             #  (4/E)*(du/da)*sqrt(a+x) * integral of sqrt(a-x) da
             # = (4/E)*(du/da)*sqrt(a+x) * (2/3) * (  (x[aidx]+da/2-x[aidx])^(3/2) - (x[aidx]-x[aidx])^(3/2) )
             # = (4/E)*(du/da)*sqrt(a+x) * (2/3) * ( (da/2)^(3/2) )
-            displacement[aidx] += (8.0*(1.0-scp.crack_model.nu**2.0)/(np.pi*scp.crack_model.E))*du_da[aidx]*np.sqrt(2.0*x_fine[aidx])*(da/2.0)**(3.0/2.0)
+            displacement[aidx] += (8.0*(1.0-scp.crack_model.nu**2.0)/(np.pi*scp.crack_model.E))*du_da[aidx+1]*np.sqrt(2.0*x_fine[aidx])*(da/2.0)**(3.0/2.0)
             pass
 
         
@@ -413,10 +413,10 @@ def sigmacontact_from_stress(scp,du_da):
     sigma_closure_interp=scipy.interpolate.interp1d(scp.x,scp.sigma_closure,kind="linear",fill_value="extrapolate")(scp.x_fine)
     
     #sigmacontact = copy.copy(sigma_closure)
-    sigmacontact = copy.copy(sigma_closure_interp[:du_da.shape[0]]) # copying slightly redundant  no that we no longer use sigma_closure_interp for anything else
+    sigmacontact = copy.copy(sigma_closure_interp[:(du_da.shape[0]-1)]) # copying slightly redundant  no that we no longer use sigma_closure_interp for anything else
     da = scp.dx_fine # same step size
 
-    x_fine = scp.x_fine[:du_da.shape[0]]
+    x_fine = scp.x_fine[:(du_da.shape[0]-1)]
     
     # integral starts at a0, where sigma_closure > 0 (compressive)
     # OR closure state with external load is compressive
@@ -428,11 +428,13 @@ def sigmacontact_from_stress(scp,du_da):
     #du_da = calc_du_da(u,da)
 
     betaval = scp.crack_model.beta(scp.crack_model)
+
+    sigmacontact += du_da[0]*da # constant term 
     
     for aidx in range(scp.afull_idx_fine+1):
         #assert(sigma_closure[aidx] > 0)
 
-        sigmacontact[(aidx+1):] -= du_da[aidx]*((betaval/sqrt(2.0))*sqrt(x_fine[aidx]/(x_fine[(aidx+1):]-x_fine[aidx])) + 1.0)*da # + 1.0 represents stress when a large distance away from effective tip
+        sigmacontact[(aidx+1):] -= du_da[aidx+1]*((betaval/sqrt(2.0))*sqrt(x_fine[aidx]/(x_fine[(aidx+1):]-x_fine[aidx])) + 1.0)*da # + 1.0 represents stress when a large distance away from effective tip
 
         # Need to include integral 
         # of (du/da)[(1/sqrt(2))sqrt(a/(x-a)) + 1]da
@@ -443,7 +445,7 @@ def sigmacontact_from_stress(scp,du_da):
         # = (du/da)(1/sqrt(2))*sqrt(a) * (-2sqrt(x-x) + 2sqrt(x-a+da/2))  + (du/da)(da/2)
         # = (1/sqrt(2))(du/da)*sqrt(a) * 2sqrt(da/2)) + (du/da)(da/2)
 
-        sigmacontact[aidx] -= (du_da[aidx]*(betaval/sqrt(2.0))*np.sqrt(x_fine[aidx])*2.0*sqrt(da/2.0) + du_da[aidx]*da/2.0)
+        sigmacontact[aidx] -= (du_da[aidx+]*(betaval/sqrt(2.0))*np.sqrt(x_fine[aidx])*2.0*sqrt(da/2.0) + du_da[aidx+1]*da/2.0)
         pass
 
     return sigmacontact
@@ -464,7 +466,7 @@ def soft_closure_goal_function(du_da_shortened,scp,closure_index):
 
 
     #du_da = np.concatenate((np.zeros(closure_index+1,dtype='d'),du_da_shortened,np.zeros(scp.xsteps*scp.fine_refinement - scp.afull_idx_fine - 2 ,dtype='d')))
-    du_da_short = np.concatenate((np.zeros(closure_index+1,dtype='d'),du_da_shortened))  # short version goes only up to afull_idx_fine as last element (afull_idx_fine+1 elements total)
+    du_da_short = np.concatenate(((du_da_shortened[0],),np.zeros(closure_index+1,dtype='d'),du_da_shortened[1:]))  # short version goes only up to afull_idx_fine as last element (afull_idx_fine+1 elements total)
   
 
     
@@ -519,7 +521,7 @@ def calc_contact(scp,sigma_ext):
     #iniguess=np.arange(scp.afull_idx+1,dtype='d')/(scp.afull_idx+1) * sigma_ext  # This iniguess was for u
     
     # now we use du_da_shortened
-    # which is afull_idx_fine+1 numbers representing
+    # which is an initial load value, followed by afull_idx_fine+1 numbers representing
     # the distributed stress concentration
     # ... Note that the distributed stress concentration indices
     # have no effect to the left of the closure point
@@ -541,14 +543,14 @@ def calc_contact(scp,sigma_ext):
         pass
 
     #du_da_shortened_iniguess=np.ones(scp.afull_idx_fine+1,dtype='d')*(1.0/(scp.afull_idx+1)) * sigma_ext/scp.dx_fine  #
-    du_da_shortened_iniguess=np.ones(scp.afull_idx_fine+1-(closure_index+1),dtype='d')*(1.0/(scp.afull_idx+1))* sigma_ext/scp.dx_fine  #
-
+    du_da_shortened_iniguess=np.ones(scp.afull_idx_fine+2-(closure_index+1),dtype='d')*(1.0/(scp.afull_idx+1))* sigma_ext/scp.dx_fine  #
+    du_da_shortened_iniguess[0]=0.0
 
     def load_constraint_fun(du_da_shortened):
 
-        du_da_short = np.concatenate((np.zeros(closure_index+1,dtype='d'),du_da_shortened))        
+        du_da_short = np.concatenate(((du_da_shortened[0],),np.zeros(closure_index+1,dtype='d'),du_da_shortened[1:]))        
         
-
+        
         
         return (np.sum(du_da_short)*scp.dx_fine)-sigma_ext  
         
@@ -620,7 +622,7 @@ def calc_contact(scp,sigma_ext):
             pass
         
         du_da_shortened=res.x
-        du_da = np.concatenate((np.zeros(closure_index+1,dtype='d'),du_da_shortened,np.zeros(scp.xsteps*scp.fine_refinement - scp.afull_idx_fine - 2 ,dtype='d')))        
+        du_da = np.concatenate(((du_da_shortened[0],),np.zeros(closure_index+1,dtype='d'),du_da_shortened[1:],np.zeros(scp.xsteps*scp.fine_refinement - scp.afull_idx_fine - 2 ,dtype='d')))        
 
 
         pass
@@ -705,7 +707,10 @@ def calc_contact(scp,sigma_ext):
             pass
         
         du_da_shortened=res.x
-        du_da = np.concatenate((du_da_shortened,np.zeros(scp.xsteps*scp.fine_refinement - scp.afull_idx_fine - 2 ,dtype='d')))
+        #du_da = np.concatenate((du_da_shortened,np.zeros(scp.xsteps*scp.fine_refinement - scp.afull_idx_fine - 2 ,dtype='d')))
+        assert(closure_index==-1)
+        du_da = np.concatenate(((du_da_shortened[0],),np.zeros(closure_index+1,dtype='d'),du_da_shortened[1:],np.zeros(scp.xsteps*scp.fine_refinement - scp.afull_idx_fine - 2 ,dtype='d')))        
+
 
         #(contact_stress,displacement) = sigmacontact_from_displacement(scp,du_da)
         

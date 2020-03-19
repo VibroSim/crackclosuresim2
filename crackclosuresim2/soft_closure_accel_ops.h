@@ -42,7 +42,7 @@ static void sigmacontact_from_displacement(double *du_da_short,
   int cnt;
   int aidx;
   
-  for (cnt=0;cnt < du_da_short_len;cnt++) {
+  for (cnt=0;cnt < du_da_short_len-1;cnt++) {
     displacement[cnt] = crack_initial_opening_interp[cnt] - pow(sigma_closure_interp[cnt]/Lm,2.0/3.0);
 
   }
@@ -50,17 +50,17 @@ static void sigmacontact_from_displacement(double *du_da_short,
   if (crack_model.modeltype==CMT_THROUGH) {
     for (aidx=afull_idx_fine;aidx >= 0;aidx--) {
       for (cnt=0;cnt < aidx;cnt++) {
-	displacement[cnt] += (4.0/crack_model.modeldat.through.Eeff)*du_da_short[aidx]*sqrt((xfine0+aidx*dx_fine + xfine0+cnt*dx_fine)*(xfine0+aidx*dx_fine - xfine0-cnt*dx_fine))*dx_fine;
+	displacement[cnt] += (4.0/crack_model.modeldat.through.Eeff)*du_da_short[aidx+1]*sqrt((xfine0+aidx*dx_fine + xfine0+cnt*dx_fine)*(xfine0+aidx*dx_fine - xfine0-cnt*dx_fine))*dx_fine;
       }
-      displacement[aidx] += (4.0/crack_model.modeldat.through.Eeff)*du_da_short[aidx]*sqrt(2.0*(xfine0+aidx*dx_fine))*pow(dx_fine/2.0,3.0/2.0);
+      displacement[aidx] += (4.0/crack_model.modeldat.through.Eeff)*du_da_short[aidx+1]*sqrt(2.0*(xfine0+aidx*dx_fine))*pow(dx_fine/2.0,3.0/2.0);
       
     }
   } else if (crack_model.modeltype==CMT_TADA) {
     for (aidx=afull_idx_fine;aidx >= 0;aidx--) {
       for (cnt=0;cnt < aidx;cnt++) {
-	displacement[cnt] += (8.0*(1.0-pow(crack_model.modeldat.tada.nu,2.0))/(M_PI*crack_model.modeldat.tada.E))*du_da_short[aidx]*sqrt((xfine0+aidx*dx_fine + xfine0+cnt*dx_fine)*(xfine0+aidx*dx_fine - xfine0-cnt*dx_fine))*dx_fine;
+	displacement[cnt] += (8.0*(1.0-pow(crack_model.modeldat.tada.nu,2.0))/(M_PI*crack_model.modeldat.tada.E))*du_da_short[aidx+1]*sqrt((xfine0+aidx*dx_fine + xfine0+cnt*dx_fine)*(xfine0+aidx*dx_fine - xfine0-cnt*dx_fine))*dx_fine;
       }
-      displacement[aidx] += (8.0*(1.0-pow(crack_model.modeldat.tada.nu,2.0))/(M_PI*crack_model.modeldat.tada.E))*du_da_short[aidx]*sqrt(2.0*(xfine0+aidx*dx_fine))*pow(dx_fine/2.0,3.0/2.0);
+      displacement[aidx] += (8.0*(1.0-pow(crack_model.modeldat.tada.nu,2.0))/(M_PI*crack_model.modeldat.tada.E))*du_da_short[aidx+1]*sqrt(2.0*(xfine0+aidx*dx_fine))*pow(dx_fine/2.0,3.0/2.0);
       
     }
 
@@ -68,7 +68,7 @@ static void sigmacontact_from_displacement(double *du_da_short,
     assert(0);
   }
   
-  for (cnt=0;cnt < du_da_short_len;cnt++) {
+  for (cnt=0;cnt < du_da_short_len-1;cnt++) {
     if (displacement[cnt] < 0.0) {
       from_displacement[cnt] = pow(-displacement[cnt],3.0/2.0) * Lm;
       
@@ -96,8 +96,8 @@ static void sigmacontact_from_stress(double *du_da_short,
   int aidx;
   double betaval=0.0;
   
-  for (cnt=0;cnt < du_da_short_len;cnt++) {
-    from_stress[cnt] = sigma_closure_interp[cnt];
+  for (cnt=0;cnt < du_da_short_len-1;cnt++) {
+    from_stress[cnt] = sigma_closure_interp[cnt] + du_da_short[0]*dx_fine;
   
   }
   
@@ -111,9 +111,9 @@ static void sigmacontact_from_stress(double *du_da_short,
   
   for (aidx=0;aidx <= afull_idx_fine;aidx++) {
     for (cnt=aidx+1;cnt <= afull_idx_fine;cnt++) {
-      from_stress[cnt] -= du_da_short[aidx]*((betaval/M_SQRT2)*sqrt((xfine0+aidx*dx_fine)/(xfine0+cnt*dx_fine - xfine0-aidx*dx_fine)) + 1.0)*dx_fine;
+      from_stress[cnt] -= du_da_short[aidx+1]*((betaval/M_SQRT2)*sqrt((xfine0+aidx*dx_fine)/(xfine0+cnt*dx_fine - xfine0-aidx*dx_fine)) + 1.0)*dx_fine;
     }
-    from_stress[aidx] -= (du_da_short[aidx]*(betaval/M_SQRT2)*sqrt(xfine0+aidx*dx_fine)*2.0*sqrt(dx_fine/2.0) + du_da_short[aidx]*dx_fine/2.0);
+    from_stress[aidx] -= (du_da_short[aidx+1]*(betaval/M_SQRT2)*sqrt(xfine0+aidx*dx_fine)*2.0*sqrt(dx_fine/2.0) + du_da_short[aidx+1]*dx_fine/2.0);
   }
 }
 
@@ -132,14 +132,16 @@ static double initialize_contact_goal_function_c(double *du_da_shortened,int du_
   du_da_short = malloc(sizeof(double)*du_da_short_len);
   
   for (cnt=0;cnt < du_da_short_len;cnt++) {
-    if (cnt <= closure_index) {
+    if (cnt == 0) {
+      du_da_short[cnt]=du_da_shortened[cnt];
+    } else if (cnt <= closure_index+1) {
       du_da_short[cnt]=0.0;
     } else {
-      du_da_short[cnt]=du_da_shortened[cnt-closure_index-1];
+      du_da_short[cnt]=du_da_shortened[cnt-closure_index-1+1];
     }
   }
   
-  from_stress = malloc(sizeof(double)*du_da_short_len);
+  from_stress = malloc(sizeof(double)*(du_da_short_len-1));
 
   
   sigmacontact_from_stress(du_da_short,du_da_short_len,
@@ -151,7 +153,7 @@ static double initialize_contact_goal_function_c(double *du_da_shortened,int du_
 			   from_stress);
 
 
-  for (cnt=0;cnt < du_da_short_len;cnt++) {
+  for (cnt=0;cnt < du_da_short_len-1;cnt++) {
     residual += pow(sigma_closure_interp[cnt]-from_stress[cnt],2.0);
     
   }
@@ -179,16 +181,18 @@ static double soft_closure_goal_function_c(double *du_da_shortened,int du_da_sho
   du_da_short = malloc(sizeof(double)*du_da_short_len);
   
   for (cnt=0;cnt < du_da_short_len;cnt++) {
-    if (cnt <= closure_index) {
+    if (cnt == 0) {
+      du_da_short[cnt] = du_da_shortened[cnt];
+    } else if (cnt <= closure_index+1) {
       du_da_short[cnt]=0.0;
     } else {
-      du_da_short[cnt]=du_da_shortened[cnt-closure_index-1];
+      du_da_short[cnt]=du_da_shortened[cnt-closure_index-1+1];
     }
   }
   
-  from_displacement = malloc(sizeof(double)*du_da_short_len);
-  displacement = malloc(sizeof(double)*du_da_short_len);
-  from_stress = malloc(sizeof(double)*du_da_short_len);
+  from_displacement = malloc(sizeof(double)*(du_da_short_len-1));
+  displacement = malloc(sizeof(double)*(du_da_short_len-1));
+  from_stress = malloc(sizeof(double)*(du_da_short_len-1));
 
   // dirty little trick to run sigmacontact_from_displacement()
   // and sigmacontact_from_stress() in parallel if possible with
@@ -227,10 +231,10 @@ static double soft_closure_goal_function_c(double *du_da_shortened,int du_da_sho
   // up to the point before the last... why?
   //  well the last point corresponds to the crack tip, which
   // CAN hold tension and doesn't have to follow the contact stress
-  // law... so we only iterate up to du_da_short_len-1,
+  // law... so we only iterate up to du_da_short_len-2,
   // representing that a stress concentration
   //  at the crack tip is OK for our goal 
-  for (cnt=0;cnt < du_da_short_len-1;cnt++) {
+  for (cnt=0;cnt < du_da_short_len-2;cnt++) {
     residual += pow(from_displacement[cnt]-from_stress[cnt],2.0);
     average = (from_displacement[cnt]+from_stress[cnt])/2.0;
 
