@@ -436,18 +436,31 @@ def sigmacontact_from_stress(scp,du_da):
 
         #sigmacontact[(aidx+1):] -= du_da[aidx+1]*((betaval/sqrt(2.0))*sqrt(x_fine[aidx]/(x_fine[(aidx+1):]-x_fine[aidx])) + 1.0)*da # + 1.0 represents stress when a large distance away from effective tip
 
-        sigmacontact[(aidx+1):] -= du_da[aidx+1]*((sqrt(betaval)/sqrt(2.0))*sqrt(x_fine[aidx]/(x_fine[(aidx+1):]-x_fine[aidx])) + 1.0)*da # + 1.0 represents stress when a large distance away from effective tip
+        a = x_fine[aidx]
+        r = (x_fine[(aidx+1):]-a)
+        sigmacontact[(aidx+1):] -= du_da[aidx+1]*((sqrt(betaval)/sqrt(2.0))*sqrt(a/r)*exp(-r/(scp.crack_model.r0_over_a*a)) + 1.0)*da # + 1.0 represents stress when a large distance away from effective tip
 
         # Need to include integral 
-        # of (du/da)[(1/sqrt(2))sqrt(a/(x-a)) + 1]da
+        # of (du/da)[(1/sqrt(2))sqrt(a/(x-a))exp(-(x-a)/r0) + 1]da
         # as a goes from x[aidx]-da/2 to x[aidx]
-        # approximate sqrt(x-a) as only a dependence
-        # (du/da)*(1/sqrt(2))*sqrt(a)*integral of sqrt(1/(x-a)) da + integral of du/da da
+        # approximate sqrt(x-a)*exp(-(x-a)/r0) as only a dependence
+        # (du/da)*(1/sqrt(2))*sqrt(a)*integral of sqrt(1/(x-a))*exp(-(x-a)/r0) da + integral of du/da da
         # as a goes from x[aidx]-da/2 to x[aidx]
-        # = (du/da)(1/sqrt(2))*sqrt(a) * (-2sqrt(x-x) + 2sqrt(x-a+da/2))  + (du/da)(da/2)
-        # = (1/sqrt(2))(du/da)*sqrt(a) * 2sqrt(da/2)) + (du/da)(da/2)
+        # = (du/da)(1/sqrt(2))*sqrt(a) * (-sqrt(pi*r0)*erf(sqrt(x-a)/sqrt(r0))) as a goes from x[aidx]-da/2 to x[aidx]  ...  + (du/da)(da/2)
 
-        sigmacontact[aidx] -= (du_da[aidx+]*(sqrt(betaval)/sqrt(2.0))*np.sqrt(x_fine[aidx])*2.0*sqrt(da/2.0) + du_da[aidx+1]*da/2.0)
+        # = (du/da)(1/sqrt(2))*sqrt(a) * [ -sqrt(pi*r0)*erf(sqrt(x-x[aidx])/sqrt(r0)) + sqrt(pi*r0)*erf(sqrt(x-x[aidx]+da/2)/sqrt(r0)) ] + (du/da)(da/2)
+
+        # = (du/da)(1/sqrt(2))*sqrt(a) * [ -sqrt(pi*r0)*erf(sqrt(0)/sqrt(r0)) + sqrt(pi*r0)*erf(sqrt(da/2)/sqrt(r0)) ] + (du/da)(da/2)
+
+        # = (du/da)(1/sqrt(2))*sqrt(a) * [ sqrt(pi*r0)*erf(sqrt(da/2)/sqrt(r0)) ] + (du/da)(da/2)
+
+        sigmacontact[aidx] -= (du_da[aidx+1]*(sqrt(betaval)/sqrt(2.0))*np.sqrt(x_fine[aidx])*sqrt(np.pi*r0_over_a*a)*erf(sqrt(da/(2.0*r0_over_a*a))) + du_da[aidx+1]*da/2.0)
+        
+        ## OBSOLETE
+        ## = (du/da)(1/sqrt(2))*sqrt(a) * (-2sqrt(x-x) + 2sqrt(x-a+da/2))  + (du/da)(da/2)
+        ## = (1/sqrt(2))(du/da)*sqrt(a) * 2sqrt(da/2)) + (du/da)(da/2)
+
+        ##sigmacontact[aidx] -= (du_da[aidx+1]*(sqrt(betaval)/sqrt(2.0))*np.sqrt(x_fine[aidx])*2.0*sqrt(da/2.0) + du_da[aidx+1]*da/2.0)
         pass
 
     return sigmacontact

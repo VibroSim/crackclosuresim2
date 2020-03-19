@@ -9,12 +9,14 @@ cimport numpy as np
 cdef extern from "soft_closure_accel_ops.h":
     cdef struct crack_model_throughcrack_t:
         double Eeff
-        double Beta 
+        double Beta
+        double r0_over_a
         pass
     cdef struct crack_model_tada_t:
         double E
         double nu 
-        double Beta 
+        double Beta
+        double r0_over_a
         pass
     cdef struct modeldat_t:
         crack_model_throughcrack_t through
@@ -61,12 +63,14 @@ def initialize_contact_goal_function_accel(np.ndarray[np.float64_t,ndim=1] du_da
         crack_model.modeltype=CMT_THROUGH
         crack_model.modeldat.through.Eeff = scp.crack_model.Eeff
         crack_model.modeldat.through.Beta = scp.crack_model.beta(scp.crack_model)
+        crack_model.modeldat.through.r0_over_a = scp.crack_model.r0_over_a
         pass
     elif isinstance(scp.crack_model,Tada_ModeI_CircularCrack_along_midline):
         crack_model.modeltype=CMT_TADA
         crack_model.modeldat.tada.E = scp.crack_model.E
         crack_model.modeldat.tada.nu = scp.crack_model.nu
         crack_model.modeldat.tada.Beta = scp.crack_model.beta(scp.crack_model)
+        crack_model.modeldat.tada.r0_over_a = scp.crack_model.r0_over_a
         pass
     
 
@@ -104,16 +108,19 @@ def soft_closure_goal_function_accel(np.ndarray[np.float64_t,ndim=1] du_da_short
         crack_model.modeltype=CMT_THROUGH
         crack_model.modeldat.through.Eeff = scp.crack_model.Eeff
         crack_model.modeldat.through.Beta = scp.crack_model.beta(scp.crack_model)
+        crack_model.modeldat.through.r0_over_a = scp.crack_model.r0_over_a
         pass
     elif isinstance(scp.crack_model,Tada_ModeI_CircularCrack_along_midline):
         crack_model.modeltype=CMT_TADA
         crack_model.modeldat.tada.E = scp.crack_model.E
         crack_model.modeldat.tada.nu = scp.crack_model.nu
         crack_model.modeldat.tada.Beta = scp.crack_model.beta(scp.crack_model)
+        crack_model.modeldat.tada.r0_over_a = scp.crack_model.r0_over_a
     else:
         crack_model.modeltype=CMT_THROUGH
         crack_model.modeldat.through.Eeff = 0.0
         crack_model.modeldat.through.Beta = 0.0
+        crack_model.modeldat.through.r0_over_a = 0.0
         raise ValueError("Invalid crack model class")
     
     
