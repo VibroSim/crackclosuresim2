@@ -47,6 +47,8 @@ class ModeI_Beta_COD_Formula(ModeI_crack_model):
 
     u=None
     beta=None
+
+    
     
     def __init__(self,**kwargs):
         if "u" not in kwargs:
@@ -1757,7 +1759,36 @@ def ModeI_throughcrack_weightfun(Eeff,x,epsx):
                                      use_surrogate=True)
 
 class ModeI_throughcrack_CODformula(ModeI_Beta_COD_Formula):
+    @property
+    def r0_over_a(self):
+        """
+        The baseline approximation of the stress field beyond the crack
+        tip is K/sqrt(2*pi*r), but this is only valid within perhaps a/10
+        of the tip. 
 
+        Initially we approximated the stress field as 
+        K/sqrt(2*pi*r) + sigma_infty so that the stress would approach
+        the correct value as r -> infty. Unfortunately this doesn't 
+        satisfy force balance (in fact if you integrate it, it fails
+        to converge!). 
+
+        So our fix is to approximate the stress field as 
+        (K/sqrt(2*pi*r))*exp(-r/r0) + sigma_infty, where 
+        r0 is selected to satisfy force balance between the load 
+        not held over the cracked region and the stress concentration
+        beyond the tip. 
+
+
+        r0 is the characteristic radius for exponential decay 
+        of the 1/sqrt(r) term
+
+        Assuming K has the form sigma*sqrt(pi*a*beta) for a through
+        crack in a thin plate, then per total_load_matching.xoj, 
+        r0 = 2a/(pi*beta) 
+        """
+        return 2.0/(np.pi*self.beta)
+    
+        
     def __init__(self,Eeff):
         def u(Eeff,sigma_applied,x,xt):
             # Non weightfunction method:
@@ -1789,6 +1820,11 @@ class ModeI_throughcrack_CODformula(ModeI_Beta_COD_Formula):
 
 
 class Tada_ModeI_CircularCrack_along_midline(ModeI_Beta_COD_Formula):
+    @property
+    def r0_over_a(self):
+        """!!!**** This the formula for a through crack... need to 
+        correct it for a circular crack !!!*** """
+        return 2.0/(np.pi*self.beta)
 
     def __init__(self,E,nu):
         def u(E,nu,sigma_applied,x,xt):
