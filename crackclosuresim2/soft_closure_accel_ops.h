@@ -102,16 +102,16 @@ static void sigmacontact_from_stress(double *du_da_short,
   double r0_over_a;
   
   for (cnt=0;cnt < du_da_short_len-1;cnt++) {
-    from_stress[cnt] = sigma_closure_interp[cnt] + du_da_short[0]*dx_fine;
+    from_stress[cnt] = sigma_closure_interp[cnt] - du_da_short[0]*dx_fine;
   
   }
   
   if (crack_model.modeltype==CMT_THROUGH) {
     sqrt_betaval = sqrt(crack_model.modeldat.through.Beta);
-    r0_over_a = crackmodel.modeldat.through.r0_over_a;
+    r0_over_a = crack_model.modeldat.through.r0_over_a;
   } else if (crack_model.modeltype==CMT_TADA) {
     sqrt_betaval = sqrt(crack_model.modeldat.tada.Beta);
-    r0_over_a = crackmodel.modeldat.tada.r0_over_a;
+    r0_over_a = crack_model.modeldat.tada.r0_over_a;
   } else {
     assert(0);    
   }

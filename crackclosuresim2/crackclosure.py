@@ -1786,7 +1786,7 @@ class ModeI_throughcrack_CODformula(ModeI_Beta_COD_Formula):
         crack in a thin plate, then per total_load_matching.xoj, 
         r0 = 2a/(pi*beta) 
         """
-        return 2.0/(np.pi*self.beta)
+        return 2.0/(np.pi*self.beta(self))
     
         
     def __init__(self,Eeff):
@@ -1824,7 +1824,7 @@ class Tada_ModeI_CircularCrack_along_midline(ModeI_Beta_COD_Formula):
     def r0_over_a(self):
         """!!!**** This the formula for a through crack... need to 
         correct it for a circular crack !!!*** """
-        return 2.0/(np.pi*self.beta)
+        return 2.0/(np.pi*self.beta(self))
 
     def __init__(self,E,nu):
         def u(E,nu,sigma_applied,x,xt):

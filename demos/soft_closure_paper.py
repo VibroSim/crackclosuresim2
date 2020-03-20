@@ -91,7 +91,7 @@ if __name__=="__main__":
     pl.grid()
     pl.savefig('/tmp/closurestress.png',dpi=300)
     
-    du_da=np.zeros(scp.x.shape[0],dtype='d')
+    du_da=np.zeros(scp.x.shape[0]+1,dtype='d')
 
     soft_closure_plots(scp,du_da,titleprefix="Initial: ")
 

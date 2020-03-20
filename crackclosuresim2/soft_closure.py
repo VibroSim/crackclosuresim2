@@ -1,7 +1,8 @@
 import copy
 import sys
 import numpy as np
-from numpy import sqrt,log,pi,cos,arctan
+from numpy import sqrt,log,pi,cos,arctan,exp
+from scipy.special import erf
 import scipy.optimize
 import scipy as sp
 
@@ -164,7 +165,7 @@ class sc_params(object):
 
         while niter < total_maxiter and not terminate: 
             this_niter=10000
-            res = scipy.optimize.minimize(initialize_contact_goal_function_accel,starting_value,args=(self,sigma_closure_interp,closure_index),
+            res = scipy.optimize.minimize(initialize_contact_goal_function,starting_value,args=(self,sigma_closure_interp,closure_index), # was initialize_contact_goal_function_accel
                                           constraints = constraints,
                                           method="SLSQP",
                                           options={"eps": epsvalscaled,
@@ -429,7 +430,7 @@ def sigmacontact_from_stress(scp,du_da):
 
     betaval = scp.crack_model.beta(scp.crack_model)
 
-    sigmacontact += du_da[0]*da # constant term 
+    sigmacontact -= du_da[0]*da # constant term 
     
     for aidx in range(scp.afull_idx_fine+1):
         #assert(sigma_closure[aidx] > 0)
@@ -454,7 +455,7 @@ def sigmacontact_from_stress(scp,du_da):
 
         # = (du/da)(1/sqrt(2))*sqrt(a) * [ sqrt(pi*r0)*erf(sqrt(da/2)/sqrt(r0)) ] + (du/da)(da/2)
 
-        sigmacontact[aidx] -= (du_da[aidx+1]*(sqrt(betaval)/sqrt(2.0))*np.sqrt(x_fine[aidx])*sqrt(np.pi*r0_over_a*a)*erf(sqrt(da/(2.0*r0_over_a*a))) + du_da[aidx+1]*da/2.0)
+        sigmacontact[aidx] -= (du_da[aidx+1]*(sqrt(betaval)/sqrt(2.0))*np.sqrt(x_fine[aidx])*sqrt(np.pi*scp.crack_model.r0_over_a*a)*erf(sqrt(da/(2.0*scp.crack_model.r0_over_a*a))) + du_da[aidx+1]*da/2.0)
         
         ## OBSOLETE
         ## = (du/da)(1/sqrt(2))*sqrt(a) * (-2sqrt(x-x) + 2sqrt(x-a+da/2))  + (du/da)(da/2)
@@ -559,7 +560,7 @@ def calc_contact(scp,sigma_ext):
 
     #du_da_shortened_iniguess=np.ones(scp.afull_idx_fine+1,dtype='d')*(1.0/(scp.afull_idx+1)) * sigma_ext/scp.dx_fine  #
     du_da_shortened_iniguess=np.ones(scp.afull_idx_fine+2-(closure_index+1),dtype='d')*(1.0/(scp.afull_idx+1))* sigma_ext/scp.dx_fine  #
-    du_da_shortened_iniguess[0]=0.0
+    #du_da_shortened_iniguess[0]=0.0
 
     def load_constraint_fun(du_da_shortened):
 
@@ -599,7 +600,7 @@ def calc_contact(scp,sigma_ext):
         while niter < total_maxiter and not terminate: 
             this_niter=10000
             print("calling scipy.optimize.minimize; sigma_ext=%g; eps=%g maxiter=%d ftol=%g" % (sigma_ext,epsvalscaled,this_niter,scp.afull_idx_fine*(np.abs(sigma_ext)+20e6)**2.0/1e14))
-            res = scipy.optimize.minimize(soft_closure_goal_function_accel,starting_value,args=(scp,closure_index),
+            res = scipy.optimize.minimize(soft_closure_goal_function,starting_value,args=(scp,closure_index),   # was soft_closure_goal_function_accel
                                           constraints = [ load_constraint ], #[ nonnegative_constraint, load_constraint ],
                                           method="SLSQP",
                                           options={"eps": epsvalscaled,
@@ -684,7 +685,7 @@ def calc_contact(scp,sigma_ext):
         starting_value=du_da_shortened_iniguess
         while niter < total_maxiter and not terminate: 
             this_niter=10000
-            res = scipy.optimize.minimize(soft_closure_goal_function_accel,starting_value,args=(scp,closure_index),
+            res = scipy.optimize.minimize(soft_closure_goal_function,starting_value,args=(scp,closure_index),   # was soft_closure_goal_function_accel
                                           constraints = constraints,
                                           method="SLSQP",
                                           options={"eps": epsvalscaled,
@@ -768,6 +769,8 @@ def soft_closure_plots(scp,du_da,titleprefix=""):
     #du_da = calc_du_da(u,scp.dx_fine)
 
 
+    x_du_da = np.concatenate(((scp.x_fine[0]-scp.dx_fine,),scp.x_fine))
+    
     
     (from_displacement,displacement) = sigmacontact_from_displacement(scp,du_da)
     from_stress = sigmacontact_from_stress(scp,du_da)
@@ -796,7 +799,7 @@ def soft_closure_plots(scp,du_da,titleprefix=""):
 
     duda_plot = pl.figure()
     pl.clf()
-    pl.plot(scp.x_fine*1e3,du_da/1e12,'-')
+    pl.plot(x_du_da*1e3,du_da/1e12,'-')
     pl.grid()
     pl.title(titleprefix+"distributed stress concentration derivative\ntotal load=%f MPa" % (u[scp.afull_idx_fine]/1e6))
     pl.xlabel('Position (mm)')
