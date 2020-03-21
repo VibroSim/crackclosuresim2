@@ -32,7 +32,7 @@ cdef extern from "soft_closure_accel_ops.h":
     cdef int CMT_TADA
     pass
 
-    cdef double initialize_contact_goal_function_c(double *du_da_shortened,int du_da_shortened_len,int closure_index,unsigned xsteps,unsigned fine_refinement,int afull_idx_fine,double *sigma_closure_interp,double xfine0,double dx_fine,double Lm,crack_model_t crack_model)
+    cdef double initialize_contact_goal_function_c(double *du_da_shortened,int du_da_shortened_len,int closure_index,unsigned xsteps,unsigned fine_refinement,int afull_idx_fine,double *scp_sigma_closure_interp,double *sigma_closure_interp,double xfine0,double dx_fine,double Lm,crack_model_t crack_model)
     cdef double soft_closure_goal_function_c(double *du_da_shortened,int du_da_shortened_len,int closure_index,unsigned xsteps,unsigned fine_refinement,int afull_idx_fine,double *crack_initial_opening_interp,double *sigma_closure_interp,double xfine0,double dx_fine,double Lm,crack_model_t crack_model)
 
 def initialize_contact_goal_function_accel(np.ndarray[np.float64_t,ndim=1] du_da_shortened,scp,np.ndarray[np.float64_t,ndim=1] sigma_closure_interp,int closure_index):
@@ -41,7 +41,7 @@ def initialize_contact_goal_function_accel(np.ndarray[np.float64_t,ndim=1] du_da
     # ***NOTE: Could define a separate version that doesn't
     # bother to calculate  dsigmaext_dxt_hardcontact_interp when calculating
     # compressive (sigma_ext < 0) loads. 
-
+    cdef np.ndarray[np.float64_t,ndim=1] scp_sigma_closure_interp
     cdef unsigned xsteps
     cdef unsigned fine_refinement
     cdef int afull_idx_fine
@@ -50,7 +50,8 @@ def initialize_contact_goal_function_accel(np.ndarray[np.float64_t,ndim=1] du_da
     cdef crack_model_t crack_model;
     cdef double Lm
     
-    
+
+    scp_sigma_closure_interp = scp.sigma_closure_interp
     xsteps = scp.xsteps
     fine_refinement = scp.fine_refinement
     afull_idx_fine = scp.afull_idx_fine
@@ -74,7 +75,7 @@ def initialize_contact_goal_function_accel(np.ndarray[np.float64_t,ndim=1] du_da
         pass
     
 
-    return initialize_contact_goal_function_c(<double *>du_da_shortened.data,du_da_shortened.shape[0],closure_index,xsteps,fine_refinement,afull_idx_fine,<double *>sigma_closure_interp.data,xfine0,dx_fine,Lm,crack_model)
+    return initialize_contact_goal_function_c(<double *>du_da_shortened.data,du_da_shortened.shape[0],closure_index,xsteps,fine_refinement,afull_idx_fine,<double *>scp_sigma_closure_interp.data,<double *>sigma_closure_interp.data,xfine0,dx_fine,Lm,crack_model)
 
 
 def soft_closure_goal_function_accel(np.ndarray[np.float64_t,ndim=1] du_da_shortened,scp,int closure_index):

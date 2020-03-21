@@ -204,6 +204,12 @@ class sc_params(object):
         # Verify proper operation of accelerated code
         slowcalc = initialize_contact_goal_function(res.x,self,sigma_closure_interp,closure_index)
         fastcalc = initialize_contact_goal_function_accel(res.x,self,sigma_closure_interp,closure_index)
+
+        if abs((slowcalc-fastcalc)/slowcalc) >= 1e-6:
+            from VibroSim_Simulator.function_as_script import scriptify
+            slowcalc2 = scriptify(initialize_contact_goal_function)(res.x,self,sigma_closure_interp,closure_index)
+            raise ValueError("Accelerated calculation mismatch: %g vs %g" % (slowcalc2,fastcalc))
+            pass
         assert(abs((slowcalc-fastcalc)/slowcalc) < 1e-6)
         
         du_da_shortened=res.x

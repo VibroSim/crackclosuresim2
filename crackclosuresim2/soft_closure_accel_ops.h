@@ -84,14 +84,14 @@ static void sigmacontact_from_displacement(double *du_da_short,
 
 
 static void sigmacontact_from_stress(double *du_da_short,
-					   int du_da_short_len,
-					   int afull_idx_fine,
-					   double *sigma_closure_interp,
-					   double xfine0,
-					   double dx_fine,
-					   struct crack_model_t crack_model,
-					   // Output parameters
-					   double *from_stress)
+				     int du_da_short_len,
+				     int afull_idx_fine,
+				     double *scp_sigma_closure_interp, // scp.sigma_closure_interp.... NOT NECESSARILY caller's sigma_closure_interp variable
+				     double xfine0,
+				     double dx_fine,
+				     struct crack_model_t crack_model,
+				     // Output parameters
+				     double *from_stress)
 // NOTE: This should be kept functionally identical to sigmacontact_from_stress() in soft_closure.py
 {
   int cnt;
@@ -102,9 +102,10 @@ static void sigmacontact_from_stress(double *du_da_short,
   double r0_over_a;
   
   for (cnt=0;cnt < du_da_short_len-1;cnt++) {
-    from_stress[cnt] = sigma_closure_interp[cnt] - du_da_short[0]*dx_fine;
+    from_stress[cnt] = scp_sigma_closure_interp[cnt] - du_da_short[0]*dx_fine;
 
   }
+  //printf("scp_sigma_closure_interp[0]=%g; du_da_short[0]=%g; dx_fine=%g\n",scp_sigma_closure_interp[0],du_da_short[0],dx_fine);
   //printf("from_stress[0]=%g\n",from_stress[0]);
   
   if (crack_model.modeltype==CMT_THROUGH) {
@@ -137,9 +138,24 @@ static void sigmacontact_from_stress(double *du_da_short,
   }
 }
 
+static void print_array(char *name,double *ptr,int numelem)
+{
+  int cnt;
+  
+  printf("%s = [ ",name);
+
+  for (cnt=0;cnt < numelem;cnt++) {
+    if (cnt % 6 == 0) {
+      printf("\n");
+    }
+    printf("%g, ", ptr[cnt]);
+  }
+  printf(" ]\n");
+  
+}
 
 
-static double initialize_contact_goal_function_c(double *du_da_shortened,int du_da_shortened_len,int closure_index,unsigned xsteps,unsigned fine_refinement,int afull_idx_fine,double *sigma_closure_interp,double xfine0,double dx_fine,double Lm,struct crack_model_t crack_model)
+static double initialize_contact_goal_function_c(double *du_da_shortened,int du_da_shortened_len,int closure_index,unsigned xsteps,unsigned fine_refinement,int afull_idx_fine,double *scp_sigma_closure_interp,double *sigma_closure_interp,double xfine0,double dx_fine,double Lm,struct crack_model_t crack_model)
 // NOTE: This should be kept identical functionally to initialize_contact_goal_function in soft_closure_accel.py
 {
   double *du_da_short;
@@ -166,7 +182,7 @@ static double initialize_contact_goal_function_c(double *du_da_shortened,int du_
   
   sigmacontact_from_stress(du_da_short,du_da_short_len,
 			   afull_idx_fine,
-			   sigma_closure_interp,
+			   scp_sigma_closure_interp,
 			   xfine0,
 			   dx_fine,
 			   crack_model,
@@ -177,6 +193,9 @@ static double initialize_contact_goal_function_c(double *du_da_shortened,int du_
     residual += pow(sigma_closure_interp[cnt]-from_stress[cnt],2.0);
     
   }
+  //print_array("sigma_closure_interp",sigma_closure_interp,du_da_short_len-1);
+  //print_array("from_stress",from_stress,du_da_short_len-1);
+
   free(from_stress);
   free(du_da_short);
 
@@ -184,21 +203,6 @@ static double initialize_contact_goal_function_c(double *du_da_shortened,int du_
 }
 
 
-static void print_array(char *name,double *ptr,int numelem)
-{
-  int cnt;
-  
-  printf("%s = [ ",name);
-
-  for (cnt=0;cnt < numelem;cnt++) {
-    if (cnt % 6 == 0) {
-      printf("\n");
-    }
-    printf("%g, ", ptr[cnt]);
-  }
-  printf(" ]\n");
-  
-}
 
 static double soft_closure_goal_function_c(double *du_da_shortened,int du_da_shortened_len,int closure_index,unsigned xsteps,unsigned fine_refinement,int afull_idx_fine,double *crack_initial_opening_interp,double *sigma_closure_interp,double xfine0,double dx_fine,double Lm,struct crack_model_t crack_model)
 // NOTE: This should be kept identical functionally to soft_closure_goal_function in soft_closure_accel.py
