@@ -1822,10 +1822,9 @@ class ModeI_throughcrack_CODformula(ModeI_Beta_COD_Formula):
 class Tada_ModeI_CircularCrack_along_midline(ModeI_Beta_COD_Formula):
     @property
     def r0_over_a(self):
-        """!!!**** This the formula for a through crack... need to 
-        correct it for a circular crack !!!*** """
-        return 2.0/(np.pi*self.beta(self))
-
+        """Based on calculation given in total_load_matching_hhmolden_2D_half_penny_crack.pdf"""
+        return (2.0/(np.pi*self.beta(self)))**(1.0/3.0)
+    
     def __init__(self,E,nu):
         def u(E,nu,sigma_applied,x,xt):
             # For a circular crack in an infinite space,
