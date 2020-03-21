@@ -32,31 +32,29 @@ cdef extern from "soft_closure_accel_ops.h":
     cdef int CMT_TADA
     pass
 
-    cdef double initialize_contact_goal_function_c(double *du_da_shortened,int du_da_shortened_len,int closure_index,unsigned xsteps,unsigned fine_refinement,int afull_idx_fine,double *scp_sigma_closure_interp,double *sigma_closure_interp,double xfine0,double dx_fine,double Lm,crack_model_t crack_model)
-    cdef double soft_closure_goal_function_c(double *du_da_shortened,int du_da_shortened_len,int closure_index,unsigned xsteps,unsigned fine_refinement,int afull_idx_fine,double *crack_initial_opening_interp,double *sigma_closure_interp,double xfine0,double dx_fine,double Lm,crack_model_t crack_model)
+    cdef double initialize_contact_goal_function_c(double *du_da_shortened,int du_da_shortened_len,int closure_index,unsigned xsteps,int afull_idx,double *scp_sigma_closure,double *sigma_closure,double x0,double dx,double Lm,crack_model_t crack_model)
+    cdef double soft_closure_goal_function_c(double *du_da_shortened,int du_da_shortened_len,int closure_index,unsigned xsteps,int afull_idx,double *crack_initial_opening,double *sigma_closure,double x0,double dx,double Lm,crack_model_t crack_model)
 
-def initialize_contact_goal_function_accel(np.ndarray[np.float64_t,ndim=1] du_da_shortened,scp,np.ndarray[np.float64_t,ndim=1] sigma_closure_interp,int closure_index):
+def initialize_contact_goal_function_accel(np.ndarray[np.float64_t,ndim=1] du_da_shortened,scp,np.ndarray[np.float64_t,ndim=1] sigma_closure,int closure_index):
     """ NOTE: This should be kept identical functionally to initialize_contact_goal_function in soft_closure.py"""
 
     # ***NOTE: Could define a separate version that doesn't
     # bother to calculate  dsigmaext_dxt_hardcontact_interp when calculating
     # compressive (sigma_ext < 0) loads. 
-    cdef np.ndarray[np.float64_t,ndim=1] scp_sigma_closure_interp
+    cdef np.ndarray[np.float64_t,ndim=1] scp_sigma_closure
     cdef unsigned xsteps
-    cdef unsigned fine_refinement
-    cdef int afull_idx_fine
-    cdef double xfine0  # first refined x position
-    cdef double dx_fine
+    cdef int afull_idx
+    cdef double x0  # first x position
+    cdef double dx
     cdef crack_model_t crack_model;
     cdef double Lm
     
 
-    scp_sigma_closure_interp = scp.sigma_closure_interp
+    scp_sigma_closure = scp.sigma_closure
     xsteps = scp.xsteps
-    fine_refinement = scp.fine_refinement
-    afull_idx_fine = scp.afull_idx_fine
-    xfine0 = scp.x_fine[0]
-    dx_fine = scp.dx_fine
+    afull_idx = scp.afull_idx
+    x0 = scp.x[0]
+    dx = scp.dx
     Lm = scp.Lm
 
     if isinstance(scp.crack_model,ModeI_throughcrack_CODformula):
@@ -75,7 +73,7 @@ def initialize_contact_goal_function_accel(np.ndarray[np.float64_t,ndim=1] du_da
         pass
     
 
-    return initialize_contact_goal_function_c(<double *>du_da_shortened.data,du_da_shortened.shape[0],closure_index,xsteps,fine_refinement,afull_idx_fine,<double *>scp_sigma_closure_interp.data,<double *>sigma_closure_interp.data,xfine0,dx_fine,Lm,crack_model)
+    return initialize_contact_goal_function_c(<double *>du_da_shortened.data,du_da_shortened.shape[0],closure_index,xsteps,afull_idx,<double *>scp_sigma_closure.data,<double *>sigma_closure.data,x0,dx,Lm,crack_model)
 
 
 def soft_closure_goal_function_accel(np.ndarray[np.float64_t,ndim=1] du_da_shortened,scp,int closure_index):
@@ -85,23 +83,21 @@ def soft_closure_goal_function_accel(np.ndarray[np.float64_t,ndim=1] du_da_short
     # compressive (sigma_ext < 0) loads. 
 
     cdef unsigned xsteps
-    cdef unsigned fine_refinement
-    cdef int afull_idx_fine
-    cdef np.ndarray[np.float64_t,ndim=1] crack_initial_opening_interp
-    cdef np.ndarray[np.float64_t,ndim=1] sigma_closure_interp
-    cdef double xfine0  # first refined x position
-    cdef double dx_fine
+    cdef int afull_idx
+    cdef np.ndarray[np.float64_t,ndim=1] crack_initial_opening
+    cdef np.ndarray[np.float64_t,ndim=1] sigma_closure
+    cdef double x0  # first refined x position
+    cdef double dx
     cdef crack_model_t crack_model;
     cdef double Lm
     
     
     xsteps = scp.xsteps
-    fine_refinement = scp.fine_refinement 
-    afull_idx_fine = scp.afull_idx_fine
-    crack_initial_opening_interp = scp.crack_initial_opening_interp
-    sigma_closure_interp = scp.sigma_closure_interp
-    xfine0 = scp.x_fine[0]
-    dx_fine = scp.dx_fine
+    afull_idx = scp.afull_idx
+    crack_initial_opening = scp.crack_initial_opening
+    sigma_closure = scp.sigma_closure
+    x0 = scp.x[0]
+    dx = scp.dx
     Lm = scp.Lm 
 
     if isinstance(scp.crack_model,ModeI_throughcrack_CODformula):
@@ -125,4 +121,4 @@ def soft_closure_goal_function_accel(np.ndarray[np.float64_t,ndim=1] du_da_short
         raise ValueError("Invalid crack model class")
     
     
-    return soft_closure_goal_function_c(<double *>du_da_shortened.data,du_da_shortened.shape[0],closure_index,xsteps,fine_refinement,afull_idx_fine,<double *>crack_initial_opening_interp.data,<double *>sigma_closure_interp.data,xfine0,dx_fine,Lm,crack_model)
+    return soft_closure_goal_function_c(<double *>du_da_shortened.data,du_da_shortened.shape[0],closure_index,xsteps,afull_idx,<double *>crack_initial_opening.data,<double *>sigma_closure.data,x0,dx,Lm,crack_model)

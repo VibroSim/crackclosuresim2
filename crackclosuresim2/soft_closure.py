@@ -29,15 +29,15 @@ class sc_params(object):
     dx = None 
     x = None
     afull_idx = None
-    fine_refinement = None
-    dx_fine = None
-    xbnd_fine = None
-    x_fine = None
-    afull_idx_fine = None
+    #fine_refinement = None
+    #dx_fine = None
+    #xbnd_fine = None
+    #x_fine = None
+    #afull_idx_fine = None
     sigma_closure = None
-    sigma_closure_interp = None
+    #sigma_closure_interp = None
     crack_initial_opening = None
-    crack_initial_opening_interp = None
+    #crack_initial_opening_interp = None
 
     def __init__(self,**kwargs):
         for argname in kwargs:
@@ -54,11 +54,11 @@ class sc_params(object):
 
     def setcrackstate(self,sigma_closure,crack_initial_opening):
         self.sigma_closure=sigma_closure
-        self.sigma_closure_interp=scipy.interpolate.interp1d(self.x,self.sigma_closure,kind="linear",fill_value="extrapolate")(self.x_fine)
+        #self.sigma_closure_interp=scipy.interpolate.interp1d(self.x,self.sigma_closure,kind="linear",fill_value="extrapolate")(self.x_fine)
 
         
         self.crack_initial_opening=crack_initial_opening
-        self.crack_initial_opening_interp=scipy.interpolate.interp1d(self.x,self.crack_initial_opening,kind="linear",fill_value="extrapolate")(self.x_fine)
+        #self.crack_initial_opening_interp=scipy.interpolate.interp1d(self.x,self.crack_initial_opening,kind="linear",fill_value="extrapolate")(self.x_fine)
         pass
 
     def initialize_contact(self,sigma_closure,crack_initial_opening):
@@ -67,16 +67,16 @@ class sc_params(object):
         
         #self.crack_initial_opening=copy.copy(crack_initial_opening)
         self.crack_initial_opening=np.zeros(self.x.shape[0],dtype='d')
-        self.crack_initial_opening_interp=np.zeros(self.x_fine.shape[0],dtype='d')
+        #self.crack_initial_opening_interp=np.zeros(self.x_fine.shape[0],dtype='d')
         self.sigma_closure=np.zeros(self.x.shape[0],dtype='d')
-        self.sigma_closure_interp=np.zeros(self.x_fine.shape[0],dtype='d')
+        #self.sigma_closure_interp=np.zeros(self.x_fine.shape[0],dtype='d')
 
         ## closure index is the last point prior to closure
-        closure_index = np.where(sigma_closure[:(self.afull_idx)]!=0.0)[0][0]*self.fine_refinement - 1
+        closure_index = np.where(sigma_closure[:(self.afull_idx)]!=0.0)[0][0] - 1
         #if closure_index < 0:
         #    closure_index = None
         #    pass
-        assert(np.all(sigma_closure[:(closure_index//self.fine_refinement+1)]==0.0))
+        assert(np.all(sigma_closure[:(closure_index+1)]==0.0))
 
         
         
@@ -91,14 +91,14 @@ class sc_params(object):
         # ... Note that the distributed stress concentration indices
         # have no effect to the left of the closure point 
 
-        sigma_closure_interp = scipy.interpolate.interp1d(self.x,sigma_closure,kind="linear",fill_value="extrapolate")(self.x_fine)
+        #sigma_closure_interp = scipy.interpolate.interp1d(self.x,sigma_closure,kind="linear",fill_value="extrapolate")(self.x_fine)
 
 
         # du_da_shortened has the initial open region removed, as we
         # disallow any concentration in this open region --
         # crack should not close. 
-        du_da_shortened_iniguess=np.zeros(self.afull_idx_fine+2-(closure_index+1),dtype='d')*(1.0/(self.afull_idx+1)) # * (-sigma_closure_avg_stress)/self.dx_fine  #
-        du_da_shortened_iniguess[1:(self.afull_idx_fine+2-(closure_index+1))] = -sigma_closure_interp[(closure_index+1):(self.afull_idx_fine+1)]
+        du_da_shortened_iniguess=np.zeros(self.afull_idx+2-(closure_index+1),dtype='d')*(1.0/(self.afull_idx+1)) # * (-sigma_closure_avg_stress)/self.dx_fine  #
+        du_da_shortened_iniguess[1:(self.afull_idx+2-(closure_index+1))] = -sigma_closure[(closure_index+1):(self.afull_idx+1)]
 
         
         
@@ -165,12 +165,12 @@ class sc_params(object):
 
         while niter < total_maxiter and not terminate: 
             this_niter=10000
-            res = scipy.optimize.minimize(initialize_contact_goal_function,starting_value,args=(self,sigma_closure_interp,closure_index), # was initialize_contact_goal_function_accel
+            res = scipy.optimize.minimize(initialize_contact_goal_function,starting_value,args=(self,sigma_closure,closure_index), # was initialize_contact_goal_function_accel
                                           constraints = constraints,
                                           method="SLSQP",
                                           options={"eps": epsvalscaled,
                                                "maxiter": this_niter,
-                                                   "ftol": self.afull_idx_fine*(abs(np.mean(sigma_closure))+20e6)**2.0/1e14})
+                                                   "ftol": self.afull_idx*(abs(np.mean(sigma_closure))+20e6)**2.0/1e14})
             if res.status != 9 and res.status != 7:  # anything but reached iteration limit or eps increase
                 terminate=True
                 pass
@@ -202,18 +202,18 @@ class sc_params(object):
             pass
 
         # Verify proper operation of accelerated code
-        slowcalc = initialize_contact_goal_function(res.x,self,sigma_closure_interp,closure_index)
-        fastcalc = initialize_contact_goal_function_accel(res.x,self,sigma_closure_interp,closure_index)
+        slowcalc = initialize_contact_goal_function(res.x,self,sigma_closure,closure_index)
+        fastcalc = initialize_contact_goal_function_accel(res.x,self,sigma_closure,closure_index)
 
         if abs((slowcalc-fastcalc)/slowcalc) >= 1e-6:
             from VibroSim_Simulator.function_as_script import scriptify
-            slowcalc2 = scriptify(initialize_contact_goal_function)(res.x,self,sigma_closure_interp,closure_index)
+            slowcalc2 = scriptify(initialize_contact_goal_function)(res.x,self,sigma_closure,closure_index)
             raise ValueError("Accelerated calculation mismatch: %g vs %g" % (slowcalc2,fastcalc))
             pass
         assert(abs((slowcalc-fastcalc)/slowcalc) < 1e-6)
         
         du_da_shortened=res.x
-        du_da = np.concatenate(((du_da_shortened[0],),np.zeros(closure_index+1,dtype='d'),du_da_shortened[1:],np.zeros(self.xsteps*self.fine_refinement - self.afull_idx_fine - 2 ,dtype='d')))
+        du_da = np.concatenate(((du_da_shortened[0],),np.zeros(closure_index+1,dtype='d'),du_da_shortened[1:],np.zeros(self.xsteps - self.afull_idx - 2 ,dtype='d')))
         
         (contact_stress,displacement) = sigmacontact_from_displacement(self,du_da)
 
@@ -236,7 +236,7 @@ class sc_params(object):
         # at zero initial opening and zero closure, 
         # stop here, and run soft_closure_plots()
         self.crack_initial_opening = crack_initial_opening -displacement - (sigma_closure/self.Lm)**(2.0/3.0)  # Through this line we have evaluated an initial opening displacement
-        self.crack_initial_opening_interp=scipy.interpolate.interp1d(self.x,self.crack_initial_opening,kind="linear",fill_value="extrapolate")(self.x_fine)
+        #self.crack_initial_opening_interp=scipy.interpolate.interp1d(self.x,self.crack_initial_opening,kind="linear",fill_value="extrapolate")(self.x_fine)
 
         
         #sys.modules["__main__"].__dict__.update(globals())
@@ -250,10 +250,10 @@ class sc_params(object):
 
         # This becomes our new initial state
         self.crack_initial_opening = displacement + (sigma_closure/self.Lm)**(2.0/3.0) # we add sigma_closure displacement back in because sigmacontact_from_displacement() will subtract it out
-        self.crack_initial_opening_interp=scipy.interpolate.interp1d(self.x,self.crack_initial_opening,kind="linear",fill_value="extrapolate")(self.x_fine)
+        #self.crack_initial_opening_interp=scipy.interpolate.interp1d(self.x,self.crack_initial_opening,kind="linear",fill_value="extrapolate")(self.x_fine)
 
         self.sigma_closure = sigma_closure
-        self.sigma_closure_interp=scipy.interpolate.interp1d(self.x,self.sigma_closure,kind="linear",fill_value="extrapolate")(self.x_fine)
+        #self.sigma_closure_interp=scipy.interpolate.interp1d(self.x,self.sigma_closure,kind="linear",fill_value="extrapolate")(self.x_fine)
         du_da[:]=0.0
         
         
@@ -269,40 +269,32 @@ class sc_params(object):
     @classmethod
     def fromcrackgeom(cls,crack_model,xmax,xsteps,a_input,fine_refinement,Lm):
         # x_bnd represents x coordinates of the boundaries of
-        # each mesh element 
+        # each mesh element
+        assert(fine_refinement==1)
         x_bnd=np.linspace(0,xmax,xsteps,dtype='d')
         dx=x_bnd[1]-x_bnd[0]
         x = (x_bnd[1:]+x_bnd[:-1])/2.0  # x represents x coordinates of the centers of each mesh element
         
         afull_idx=np.argmin(np.abs(a_input-x_bnd))
         a = x_bnd[afull_idx]
-        dx_fine = dx/float(fine_refinement)
-        xbnd_fine = np.arange(xsteps*fine_refinement-(fine_refinement-1),dtype='d')*dx_fine
-        x_fine=(xbnd_fine[1:]+xbnd_fine[:-1])/2.0
-        afull_idx_fine = afull_idx*fine_refinement  # xbnd_fine[afull_idx_fine]==a within roundoff error
 
 
         return cls(crack_model=crack_model,
                    xmax=xmax,
                    xsteps=xsteps,
                    a_input=a_input,
-                   fine_refinement=fine_refinement,
                    Lm=Lm,
                    x_bnd=x_bnd,
                    dx=dx,
                    x=x,
                    afull_idx=afull_idx,
-                   a=a,
-                   dx_fine=dx_fine,
-                   xbnd_fine=xbnd_fine,
-                   x_fine=x_fine,
-                   afull_idx_fine=afull_idx_fine)
+                   a=a)
         pass
     pass
 
 
 
-def initialize_contact_goal_function(du_da_shortened,scp,sigma_closure_interp,closure_index):
+def initialize_contact_goal_function(du_da_shortened,scp,sigma_closure,closure_index):
     """ NOTE: This should be kept identical functionally to initialize_contact_goal_function_accel in soft_closure_accel.pyx"""
 
     #du_da = np.concatenate((np.zeros(closure_index+1,dtype='d'),du_da_shortened,np.zeros(scp.xsteps*scp.fine_refinement - scp.afull_idx_fine - 2 ,dtype='d')))
@@ -322,7 +314,7 @@ def initialize_contact_goal_function(du_da_shortened,scp,sigma_closure_interp,cl
     from_stress = sigmacontact_from_stress(scp,du_da_short)
     
     # elements of residual have units of stress^2
-    residual = (sigma_closure_interp[:(scp.afull_idx_fine+1)]-from_stress)
+    residual = (sigma_closure[:(scp.afull_idx+1)]-from_stress)
 
     return np.sum(residual**2.0) # + 1.0*np.sum(negative**2.0) #  + 10*residual.shape[0]*(u[scp.afull_idx_fine]-sigma_ext)**2.0 
 
@@ -337,9 +329,9 @@ def initialize_contact_goal_function(du_da_shortened,scp,sigma_closure_interp,cl
 def sigmacontact_from_displacement(scp,du_da):
     """ NOTE: This should be kept functionally identical to sigmacontact_from_displacement() in soft_closure_accel_ops.h"""
     # 
-    da = scp.dx_fine # same step size
+    da = scp.dx # same step size
 
-    x_fine = scp.x_fine[:(du_da.shape[0]-1)]
+    x = scp.x[:(du_da.shape[0]-1)]
 
     # integral starts at a0, where sigma_closure > 0 (compressive)
     #first_closureidx = np.where(sigma_closure >0)[0][0]
@@ -348,9 +340,9 @@ def sigmacontact_from_displacement(scp,du_da):
     
 
     
-    displacement_coarse = scp.crack_initial_opening - (scp.sigma_closure/scp.Lm)**(2.0/3.0)
+    displacement = scp.crack_initial_opening[:(du_da.shape[0]-1)] - (scp.sigma_closure[:(du_da.shape[0]-1)]/scp.Lm)**(2.0/3.0)
 
-    displacement=scipy.interpolate.interp1d(scp.x,displacement_coarse,kind="linear",fill_value="extrapolate")(x_fine)
+    #displacement=scipy.interpolate.interp1d(scp.x,displacement_coarse,kind="linear",fill_value="extrapolate")(x)
     
     
 
@@ -363,12 +355,12 @@ def sigmacontact_from_displacement(scp,du_da):
 
     if isinstance(scp.crack_model,ModeI_throughcrack_CODformula):
     
-        for aidx in range(scp.afull_idx_fine,-1,-1): 
+        for aidx in range(scp.afull_idx,-1,-1): 
             #assert(sigma_closure[aidx] > 0)
             #   in next line: sqrt( (a+x) * (a-x) where x >= 0 and
             #   throw out where x >= a
-            # diplacement defined on x_fine
-            displacement[:aidx] += (4.0/scp.crack_model.Eeff)*du_da[aidx+1]*np.sqrt((x_fine[aidx]+x_fine[:aidx])*(x_fine[aidx]-x_fine[:aidx]))*da
+            # diplacement defined on x
+            displacement[:aidx] += (4.0/scp.crack_model.Eeff)*du_da[aidx+1]*np.sqrt((x[aidx]+x[:aidx])*(x[aidx]-x[:aidx]))*da
             # Add in the x=a position
             # Here we have the integral of (4/E)*(du/da)*sqrt( (a+x)* (a-x) )da
             # as a goes from x[aidx] to x[aidx]+da/2
@@ -376,12 +368,12 @@ def sigmacontact_from_displacement(scp,du_da):
             #  (4/E)*(du/da)*sqrt(a+x) * integral of sqrt(a-x) da
             # = (4/E)*(du/da)*sqrt(a+x) * (2/3) * (  (x[aidx]+da/2-x[aidx])^(3/2) - (x[aidx]-x[aidx])^(3/2) )
             # = (4/E)*(du/da)*sqrt(a+x) * (2/3) * ( (da/2)^(3/2) )
-            displacement[aidx] += (4.0/scp.crack_model.Eeff)*du_da[aidx+1]*np.sqrt(2.0*x_fine[aidx])*(da/2.0)**(3.0/2.0)
+            displacement[aidx] += (4.0/scp.crack_model.Eeff)*du_da[aidx+1]*np.sqrt(2.0*x[aidx])*(da/2.0)**(3.0/2.0)
             
             pass
         pass
     elif isinstance(scp.crack_model,Tada_ModeI_CircularCrack_along_midline):
-        for aidx in range(scp.afull_idx_fine,-1,-1): 
+        for aidx in range(scp.afull_idx,-1,-1): 
             #assert(sigma_closure[aidx] > 0)
             #   in next line: sqrt( (a+x) * (a-x) where x >= 0 and
             #   throw out where x >= a
@@ -391,7 +383,7 @@ def sigmacontact_from_displacement(scp,du_da):
             # Tada turns out to have sqrt(xt^2-x^2) === sqrt((xt-x)(xt+x)) form
             # as throughcrack, so same integral calculation applies.
             # We just change the leading factors
-            displacement[:aidx] += (8.0*(1.0-scp.crack_model.nu**2.0)/(np.pi*scp.crack_model.E))*du_da[aidx+1]*np.sqrt((x_fine[aidx]+x_fine[:aidx])*(x_fine[aidx]-x_fine[:aidx]))*da
+            displacement[:aidx] += (8.0*(1.0-scp.crack_model.nu**2.0)/(np.pi*scp.crack_model.E))*du_da[aidx+1]*np.sqrt((x[aidx]+x[:aidx])*(x[aidx]-x[:aidx]))*da
             # Add in the x=a position
             # Here we have the integral of (4/E)*(du/da)*sqrt( (a+x)* (a-x) )da
             # as a goes from x[aidx] to x[aidx]+da/2
@@ -399,7 +391,7 @@ def sigmacontact_from_displacement(scp,du_da):
             #  (4/E)*(du/da)*sqrt(a+x) * integral of sqrt(a-x) da
             # = (4/E)*(du/da)*sqrt(a+x) * (2/3) * (  (x[aidx]+da/2-x[aidx])^(3/2) - (x[aidx]-x[aidx])^(3/2) )
             # = (4/E)*(du/da)*sqrt(a+x) * (2/3) * ( (da/2)^(3/2) )
-            displacement[aidx] += (8.0*(1.0-scp.crack_model.nu**2.0)/(np.pi*scp.crack_model.E))*du_da[aidx+1]*np.sqrt(2.0*x_fine[aidx])*(da/2.0)**(3.0/2.0)
+            displacement[aidx] += (8.0*(1.0-scp.crack_model.nu**2.0)/(np.pi*scp.crack_model.E))*du_da[aidx+1]*np.sqrt(2.0*x[aidx])*(da/2.0)**(3.0/2.0)
             pass
 
         
@@ -412,7 +404,7 @@ def sigmacontact_from_displacement(scp,du_da):
     # sigmacontact is positive compression
 
     
-    sigma_contact = np.zeros(x_fine.shape[0],dtype='d')
+    sigma_contact = np.zeros(x.shape[0],dtype='d')
     sigma_contact[displacement < 0.0] = ((-displacement[displacement < 0.0])**(3.0/2.0)) * scp.Lm
     
     return (sigma_contact,displacement) 
@@ -422,13 +414,13 @@ def sigmacontact_from_stress(scp,du_da):
     """ NOTE: This should be kept functionally identical to sigmacontact_from_stress() in soft_closure_accel_ops.h"""
     # sigmacontact is positive compression
 
-    sigma_closure_interp=scipy.interpolate.interp1d(scp.x,scp.sigma_closure,kind="linear",fill_value="extrapolate")(scp.x_fine)
+    #sigma_closure_interp=scipy.interpolate.interp1d(scp.x,scp.sigma_closure,kind="linear",fill_value="extrapolate")(scp.x)
     
     #sigmacontact = copy.copy(sigma_closure)
-    sigmacontact = copy.copy(sigma_closure_interp[:(du_da.shape[0]-1)]) # copying slightly redundant  no that we no longer use sigma_closure_interp for anything else
-    da = scp.dx_fine # same step size
+    sigmacontact = copy.copy(scp.sigma_closure[:(du_da.shape[0]-1)]) 
+    da = scp.dx # same step size
 
-    x_fine = scp.x_fine[:(du_da.shape[0]-1)]
+    x = scp.x[:(du_da.shape[0]-1)]
     
     # integral starts at a0, where sigma_closure > 0 (compressive)
     # OR closure state with external load is compressive
@@ -443,13 +435,13 @@ def sigmacontact_from_stress(scp,du_da):
 
     sigmacontact -= du_da[0]*da # constant term 
     
-    for aidx in range(scp.afull_idx_fine+1):
+    for aidx in range(scp.afull_idx+1):
         #assert(sigma_closure[aidx] > 0)
 
         #sigmacontact[(aidx+1):] -= du_da[aidx+1]*((betaval/sqrt(2.0))*sqrt(x_fine[aidx]/(x_fine[(aidx+1):]-x_fine[aidx])) + 1.0)*da # + 1.0 represents stress when a large distance away from effective tip
 
-        a = x_fine[aidx]
-        r = (x_fine[(aidx+1):]-a)
+        a = x[aidx]
+        r = (x[(aidx+1):]-a)
         sigmacontact[(aidx+1):] -= du_da[aidx+1]*((sqrt(betaval)/sqrt(2.0))*sqrt(a/r)*exp(-r/(scp.crack_model.r0_over_a*a)) + 1.0)*da # + 1.0 represents stress when a large distance away from effective tip
 
         # Need to include integral 
@@ -466,7 +458,7 @@ def sigmacontact_from_stress(scp,du_da):
 
         # = (du/da)(1/sqrt(2))*sqrt(a) * [ sqrt(pi*r0)*erf(sqrt(da/2)/sqrt(r0)) ] + (du/da)(da/2)
 
-        sigmacontact[aidx] -= (du_da[aidx+1]*(sqrt(betaval)/sqrt(2.0))*np.sqrt(x_fine[aidx])*sqrt(np.pi*scp.crack_model.r0_over_a*a)*erf(sqrt(da/(2.0*scp.crack_model.r0_over_a*a))) + du_da[aidx+1]*da/2.0)
+        sigmacontact[aidx] -= (du_da[aidx+1]*(sqrt(betaval)/sqrt(2.0))*np.sqrt(x[aidx])*sqrt(np.pi*scp.crack_model.r0_over_a*a)*erf(sqrt(da/(2.0*scp.crack_model.r0_over_a*a))) + du_da[aidx+1]*da/2.0)
         
         ## OBSOLETE
         ## = (du/da)(1/sqrt(2))*sqrt(a) * (-2sqrt(x-x) + 2sqrt(x-a+da/2))  + (du/da)(da/2)
@@ -563,14 +555,14 @@ def calc_contact(scp,sigma_ext):
 
         # closure_index is used to disallow any stresses or stress concentration
         # added to region that was open prior to applying load
-        closure_index = np.where(scp.sigma_closure[:(scp.afull_idx)]!=0.0)[0][0]*scp.fine_refinement - 1
+        closure_index = np.where(scp.sigma_closure[:(scp.afull_idx)]!=0.0)[0][0] - 1
         pass
     else:
         closure_index = -1
         pass
 
     #du_da_shortened_iniguess=np.ones(scp.afull_idx_fine+1,dtype='d')*(1.0/(scp.afull_idx+1)) * sigma_ext/scp.dx_fine  #
-    du_da_shortened_iniguess=np.ones(scp.afull_idx_fine+2-(closure_index+1),dtype='d')*(1.0/(scp.afull_idx+1))* sigma_ext/scp.dx_fine  #
+    du_da_shortened_iniguess=np.ones(scp.afull_idx+2-(closure_index+1),dtype='d')*(1.0/(scp.afull_idx+1))* sigma_ext/scp.dx  #
     #du_da_shortened_iniguess[0]=0.0
 
     def load_constraint_fun(du_da_shortened):
@@ -579,7 +571,7 @@ def calc_contact(scp,sigma_ext):
         
         
         
-        return (np.sum(du_da_short)*scp.dx_fine)-sigma_ext  
+        return (np.sum(du_da_short)*scp.dx)-sigma_ext  
         
     load_constraint = { "type": "eq",
                         "fun": load_constraint_fun }
@@ -616,7 +608,7 @@ def calc_contact(scp,sigma_ext):
                                           method="SLSQP",
                                           options={"eps": epsvalscaled,
                                                    "maxiter": this_niter,
-                                                   "ftol": scp.afull_idx_fine*(np.abs(sigma_ext)+20e6)**2.0/1e14})
+                                                   "ftol": scp.afull_idx*(np.abs(sigma_ext)+20e6)**2.0/1e14})
             #print("res=%s" % (str(res)))
             if res.status != 9 and res.status != 7:  # anything but reached iteration limit or eps increase
                 terminate=True
@@ -655,7 +647,7 @@ def calc_contact(scp,sigma_ext):
         
         
         du_da_shortened=res.x
-        du_da = np.concatenate(((du_da_shortened[0],),np.zeros(closure_index+1,dtype='d'),du_da_shortened[1:],np.zeros(scp.xsteps*scp.fine_refinement - scp.afull_idx_fine - 2 ,dtype='d')))        
+        du_da = np.concatenate(((du_da_shortened[0],),np.zeros(closure_index+1,dtype='d'),du_da_shortened[1:],np.zeros(scp.xsteps - scp.afull_idx - 2 ,dtype='d')))        
 
 
         pass
@@ -707,7 +699,7 @@ def calc_contact(scp,sigma_ext):
                                           method="SLSQP",
                                           options={"eps": epsvalscaled,
                                                    "maxiter": this_niter,
-                                                   "ftol": scp.afull_idx_fine*(np.abs(sigma_ext)+20e6)**2.0/1e14})
+                                                   "ftol": scp.afull_idx*(np.abs(sigma_ext)+20e6)**2.0/1e14})
             if res.status != 9 and res.status != 7: # anything but reached iteration limit or eps increase needed
                 terminate=True
                 pass
@@ -747,7 +739,7 @@ def calc_contact(scp,sigma_ext):
 
         #du_da = np.concatenate((du_da_shortened,np.zeros(scp.xsteps*scp.fine_refinement - scp.afull_idx_fine - 2 ,dtype='d')))
         assert(closure_index==-1)
-        du_da = np.concatenate(((du_da_shortened[0],),np.zeros(closure_index+1,dtype='d'),du_da_shortened[1:],np.zeros(scp.xsteps*scp.fine_refinement - scp.afull_idx_fine - 2 ,dtype='d')))        
+        du_da = np.concatenate(((du_da_shortened[0],),np.zeros(closure_index+1,dtype='d'),du_da_shortened[1:],np.zeros(scp.xsteps - scp.afull_idx - 2 ,dtype='d')))        
 
 
         #(contact_stress,displacement) = sigmacontact_from_displacement(scp,du_da)
@@ -791,7 +783,7 @@ def soft_closure_plots(scp,du_da,titleprefix=""):
     #du_da = calc_du_da(u,scp.dx_fine)
 
 
-    x_du_da = np.concatenate(((scp.x_fine[0]-scp.dx_fine,),scp.x_fine))
+    x_du_da = np.concatenate(((scp.x[0]-scp.dx,),scp.x))
     
     
     (from_displacement,displacement) = sigmacontact_from_displacement(scp,du_da)
@@ -808,29 +800,29 @@ def soft_closure_plots(scp,du_da,titleprefix=""):
     
     sigmacontact_plot=pl.figure()
     pl.clf()
-    pl.plot(scp.x_fine*1e3,from_displacement/1e6,'-',
-            scp.x_fine*1e3,from_stress/1e6,'-'),
+    pl.plot(scp.x*1e3,from_displacement/1e6,'-',
+            scp.x*1e3,from_stress/1e6,'-'),
     pl.grid()
     pl.legend(("from displacement","from stress"))
     pl.ylabel("Stress (MPa)")
     pl.xlabel('Position (mm)')
     pl.title(titleprefix+"sigmacontact")
 
-    u = np.cumsum(du_da)*scp.dx_fine
+    u = np.cumsum(du_da)*scp.dx
     # u nominally on position basis x_fine+dx_fine/2.0
 
     duda_plot = pl.figure()
     pl.clf()
     pl.plot(x_du_da*1e3,du_da/1e12,'-')
     pl.grid()
-    pl.title(titleprefix+"distributed stress concentration derivative\ntotal load=%f MPa" % (u[scp.afull_idx_fine]/1e6))
+    pl.title(titleprefix+"distributed stress concentration derivative\ntotal load=%f MPa" % (u[scp.afull_idx]/1e6))
     pl.xlabel('Position (mm)')
     pl.ylabel("Distributed stress concentration (TPa/m)")
 
     displacement_plot=pl.figure()
     pl.clf()
     pl.plot(scp.x*1e3,(scp.crack_initial_opening-(scp.sigma_closure/scp.Lm)**(2.0/3.0))*1e6,'-')
-    pl.plot(scp.x_fine*1e3,displacement*1e6,'-')
+    pl.plot(scp.x*1e3,displacement*1e6,'-')
     pl.grid()
     pl.legend(('Initial displacement','Final displacement'))
     pl.xlabel('Position (mm)')

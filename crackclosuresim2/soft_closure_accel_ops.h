@@ -29,11 +29,11 @@ struct crack_model_t
   
 static void sigmacontact_from_displacement(double *du_da_short,
 					   int du_da_short_len,
-					   int afull_idx_fine,
+					   int afull_idx,
 					   double *crack_initial_opening_interp,
 					   double *sigma_closure_interp,
-					   double xfine0,
-					   double dx_fine,
+					   double x0,
+					   double dx,
 					   double Lm,
 					   struct crack_model_t crack_model,
 					   // Output parameters
@@ -50,19 +50,19 @@ static void sigmacontact_from_displacement(double *du_da_short,
   }
 
   if (crack_model.modeltype==CMT_THROUGH) {
-    for (aidx=afull_idx_fine;aidx >= 0;aidx--) {
+    for (aidx=afull_idx;aidx >= 0;aidx--) {
       for (cnt=0;cnt < aidx;cnt++) {
-	displacement[cnt] += (4.0/crack_model.modeldat.through.Eeff)*du_da_short[aidx+1]*sqrt((xfine0+aidx*dx_fine + xfine0+cnt*dx_fine)*(xfine0+aidx*dx_fine - xfine0-cnt*dx_fine))*dx_fine;
+	displacement[cnt] += (4.0/crack_model.modeldat.through.Eeff)*du_da_short[aidx+1]*sqrt((x0+aidx*dx + x0+cnt*dx)*(x0+aidx*dx - x0-cnt*dx))*dx;
       }
-      displacement[aidx] += (4.0/crack_model.modeldat.through.Eeff)*du_da_short[aidx+1]*sqrt(2.0*(xfine0+aidx*dx_fine))*pow(dx_fine/2.0,3.0/2.0);
+      displacement[aidx] += (4.0/crack_model.modeldat.through.Eeff)*du_da_short[aidx+1]*sqrt(2.0*(x0+aidx*dx))*pow(dx/2.0,3.0/2.0);
       
     }
   } else if (crack_model.modeltype==CMT_TADA) {
-    for (aidx=afull_idx_fine;aidx >= 0;aidx--) {
+    for (aidx=afull_idx;aidx >= 0;aidx--) {
       for (cnt=0;cnt < aidx;cnt++) {
-	displacement[cnt] += (8.0*(1.0-pow(crack_model.modeldat.tada.nu,2.0))/(M_PI*crack_model.modeldat.tada.E))*du_da_short[aidx+1]*sqrt((xfine0+aidx*dx_fine + xfine0+cnt*dx_fine)*(xfine0+aidx*dx_fine - xfine0-cnt*dx_fine))*dx_fine;
+	displacement[cnt] += (8.0*(1.0-pow(crack_model.modeldat.tada.nu,2.0))/(M_PI*crack_model.modeldat.tada.E))*du_da_short[aidx+1]*sqrt((x0+aidx*dx + x0+cnt*dx)*(x0+aidx*dx - x0-cnt*dx))*dx;
       }
-      displacement[aidx] += (8.0*(1.0-pow(crack_model.modeldat.tada.nu,2.0))/(M_PI*crack_model.modeldat.tada.E))*du_da_short[aidx+1]*sqrt(2.0*(xfine0+aidx*dx_fine))*pow(dx_fine/2.0,3.0/2.0);
+      displacement[aidx] += (8.0*(1.0-pow(crack_model.modeldat.tada.nu,2.0))/(M_PI*crack_model.modeldat.tada.E))*du_da_short[aidx+1]*sqrt(2.0*(x0+aidx*dx))*pow(dx/2.0,3.0/2.0);
       
     }
 
@@ -85,10 +85,10 @@ static void sigmacontact_from_displacement(double *du_da_short,
 
 static void sigmacontact_from_stress(double *du_da_short,
 				     int du_da_short_len,
-				     int afull_idx_fine,
+				     int afull_idx,
 				     double *scp_sigma_closure_interp, // scp.sigma_closure_interp.... NOT NECESSARILY caller's sigma_closure_interp variable
-				     double xfine0,
-				     double dx_fine,
+				     double x0,
+				     double dx,
 				     struct crack_model_t crack_model,
 				     // Output parameters
 				     double *from_stress)
@@ -102,10 +102,10 @@ static void sigmacontact_from_stress(double *du_da_short,
   double r0_over_a;
   
   for (cnt=0;cnt < du_da_short_len-1;cnt++) {
-    from_stress[cnt] = scp_sigma_closure_interp[cnt] - du_da_short[0]*dx_fine;
+    from_stress[cnt] = scp_sigma_closure_interp[cnt] - du_da_short[0]*dx;
 
   }
-  //printf("scp_sigma_closure_interp[0]=%g; du_da_short[0]=%g; dx_fine=%g\n",scp_sigma_closure_interp[0],du_da_short[0],dx_fine);
+  //printf("scp_sigma_closure_interp[0]=%g; du_da_short[0]=%g; dx=%g\n",scp_sigma_closure_interp[0],du_da_short[0],dx);
   //printf("from_stress[0]=%g\n",from_stress[0]);
   
   if (crack_model.modeltype==CMT_THROUGH) {
@@ -118,21 +118,21 @@ static void sigmacontact_from_stress(double *du_da_short,
     assert(0);    
   }
   
-  for (aidx=0;aidx <= afull_idx_fine;aidx++) {
-    a = xfine0 + aidx*dx_fine;
+  for (aidx=0;aidx <= afull_idx;aidx++) {
+    a = x0 + aidx*dx;
     
-    for (cnt=aidx+1;cnt <= afull_idx_fine;cnt++) {
-      r = xfine0+cnt*dx_fine - a;
-      //from_stress[cnt] -= du_da_short[aidx+1]*((sqrt_betaval/M_SQRT2)*sqrt((xfine0+aidx*dx_fine)/(xfine0+cnt*dx_fine - xfine0-aidx*dx_fine)) + 1.0)*dx_fine;
-      //from_stress[cnt] -= du_da_short[aidx+1]*((sqrt_betaval/M_SQRT2)*sqrt(a/r) + 1.0)*dx_fine;
-      from_stress[cnt] -= du_da_short[aidx+1]*((sqrt_betaval/M_SQRT2)*sqrt(a/r)*exp(-r/(r0_over_a*a)) + 1.0)*dx_fine;
+    for (cnt=aidx+1;cnt <= afull_idx;cnt++) {
+      r = x0+cnt*dx - a;
+      //from_stress[cnt] -= du_da_short[aidx+1]*((sqrt_betaval/M_SQRT2)*sqrt((x0+aidx*dx)/(x0+cnt*dx - x0-aidx*dx)) + 1.0)*dx;
+      //from_stress[cnt] -= du_da_short[aidx+1]*((sqrt_betaval/M_SQRT2)*sqrt(a/r) + 1.0)*dx;
+      from_stress[cnt] -= du_da_short[aidx+1]*((sqrt_betaval/M_SQRT2)*sqrt(a/r)*exp(-r/(r0_over_a*a)) + 1.0)*dx;
     }
-    //from_stress[aidx] -= (du_da_short[aidx+1]*(sqrt_betaval/M_SQRT2)*sqrt(xfine0+aidx*dx_fine)*2.0*sqrt(dx_fine/2.0) + du_da_short[aidx+1]*dx_fine/2.0);
-    //from_stress[aidx] -= (du_da_short[aidx+1]*(sqrt_betaval/M_SQRT2)*sqrt(a)*2.0*sqrt(dx_fine/2.0) + du_da_short[aidx+1]*dx_fine/2.0);
-    from_stress[aidx] -= (du_da_short[aidx+1]*(sqrt_betaval/M_SQRT2)*sqrt(a)*sqrt(M_PI*r0_over_a*a)*erf(sqrt(dx_fine/(2.0*r0_over_a*a))) + du_da_short[aidx+1]*dx_fine/2.0);
+    //from_stress[aidx] -= (du_da_short[aidx+1]*(sqrt_betaval/M_SQRT2)*sqrt(x0+aidx*dx)*2.0*sqrt(dx/2.0) + du_da_short[aidx+1]*dx/2.0);
+    //from_stress[aidx] -= (du_da_short[aidx+1]*(sqrt_betaval/M_SQRT2)*sqrt(a)*2.0*sqrt(dx/2.0) + du_da_short[aidx+1]*dx/2.0);
+    from_stress[aidx] -= (du_da_short[aidx+1]*(sqrt_betaval/M_SQRT2)*sqrt(a)*sqrt(M_PI*r0_over_a*a)*erf(sqrt(dx/(2.0*r0_over_a*a))) + du_da_short[aidx+1]*dx/2.0);
     //if (aidx==0) {
-    //  printf("fs[0] subtraction=%g\n",(du_da_short[aidx+1]*(sqrt_betaval/M_SQRT2)*sqrt(a)*sqrt(M_PI*r0_over_a*a)*erf(sqrt(dx_fine/(2.0*r0_over_a*a))) + du_da_short[aidx+1]*dx_fine/2.0));
-    //  printf("fs[0] subtraction terms/factors=%g, %g, %g, %g, %g, %g\n",du_da_short[aidx+1],(sqrt_betaval/M_SQRT2),sqrt(a),sqrt(M_PI*r0_over_a*a),erf(sqrt(dx_fine/(2.0*r0_over_a*a))),du_da_short[aidx+1]*dx_fine/2.0);
+    //  printf("fs[0] subtraction=%g\n",(du_da_short[aidx+1]*(sqrt_betaval/M_SQRT2)*sqrt(a)*sqrt(M_PI*r0_over_a*a)*erf(sqrt(dx/(2.0*r0_over_a*a))) + du_da_short[aidx+1]*dx/2.0));
+    //  printf("fs[0] subtraction terms/factors=%g, %g, %g, %g, %g, %g\n",du_da_short[aidx+1],(sqrt_betaval/M_SQRT2),sqrt(a),sqrt(M_PI*r0_over_a*a),erf(sqrt(dx/(2.0*r0_over_a*a))),du_da_short[aidx+1]*dx/2.0);
     //  printf("from_stress[0]=%g\n",from_stress[0]);
     //}
   }
@@ -155,7 +155,7 @@ static void print_array(char *name,double *ptr,int numelem)
 }
 
 
-static double initialize_contact_goal_function_c(double *du_da_shortened,int du_da_shortened_len,int closure_index,unsigned xsteps,unsigned fine_refinement,int afull_idx_fine,double *scp_sigma_closure_interp,double *sigma_closure_interp,double xfine0,double dx_fine,double Lm,struct crack_model_t crack_model)
+static double initialize_contact_goal_function_c(double *du_da_shortened,int du_da_shortened_len,int closure_index,unsigned xsteps,int afull_idx,double *scp_sigma_closure_interp,double *sigma_closure_interp,double x0,double dx,double Lm,struct crack_model_t crack_model)
 // NOTE: This should be kept identical functionally to initialize_contact_goal_function in soft_closure_accel.py
 {
   double *du_da_short;
@@ -181,10 +181,10 @@ static double initialize_contact_goal_function_c(double *du_da_shortened,int du_
 
   
   sigmacontact_from_stress(du_da_short,du_da_short_len,
-			   afull_idx_fine,
+			   afull_idx,
 			   scp_sigma_closure_interp,
-			   xfine0,
-			   dx_fine,
+			   x0,
+			   dx,
 			   crack_model,
 			   from_stress);
 
@@ -204,7 +204,7 @@ static double initialize_contact_goal_function_c(double *du_da_shortened,int du_
 
 
 
-static double soft_closure_goal_function_c(double *du_da_shortened,int du_da_shortened_len,int closure_index,unsigned xsteps,unsigned fine_refinement,int afull_idx_fine,double *crack_initial_opening_interp,double *sigma_closure_interp,double xfine0,double dx_fine,double Lm,struct crack_model_t crack_model)
+static double soft_closure_goal_function_c(double *du_da_shortened,int du_da_shortened_len,int closure_index,unsigned xsteps,int afull_idx,double *crack_initial_opening_interp,double *sigma_closure_interp,double x0,double dx,double Lm,struct crack_model_t crack_model)
 // NOTE: This should be kept identical functionally to soft_closure_goal_function in soft_closure_accel.py
 {
   double *du_da_short;
@@ -243,21 +243,21 @@ static double soft_closure_goal_function_c(double *du_da_shortened,int du_da_sho
     for (iter=0;iter < 2; iter++) {
       if (iter==0) {
 	sigmacontact_from_displacement(du_da_short,du_da_short_len,
-				       afull_idx_fine,
+				       afull_idx,
 				       crack_initial_opening_interp,
 				       sigma_closure_interp,
-				       xfine0,
-				       dx_fine,
+				       x0,
+				       dx,
 				       Lm,
 				       crack_model,
 				       from_displacement,
 				       displacement);
       } else {
 	sigmacontact_from_stress(du_da_short,du_da_short_len,
-				 afull_idx_fine,
+				 afull_idx,
 				 sigma_closure_interp,
-				 xfine0,
-				 dx_fine,
+				 x0,
+				 dx,
 				 crack_model,
 				 from_stress);
       }
