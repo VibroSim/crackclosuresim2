@@ -32,22 +32,24 @@ cdef extern from "soft_closure_accel_ops.h":
     cdef int CMT_TADA
     pass
 
-    cdef double initialize_contact_goal_function_c(double *du_da_shortened,int du_da_shortened_len,int closure_index,unsigned xsteps,int afull_idx,double *scp_sigma_closure,double *sigma_closure,double x0,double dx,double Lm,crack_model_t crack_model)
-    cdef double soft_closure_goal_function_c(double *du_da_shortened,int du_da_shortened_len,int closure_index,unsigned xsteps,int afull_idx,double *crack_initial_opening,double *sigma_closure,double x0,double dx,double Lm,crack_model_t crack_model)
+    cdef double initialize_contact_goal_function_with_gradient_c(double *du_da_shortened,int du_da_shortened_len,int closure_index,unsigned xsteps,int afull_idx,double *scp_sigma_closure,double *sigma_closure,double x0,double dx,double Lm,crack_model_t crack_model,double *du_da_shortened_gradient_out)
+    cdef double soft_closure_goal_function_with_gradient_c(double *du_da_shortened,int du_da_shortened_len,int closure_index,unsigned xsteps,int afull_idx,double *crack_initial_opening,double *sigma_closure,double x0,double dx,double Lm,crack_model_t crack_model,double *du_da_shortened_gradient_out)
 
-def initialize_contact_goal_function_accel(np.ndarray[np.float64_t,ndim=1] du_da_shortened,scp,np.ndarray[np.float64_t,ndim=1] sigma_closure,int closure_index):
+def initialize_contact_goal_function_with_gradient_accel(np.ndarray[np.float64_t,ndim=1] du_da_shortened,scp,np.ndarray[np.float64_t,ndim=1] sigma_closure,int closure_index):
     """ NOTE: This should be kept identical functionally to initialize_contact_goal_function in soft_closure.py"""
 
     # ***NOTE: Could define a separate version that doesn't
     # bother to calculate  dsigmaext_dxt_hardcontact_interp when calculating
     # compressive (sigma_ext < 0) loads. 
     cdef np.ndarray[np.float64_t,ndim=1] scp_sigma_closure
+    cdef np.ndarray[np.float64_t,ndim=1] gradient
     cdef unsigned xsteps
     cdef int afull_idx
     cdef double x0  # first x position
     cdef double dx
     cdef crack_model_t crack_model;
     cdef double Lm
+    cdef double goal_function_value
     
 
     scp_sigma_closure = scp.sigma_closure
@@ -72,11 +74,14 @@ def initialize_contact_goal_function_accel(np.ndarray[np.float64_t,ndim=1] du_da
         crack_model.modeldat.tada.r0_over_a = scp.crack_model.r0_over_a
         pass
     
+    gradient = np.empty(du_da_shortened.shape[0],dtype='d')
 
-    return initialize_contact_goal_function_c(<double *>du_da_shortened.data,du_da_shortened.shape[0],closure_index,xsteps,afull_idx,<double *>scp_sigma_closure.data,<double *>sigma_closure.data,x0,dx,Lm,crack_model)
+    goal_function_value = initialize_contact_goal_function_with_gradient_c(<double *>du_da_shortened.data,du_da_shortened.shape[0],closure_index,xsteps,afull_idx,<double *>scp_sigma_closure.data,<double *>sigma_closure.data,x0,dx,Lm,crack_model,<double *>gradient.data)
+
+    return (goal_function_value,gradient)
 
 
-def soft_closure_goal_function_accel(np.ndarray[np.float64_t,ndim=1] du_da_shortened,scp,int closure_index):
+def soft_closure_goal_function_with_gradient_accel(np.ndarray[np.float64_t,ndim=1] du_da_shortened,scp,int closure_index):
     """ NOTE: This should be kept identical functionally to soft_closure_goal_function in soft_closure.py"""
     # ***NOTE: Could define a separate version that doesn't
     # bother to calculate  dsigmaext_dxt_hardcontact_interp when calculating
@@ -86,11 +91,12 @@ def soft_closure_goal_function_accel(np.ndarray[np.float64_t,ndim=1] du_da_short
     cdef int afull_idx
     cdef np.ndarray[np.float64_t,ndim=1] crack_initial_opening
     cdef np.ndarray[np.float64_t,ndim=1] sigma_closure
+    cdef np.ndarray[np.float64_t,ndim=1] gradient
     cdef double x0  # first refined x position
     cdef double dx
-    cdef crack_model_t crack_model;
+    cdef crack_model_t crack_model
     cdef double Lm
-    
+    cdef double goal_function_value
     
     xsteps = scp.xsteps
     afull_idx = scp.afull_idx
@@ -119,6 +125,12 @@ def soft_closure_goal_function_accel(np.ndarray[np.float64_t,ndim=1] du_da_short
         crack_model.modeldat.through.Beta = 0.0
         crack_model.modeldat.through.r0_over_a = 0.0
         raise ValueError("Invalid crack model class")
+
+    gradient = np.empty(du_da_shortened.shape[0],dtype='d')
     
     
-    return soft_closure_goal_function_c(<double *>du_da_shortened.data,du_da_shortened.shape[0],closure_index,xsteps,afull_idx,<double *>crack_initial_opening.data,<double *>sigma_closure.data,x0,dx,Lm,crack_model)
+    goal_function_value = soft_closure_goal_function_with_gradient_c(<double *>du_da_shortened.data,du_da_shortened.shape[0],closure_index,xsteps,afull_idx,<double *>crack_initial_opening.data,<double *>sigma_closure.data,x0,dx,Lm,crack_model,<double *>gradient.data)
+
+    return (goal_function_value,gradient)
+
+

@@ -12,8 +12,8 @@ from . import inverse_closure,crackopening_from_tensile_closure
 from . import ModeI_Beta_COD_Formula
 from . import ModeI_throughcrack_CODformula
 from . import Tada_ModeI_CircularCrack_along_midline
-from .soft_closure_accel import initialize_contact_goal_function_accel
-from .soft_closure_accel import soft_closure_goal_function_accel
+from .soft_closure_accel import initialize_contact_goal_function_with_gradient_accel
+from .soft_closure_accel import soft_closure_goal_function_with_gradient_accel
 
 
 # IMPORTANT:
@@ -125,7 +125,7 @@ class sc_params(object):
             du_da_shortened_iniguess[0] = -sigma_closure[0]*self.dx
             pass
         
-        du_da_shortened_iniguess[1:(self.afull_idx+2-(closure_index+1))] = -sigma_closure[(closure_index+1):(self.afull_idx+1)]*self.dx
+        du_da_shortened_iniguess[1:(self.afull_idx+2-(closure_index+1))] = -sigma_closure[(closure_index+1):(self.afull_idx+1)]/self.dx
 
         
         
@@ -174,6 +174,22 @@ class sc_params(object):
         
 
                
+        # Check gradient
+    
+        grad_eval = initialize_contact_goal_function_with_gradient(du_da_shortened_iniguess,self,sigma_closure,closure_index)[1]
+        grad_approx = scipy.optimize.approx_fprime(du_da_shortened_iniguess,lambda x: initialize_contact_goal_function_with_gradient(x,self,sigma_closure,closure_index)[0],(abs(np.mean(sigma_closure))+10e6)/self.dx/1e6)
+        grad_sumsquareddiff = np.sqrt(np.sum((grad_eval-grad_approx)**2.0))
+        grad_sumsquared = np.sqrt(np.sum(grad_eval**2.0))
+    
+    
+        assert(grad_sumsquareddiff/grad_sumsquared < 1e-4) # NOTE: In the obscure case where our initial guess is at a relative minimum, this might fail extraneously
+
+        # check accelerated gradient
+        grad_eval_accel = initialize_contact_goal_function_with_gradient_accel(du_da_shortened_iniguess,self,sigma_closure,closure_index)[1]
+        grad_sumsquareddiff_accel = np.sqrt(np.sum((grad_eval_accel-grad_approx)**2.0))
+        grad_sumsquared_accel = np.sqrt(np.sum(grad_eval_accel**2.0))
+        
+        assert(grad_sumsquareddiff_accel/grad_sumsquared_accel < 1e-4) # NOTE: In the obscure case where our initial guess is at a relative minimum, this might fail extraneously
         
 
         constraints = [] #[ load_constraint, crack_open_constraint ]
@@ -192,11 +208,12 @@ class sc_params(object):
 
         while niter < total_maxiter and not terminate: 
             this_niter=10000
-            res = scipy.optimize.minimize(initialize_contact_goal_function,starting_value,args=(self,sigma_closure,closure_index), # was initialize_contact_goal_function_accel
+            res = scipy.optimize.minimize(initialize_contact_goal_function_with_gradient_accel,starting_value,args=(self,sigma_closure,closure_index), # was initialize_contact_goal_function_accel
                                           constraints = constraints,
                                           method="SLSQP",
+                                          jac=True,
                                           options={"eps": epsvalscaled,
-                                               "maxiter": this_niter,
+                                                   "maxiter": this_niter,
                                                    "ftol": self.afull_idx*(abs(np.mean(sigma_closure))+20e6)**2.0/1e14})
             if res.status != 9 and res.status != 7:  # anything but reached iteration limit or eps increase
                 terminate=True
@@ -229,12 +246,12 @@ class sc_params(object):
             pass
 
         # Verify proper operation of accelerated code
-        slowcalc = initialize_contact_goal_function(res.x,self,sigma_closure,closure_index)
-        fastcalc = initialize_contact_goal_function_accel(res.x,self,sigma_closure,closure_index)
+        (slowcalc,slowcalc_grad) = initialize_contact_goal_function_with_gradient(res.x,self,sigma_closure,closure_index)
+        (fastcalc,fastcalc_grad) = initialize_contact_goal_function_with_gradient_accel(res.x,self,sigma_closure,closure_index)
 
         if abs((slowcalc-fastcalc)/slowcalc) >= 1e-6:
             from VibroSim_Simulator.function_as_script import scriptify
-            slowcalc2 = scriptify(initialize_contact_goal_function)(res.x,self,sigma_closure,closure_index)
+            (slowcalc2,slowcalc2_grad) = scriptify(initialize_contact_goal_function_with_gradient)(res.x,self,sigma_closure,closure_index)
             raise ValueError("Accelerated calculation mismatch: %g vs %g" % (slowcalc2,fastcalc))
             pass
         assert(abs((slowcalc-fastcalc)/slowcalc) < 1e-6)
@@ -322,7 +339,7 @@ class sc_params(object):
 
 
 
-def initialize_contact_goal_function(du_da_shortened,scp,sigma_closure,closure_index):
+def initialize_contact_goal_function_with_gradient(du_da_shortened,scp,sigma_closure,closure_index):
     """ NOTE: This should be kept identical functionally to initialize_contact_goal_function_accel in soft_closure_accel.pyx"""
 
     #du_da = np.concatenate((np.zeros(closure_index+1,dtype='d'),du_da_shortened,np.zeros(scp.xsteps*scp.fine_refinement - scp.afull_idx_fine - 2 ,dtype='d')))
@@ -338,13 +355,18 @@ def initialize_contact_goal_function(du_da_shortened,scp,sigma_closure,closure_i
     #(from_displacement,displacement) = sigmacontact_from_displacement(scp,du_da_short)
 
     
-    from_stress = sigmacontact_from_stress(scp,du_da_short)
+    (from_stress,from_stress_gradient) = sigmacontact_from_stress(scp,du_da_short,closure_index_for_gradient=closure_index)
     
     # elements of residual have units of stress^2
     residual = (sigma_closure[:(scp.afull_idx+1)]-from_stress)
+    dresidual = - from_stress_gradient
 
-    return np.sum(residual**2.0) # + 1.0*np.sum(negative**2.0) #  + 10*residual.shape[0]*(u[scp.afull_idx_fine]-sigma_ext)**2.0 
 
+    goal_function = np.sum(residual**2.0) # + 1.0*np.sum(negative**2.0) #  + 10*residual.shape[0]*(u[scp.afull_idx_fine]-sigma_ext)**2.0 
+
+    gradient = np.sum(2.0*residual[:,np.newaxis]*dresidual,axis=0)
+    
+    return (goal_function,gradient)
 
 
 
@@ -353,7 +375,7 @@ def initialize_contact_goal_function(du_da_shortened,scp,sigma_closure,closure_i
 
 
 # du/da defined on x positions... represents distributed stress concentrations
-def sigmacontact_from_displacement(scp,du_da):
+def sigmacontact_from_displacement(scp,du_da,closure_index_for_gradient=None):
     """ NOTE: This should be kept functionally identical to sigmacontact_from_displacement() in soft_closure_accel_ops.h"""
     # 
     da = scp.dx # same step size
@@ -370,8 +392,11 @@ def sigmacontact_from_displacement(scp,du_da):
     displacement = scp.crack_initial_opening[:(du_da.shape[0]-1)] - (scp.sigma_closure[:(du_da.shape[0]-1)]/scp.Lm)**(2.0/3.0)
 
     #displacement=scipy.interpolate.interp1d(scp.x,displacement_coarse,kind="linear",fill_value="extrapolate")(x)
-    
-    
+
+    if closure_index_for_gradient is not None:
+        # displacement gradient axis zero is position along crack, axis one is du_da_shortened element 
+        displacement_gradient = np.zeros((du_da.shape[0]-1,scp.afull_idx-closure_index_for_gradient+1),dtype='d')
+        pass
 
     # !!!*** Possibly calculation should start at scp.afull_idx_fine instead of
     # afull_idx_fine-1.
@@ -382,12 +407,14 @@ def sigmacontact_from_displacement(scp,du_da):
 
     if isinstance(scp.crack_model,ModeI_throughcrack_CODformula):
     
-        for aidx in range(scp.afull_idx,-1,-1): 
+        for aidx in range(scp.afull_idx,-1,-1):
+            
             #assert(sigma_closure[aidx] > 0)
             #   in next line: sqrt( (a+x) * (a-x) where x >= 0 and
             #   throw out where x >= a
             # diplacement defined on x
             displacement[:aidx] += (4.0/scp.crack_model.Eeff)*du_da[aidx+1]*np.sqrt((x[aidx]+x[:aidx])*(x[aidx]-x[:aidx]))*da
+            
             # Add in the x=a position
             # Here we have the integral of (4/E)*(du/da)*sqrt( (a+x)* (a-x) )da
             # as a goes from x[aidx] to x[aidx]+da/2
@@ -396,6 +423,16 @@ def sigmacontact_from_displacement(scp,du_da):
             # = (4/E)*(du/da)*sqrt(a+x) * (2/3) * (  (x[aidx]+da/2-x[aidx])^(3/2) - (x[aidx]-x[aidx])^(3/2) )
             # = (4/E)*(du/da)*sqrt(a+x) * (2/3) * ( (da/2)^(3/2) )
             displacement[aidx] += (4.0/scp.crack_model.Eeff)*du_da[aidx+1]*np.sqrt(2.0*x[aidx])*(da/2.0)**(3.0/2.0)
+
+            if closure_index_for_gradient is not None:
+                if aidx+1 >= closure_index_for_gradient+2:
+                    du_da_shortened_index = aidx+2 + closure_index_for_gradient
+                    displacement_gradient[:aidx,du_da_shortened_index] += (4.0/scp.crack_model.Eeff)*np.sqrt((x[aidx]+x[:aidx])*(x[aidx]-x[:aidx]))*da
+                    displacement_gradient[aidx,du_da_shortened_index] += (4.0/scp.crack_model.Eeff)*np.sqrt(2.0*x[aidx])*(da/2.0)**(3.0/2.0)
+                    pass
+                
+                pass
+            
             
             pass
         pass
@@ -419,6 +456,18 @@ def sigmacontact_from_displacement(scp,du_da):
             # = (4/E)*(du/da)*sqrt(a+x) * (2/3) * (  (x[aidx]+da/2-x[aidx])^(3/2) - (x[aidx]-x[aidx])^(3/2) )
             # = (4/E)*(du/da)*sqrt(a+x) * (2/3) * ( (da/2)^(3/2) )
             displacement[aidx] += (8.0*(1.0-scp.crack_model.nu**2.0)/(np.pi*scp.crack_model.E))*du_da[aidx+1]*np.sqrt(2.0*x[aidx])*(da/2.0)**(3.0/2.0)
+
+            if closure_index_for_gradient is not None:
+                if aidx+1 >= closure_index_for_gradient+2:
+                    du_da_shortened_index = aidx+2 + closure_index_for_gradient
+                    displacement_gradient[:aidx,du_da_shortened_index] += (8.0*(1.0-scp.crack_model.nu**2.0)/(np.pi*scp.crack_model.E))*np.sqrt((x[aidx]+x[:aidx])*(x[aidx]-x[:aidx]))*da
+                    displacement_gradient[aidx,du_da_shortened_index] += (8.0*(1.0-scp.crack_model.nu**2.0)/(np.pi*scp.crack_model.E))*np.sqrt(2.0*x[aidx])*(da/2.0)**(3.0/2.0)
+                    pass
+                
+                pass
+            
+
+            
             pass
 
         
@@ -433,18 +482,35 @@ def sigmacontact_from_displacement(scp,du_da):
     
     sigma_contact = np.zeros(x.shape[0],dtype='d')
     sigma_contact[displacement < 0.0] = ((-displacement[displacement < 0.0])**(3.0/2.0)) * scp.Lm
+
+    if closure_index_for_gradient is not None:
+        # sigma_contact gradient axis zero is position along crack, axis one is du_da_shortened element 
+        sigma_contact_gradient = np.zeros((du_da.shape[0]-1,scp.afull_idx-closure_index_for_gradient+1),dtype='d')
+        sigma_contact_gradient[displacement < 0.0,:] = -(3.0/2.0)*((-displacement[displacement < 0.0,np.newaxis])**(1.0/2.0))*scp.Lm*displacement_gradient[displacement < 0.0,:]
+        pass
     
-    return (sigma_contact,displacement) 
 
+    
+    if closure_index_for_gradient is None:
+        return (sigma_contact,displacement) 
+    else:
+        return (sigma_contact,displacement,sigma_contact_gradient,displacement_gradient) 
+    pass
 
-def sigmacontact_from_stress(scp,du_da):
+def sigmacontact_from_stress(scp,du_da,closure_index_for_gradient=None):
     """ NOTE: This should be kept functionally identical to sigmacontact_from_stress() in soft_closure_accel_ops.h"""
     # sigmacontact is positive compression
 
     #sigma_closure_interp=scipy.interpolate.interp1d(scp.x,scp.sigma_closure,kind="linear",fill_value="extrapolate")(scp.x)
     
     #sigmacontact = copy.copy(sigma_closure)
-    sigmacontact = copy.copy(scp.sigma_closure[:(du_da.shape[0]-1)]) 
+    sigmacontact = copy.copy(scp.sigma_closure[:(du_da.shape[0]-1)])
+
+    if closure_index_for_gradient is not None:
+        # sigma_contact gradient axis zero is position along crack, axis one is du_da_shortened element 
+        sigma_contact_gradient = np.zeros((du_da.shape[0]-1,scp.afull_idx-closure_index_for_gradient+1),dtype='d')
+        pass
+    
     da = scp.dx # same step size
 
     x = scp.x[:(du_da.shape[0]-1)]
@@ -461,6 +527,9 @@ def sigmacontact_from_stress(scp,du_da):
     betaval = scp.crack_model.beta(scp.crack_model)
 
     sigmacontact -= du_da[0]*da # constant term 
+    if closure_index_for_gradient is not None:
+        sigma_contact_gradient[:,0] -= da
+        pass
     
     for aidx in range(scp.afull_idx+1):
         #assert(sigma_closure[aidx] > 0)
@@ -492,9 +561,23 @@ def sigmacontact_from_stress(scp,du_da):
         ## = (1/sqrt(2))(du/da)*sqrt(a) * 2sqrt(da/2)) + (du/da)(da/2)
 
         ##sigmacontact[aidx] -= (du_da[aidx+1]*(sqrt(betaval)/sqrt(2.0))*np.sqrt(x_fine[aidx])*2.0*sqrt(da/2.0) + du_da[aidx+1]*da/2.0)
+
+        if closure_index_for_gradient is not None:
+            if aidx+1 >= closure_index_for_gradient+2:
+                du_da_shortened_index = aidx+2 + closure_index_for_gradient
+                sigma_contact_gradient[(aidx+1):,du_da_shortened_index] -= ((sqrt(betaval)/sqrt(2.0))*sqrt(a/r)*exp(-r/(scp.crack_model.r0_over_a*a)) + 1.0)*da
+                sigma_contact_gradient[aidx,du_da_shortened_index] -= ( (sqrt(betaval)/sqrt(2.0))*np.sqrt(x[aidx])*sqrt(np.pi*scp.crack_model.r0_over_a*a)*erf(sqrt(da/(2.0*scp.crack_model.r0_over_a*a))) + da/2.0 )
+                pass
+                
+            pass
+
         pass
 
-    return sigmacontact
+    if closure_index_for_gradient is None:
+        return sigmacontact
+    else:
+        return (sigmacontact,sigma_contact_gradient)
+    pass
 
 #def solve_sigmacontact(sigma_ext):
     # Contraints:
@@ -505,7 +588,7 @@ def sigmacontact_from_stress(scp,du_da):
 
     #sigma_nominal = (np.sqrt(np.mean(sigma_closure**2.0)) + np.abs(sigma_ext))/2.0
 
-def soft_closure_goal_function(du_da_shortened,scp,closure_index):
+def soft_closure_goal_function_with_gradient(du_da_shortened,scp,closure_index):
     """ NOTE: This should be kept identical functionally to soft_closure_goal_function_accel in soft_closure_accel.pyx"""
     # closure_index is used in tension to shorten du_da, disallowing any stresses or concentration to left of initial opening distance
     
@@ -524,30 +607,54 @@ def soft_closure_goal_function(du_da_shortened,scp,closure_index):
     
     # sigmacontact is positive compression
     
-    (from_displacement,displacement) = sigmacontact_from_displacement(scp,du_da_short)
+    (from_displacement,displacement,from_displacement_gradient,displacement_gradient) = sigmacontact_from_displacement(scp,du_da_short,closure_index_for_gradient=closure_index)
+    #dfrom_displacement = 0 when displacement < 0; (-3/2)displacement**(1/2)*Lm*ddisplacement otherwise
 
     #u = np.cumsum(du_da)*scp.dx_fine
     # u nominally on position basis x_fine+dx_fine/2.0
     
-    from_stress = sigmacontact_from_stress(scp,du_da_short)
+    (from_stress,from_stress_gradient) = sigmacontact_from_stress(scp,du_da_short,closure_index_for_gradient=closure_index)
     
     # elements of residual have units of stress^2
     residual = (from_displacement-from_stress)
+    dresidual = from_displacement_gradient - from_stress_gradient
 
     average = (from_displacement+from_stress)/2.0
+    daverage = (from_displacement_gradient + from_stress_gradient)/2.0
 
     # We only worry about residual, negative, and displaced
     # up to the point before the last... why?
     # well the last point corresponds to the crack tip, which
     # CAN hold tension and doesn't have to follow the contact stress
     # law... so all these [:-1]'s represent that a stress concentration
-    # at the crack tip is OK for our goal 
-    negative = average[:-1][average[:-1] < 0]  # negative sigmacontact means tension on the surfaces, which is not allowed (except at the actual tip)!
+    # at the crack tip is OK for our goal
 
-    displaced = average[:-1][displacement[:-1] > 0.0] # should not have stresses with positive displacement 
+    #negative = average[:-1][average[:-1] < 0]  # negative sigmacontact means tension on the surfaces, which is not allowed (except at the actual tip)!
+    negative_except_at_tip = average < 0
+    negative_except_at_tip[-1] = False
+
+    negative = average[negative_except_at_tip]
     
-    return 1.0*np.sum(residual[:-1]**2.0) + 1.0*np.sum(negative**2.0) + 1.0*np.sum(displaced**2.0) 
+    dnegative = daverage[negative_except_at_tip,:]
 
+    #displaced = average[:-1][displacement[:-1] > 0.0] # should not have stresses with positive displacement
+    displaced_except_at_tip = displacement > 0.0
+    displaced_except_at_tip[-1] = False
+
+    displaced = average[displaced_except_at_tip]
+    
+    ddisplaced = daverage[displaced_except_at_tip,:]
+    
+    goal_function =  1.0*np.sum(residual[:-1]**2.0) + 1.0*np.sum(negative**2.0) + 1.0*np.sum(displaced**2.0) 
+    gradient = 1.0*np.sum(2.0*residual[:-1,np.newaxis]*dresidual[:-1,:],axis=0) + 1.0*np.sum(2.0*negative[:,np.newaxis]*dnegative,axis=0) + 1.0*np.sum(2.0*displaced[:,np.newaxis]*ddisplaced,axis=0)
+
+    #print("grad_residual=%s" % (str(np.sum(2.0*residual[:-1,np.newaxis]*dresidual[:-1,:],axis=0))))
+    
+    #print("from_displacement_grad_residual_component=%s" % (str(np.sum(2.0*residual[:-1,np.newaxis]*from_displacement_gradient[:-1,:],axis=0))))
+
+    #print("from_stress_grad_residual_component=%s" % (str(np.sum(2.0*residual[:-1,np.newaxis]*(-from_stress_gradient[:-1,:]),axis=0))))
+
+    return (goal_function,gradient)
 
 
 def calc_contact(scp,sigma_ext):
@@ -603,7 +710,26 @@ def calc_contact(scp,sigma_ext):
     load_constraint = { "type": "eq",
                         "fun": load_constraint_fun }
         
+    
+    # Check gradient
+    
+    grad_eval = soft_closure_goal_function_with_gradient(du_da_shortened_iniguess,scp,closure_index)[1]
+    grad_approx = scipy.optimize.approx_fprime(du_da_shortened_iniguess,lambda x: soft_closure_goal_function_with_gradient(x,scp,closure_index)[0],sigma_ext/scp.dx/1e6)
+    grad_sumsquareddiff = np.sqrt(np.sum((grad_eval-grad_approx)**2.0))
+    grad_sumsquared = np.sqrt(np.sum(grad_eval**2.0))
 
+    
+    assert(grad_sumsquareddiff/grad_sumsquared < 1e-4) # NOTE: In the obscure case where our initial guess is at a relative minimum, this might fail extraneously
+
+    
+    # check accelerated gradient
+    grad_eval_accel = soft_closure_goal_function_with_gradient_accel(du_da_shortened_iniguess,scp,closure_index)[1]
+    grad_sumsquareddiff_accel = np.sqrt(np.sum((grad_eval_accel-grad_approx)**2.0))
+    grad_sumsquared_accel = np.sqrt(np.sum(grad_eval_accel**2.0))
+    
+    assert(grad_sumsquareddiff_accel/grad_sumsquared_accel < 1e-4) # NOTE: In the obscure case where our initial guess is at a relative minimum, this might fail extraneously
+        
+    
     
     if sigma_ext > 0: # Tensile
 
@@ -611,9 +737,8 @@ def calc_contact(scp,sigma_ext):
         nonnegative_constraint = { "type": "ineq",
                                    "fun": lambda du_da_shortened: du_da_shortened }
 
-        
 
-        
+
         # Calculate x
 
         
@@ -630,9 +755,10 @@ def calc_contact(scp,sigma_ext):
         while niter < total_maxiter and not terminate: 
             this_niter=10000
             #print("calling scipy.optimize.minimize; sigma_ext=%g; eps=%g maxiter=%d ftol=%g" % (sigma_ext,epsvalscaled,this_niter,scp.afull_idx_fine*(np.abs(sigma_ext)+20e6)**2.0/1e14))
-            res = scipy.optimize.minimize(soft_closure_goal_function_accel,starting_value,args=(scp,closure_index),   # was soft_closure_goal_function_accel
+            res = scipy.optimize.minimize(soft_closure_goal_function_with_gradient_accel,starting_value,args=(scp,closure_index),   # was soft_closure_goal_function_accel
                                           constraints = [ load_constraint ], #[ nonnegative_constraint, load_constraint ],
                                           method="SLSQP",
+                                          jac=True,
                                           options={"eps": epsvalscaled,
                                                    "maxiter": this_niter,
                                                    "ftol": scp.afull_idx*(np.abs(sigma_ext)+20e6)**2.0/1e14})
@@ -668,8 +794,8 @@ def calc_contact(scp,sigma_ext):
             pass
 
         # Verify proper operation of accelerated code
-        slowcalc = soft_closure_goal_function(res.x,scp,closure_index)
-        fastcalc = soft_closure_goal_function_accel(res.x,scp,closure_index)
+        (slowcalc,slowcalc_gradient) = soft_closure_goal_function_with_gradient(res.x,scp,closure_index)
+        (fastcalc,fastcalc_gradient) = soft_closure_goal_function_with_gradient_accel(res.x,scp,closure_index)
         assert(abs((slowcalc-fastcalc)/slowcalc) < 1e-6)
         
         
@@ -721,9 +847,10 @@ def calc_contact(scp,sigma_ext):
         starting_value=du_da_shortened_iniguess
         while niter < total_maxiter and not terminate: 
             this_niter=10000
-            res = scipy.optimize.minimize(soft_closure_goal_function,starting_value,args=(scp,closure_index),   # was soft_closure_goal_function_accel
+            res = scipy.optimize.minimize(soft_closure_goal_function_with_gradient_accel,starting_value,args=(scp,closure_index),   # was soft_closure_goal_function_accel
                                           constraints = constraints,
                                           method="SLSQP",
+                                          jac=True,
                                           options={"eps": epsvalscaled,
                                                    "maxiter": this_niter,
                                                    "ftol": scp.afull_idx*(np.abs(sigma_ext)+20e6)**2.0/1e14})
@@ -761,8 +888,9 @@ def calc_contact(scp,sigma_ext):
         du_da_shortened=res.x
 
         # Verify proper operation of accelerated code
-        slowcalc = soft_closure_goal_function(res.x,scp,closure_index)
-        fastcalc = soft_closure_goal_function_accel(res.x,scp,closure_index)
+        (slowcalc,slowcalc_gradient) = soft_closure_goal_function_with_gradient(res.x,scp,closure_index)
+        (fastcalc,fastcalc_gradient) = soft_closure_goal_function_with_gradient_accel(res.x,scp,closure_index)
+        assert(abs((slowcalc-fastcalc)/slowcalc) < 1e-6)
 
         #du_da = np.concatenate((du_da_shortened,np.zeros(scp.xsteps*scp.fine_refinement - scp.afull_idx_fine - 2 ,dtype='d')))
         assert(closure_index==-1)
