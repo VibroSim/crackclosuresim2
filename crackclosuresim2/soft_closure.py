@@ -200,6 +200,11 @@ class sc_params(object):
             import pdb
             pdb.set_trace()
             pass
+
+        # Verify proper operation of accelerated code
+        slowcalc = initialize_contact_goal_function(res.x,self,sigma_closure_interp,closure_index)
+        fastcalc = initialize_contact_goal_function_accel(res.x,self,sigma_closure_interp,closure_index)
+        assert(abs((slowcalc-fastcalc)/slowcalc) < 1e-6)
         
         du_da_shortened=res.x
         du_da = np.concatenate(((du_da_shortened[0],),np.zeros(closure_index+1,dtype='d'),du_da_shortened[1:],np.zeros(self.xsteps*self.fine_refinement - self.afull_idx_fine - 2 ,dtype='d')))
@@ -600,7 +605,7 @@ def calc_contact(scp,sigma_ext):
         while niter < total_maxiter and not terminate: 
             this_niter=10000
             print("calling scipy.optimize.minimize; sigma_ext=%g; eps=%g maxiter=%d ftol=%g" % (sigma_ext,epsvalscaled,this_niter,scp.afull_idx_fine*(np.abs(sigma_ext)+20e6)**2.0/1e14))
-            res = scipy.optimize.minimize(soft_closure_goal_function,starting_value,args=(scp,closure_index),   # was soft_closure_goal_function_accel
+            res = scipy.optimize.minimize(soft_closure_goal_function_accel,starting_value,args=(scp,closure_index),   # was soft_closure_goal_function_accel
                                           constraints = [ load_constraint ], #[ nonnegative_constraint, load_constraint ],
                                           method="SLSQP",
                                           options={"eps": epsvalscaled,
@@ -636,6 +641,12 @@ def calc_contact(scp,sigma_ext):
             import pdb
             pdb.set_trace()
             pass
+
+        # Verify proper operation of accelerated code
+        slowcalc = soft_closure_goal_function(res.x,scp,closure_index)
+        fastcalc = soft_closure_goal_function_accel(res.x,scp,closure_index)
+        assert(abs((slowcalc-fastcalc)/slowcalc) < 1e-6)
+        
         
         du_da_shortened=res.x
         du_da = np.concatenate(((du_da_shortened[0],),np.zeros(closure_index+1,dtype='d'),du_da_shortened[1:],np.zeros(scp.xsteps*scp.fine_refinement - scp.afull_idx_fine - 2 ,dtype='d')))        
@@ -723,6 +734,11 @@ def calc_contact(scp,sigma_ext):
             pass
         
         du_da_shortened=res.x
+
+        # Verify proper operation of accelerated code
+        slowcalc = soft_closure_goal_function(res.x,scp,closure_index)
+        fastcalc = soft_closure_goal_function_accel(res.x,scp,closure_index)
+
         #du_da = np.concatenate((du_da_shortened,np.zeros(scp.xsteps*scp.fine_refinement - scp.afull_idx_fine - 2 ,dtype='d')))
         assert(closure_index==-1)
         du_da = np.concatenate(((du_da_shortened[0],),np.zeros(closure_index+1,dtype='d'),du_da_shortened[1:],np.zeros(scp.xsteps*scp.fine_refinement - scp.afull_idx_fine - 2 ,dtype='d')))        

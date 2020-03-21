@@ -103,8 +103,9 @@ static void sigmacontact_from_stress(double *du_da_short,
   
   for (cnt=0;cnt < du_da_short_len-1;cnt++) {
     from_stress[cnt] = sigma_closure_interp[cnt] - du_da_short[0]*dx_fine;
-  
+
   }
+  //printf("from_stress[0]=%g\n",from_stress[0]);
   
   if (crack_model.modeltype==CMT_THROUGH) {
     sqrt_betaval = sqrt(crack_model.modeldat.through.Beta);
@@ -128,6 +129,11 @@ static void sigmacontact_from_stress(double *du_da_short,
     //from_stress[aidx] -= (du_da_short[aidx+1]*(sqrt_betaval/M_SQRT2)*sqrt(xfine0+aidx*dx_fine)*2.0*sqrt(dx_fine/2.0) + du_da_short[aidx+1]*dx_fine/2.0);
     //from_stress[aidx] -= (du_da_short[aidx+1]*(sqrt_betaval/M_SQRT2)*sqrt(a)*2.0*sqrt(dx_fine/2.0) + du_da_short[aidx+1]*dx_fine/2.0);
     from_stress[aidx] -= (du_da_short[aidx+1]*(sqrt_betaval/M_SQRT2)*sqrt(a)*sqrt(M_PI*r0_over_a*a)*erf(sqrt(dx_fine/(2.0*r0_over_a*a))) + du_da_short[aidx+1]*dx_fine/2.0);
+    //if (aidx==0) {
+    //  printf("fs[0] subtraction=%g\n",(du_da_short[aidx+1]*(sqrt_betaval/M_SQRT2)*sqrt(a)*sqrt(M_PI*r0_over_a*a)*erf(sqrt(dx_fine/(2.0*r0_over_a*a))) + du_da_short[aidx+1]*dx_fine/2.0));
+    //  printf("fs[0] subtraction terms/factors=%g, %g, %g, %g, %g, %g\n",du_da_short[aidx+1],(sqrt_betaval/M_SQRT2),sqrt(a),sqrt(M_PI*r0_over_a*a),erf(sqrt(dx_fine/(2.0*r0_over_a*a))),du_da_short[aidx+1]*dx_fine/2.0);
+    //  printf("from_stress[0]=%g\n",from_stress[0]);
+    //}
   }
 }
 
@@ -151,7 +157,7 @@ static double initialize_contact_goal_function_c(double *du_da_shortened,int du_
     } else if (cnt <= closure_index+1) {
       du_da_short[cnt]=0.0;
     } else {
-      du_da_short[cnt]=du_da_shortened[cnt-closure_index-1+1];
+      du_da_short[cnt]=du_da_shortened[cnt-closure_index-1];
     }
   }
   
@@ -178,6 +184,21 @@ static double initialize_contact_goal_function_c(double *du_da_shortened,int du_
 }
 
 
+static void print_array(char *name,double *ptr,int numelem)
+{
+  int cnt;
+  
+  printf("%s = [ ",name);
+
+  for (cnt=0;cnt < numelem;cnt++) {
+    if (cnt % 6 == 0) {
+      printf("\n");
+    }
+    printf("%g, ", ptr[cnt]);
+  }
+  printf(" ]\n");
+  
+}
 
 static double soft_closure_goal_function_c(double *du_da_shortened,int du_da_shortened_len,int closure_index,unsigned xsteps,unsigned fine_refinement,int afull_idx_fine,double *crack_initial_opening_interp,double *sigma_closure_interp,double xfine0,double dx_fine,double Lm,struct crack_model_t crack_model)
 // NOTE: This should be kept identical functionally to soft_closure_goal_function in soft_closure_accel.py
@@ -200,7 +221,7 @@ static double soft_closure_goal_function_c(double *du_da_shortened,int du_da_sho
     } else if (cnt <= closure_index+1) {
       du_da_short[cnt]=0.0;
     } else {
-      du_da_short[cnt]=du_da_shortened[cnt-closure_index-1+1];
+      du_da_short[cnt]=du_da_shortened[cnt-closure_index-1];
     }
   }
   
@@ -255,16 +276,22 @@ static double soft_closure_goal_function_c(double *du_da_shortened,int du_da_sho
     if (average < 0.0) {
       negative += pow(average,2.0); // negative sigmacontact means tension on the surfaces, which is not allowed (except at the actual tip)!
 
-      if (displacement[cnt] > 0.0) {
-	displaced += pow(average,2.0);  // should not have stresses with positive displacement 
-      }
     }
-    
+
+    if (displacement[cnt] > 0.0) {
+      displaced += pow(average,2.0);  // should not have stresses with positive displacement 
+    }
+
   }
+  //print_array("from_stress",from_stress,du_da_short_len-1);
+  //print_array("from_displacement",from_displacement,du_da_short_len-1);
+  //print_array("du_da_short",du_da_short,du_da_short_len);
   free(from_stress);
   free(displacement);
   free(from_displacement);
   free(du_da_short);
+
+  //printf("residual=%g; negative=%g; displaced=%g\n",residual,negative,displaced);
 
   return residual + negative + displaced;
 }
