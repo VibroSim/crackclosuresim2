@@ -16,6 +16,29 @@ from .soft_closure_accel import initialize_contact_goal_function_accel
 from .soft_closure_accel import soft_closure_goal_function_accel
 
 
+# IMPORTANT:
+# du_da terminology
+
+# Full length: starts with element corresponding to uniform load, no displacement. Then
+# followed by distributed stress concentration starting at x center offset by dx/2 from
+# crack center, may extend well beyond crack tip. Only meaningful up through crack tip.
+#
+# du_da_short: Same as full length but does not extend significantly beyond crack tip. Goes up to afull_idx_fine+1 as last element (afull_idx_fine+2 elements total)
+#
+# du_da_shortened: representation of du_da_short consisting of first element,
+#  closure_index+1 implicit zeros, followed by afull_idx_fine-closure_index
+# remaining elements from du_da_short. Total number of (non-implicit)
+#  elements: afull_idx_fine-closure_index+1
+
+
+def duda_short__from_duda_shortened(du_da_shortened,closure_index):
+    du_da_short = np.concatenate(((du_da_shortened[0],),np.zeros(closure_index+1,dtype='d'),du_da_shortened[1:]))  # short version goes only up to afull_idx_fine+1 as last element (afull_idx_fine+2 elements total)
+    return du_da_short
+
+def duda__from_duda_shortened(scp,du_da_shortened,closure_index):
+    du_da = np.concatenate(((du_da_shortened[0],),np.zeros(closure_index+1,dtype='d'),du_da_shortened[1:],np.zeros(scp.xsteps - scp.afull_idx - 2, dtype='d')))  # full version goes all the way up to and including scp.xsteps. 
+    return du_da
+
 
 class sc_params(object):
     # soft closure parameters
@@ -98,7 +121,11 @@ class sc_params(object):
         # disallow any concentration in this open region --
         # crack should not close. 
         du_da_shortened_iniguess=np.zeros(self.afull_idx+2-(closure_index+1),dtype='d')*(1.0/(self.afull_idx+1)) # * (-sigma_closure_avg_stress)/self.dx_fine  #
-        du_da_shortened_iniguess[1:(self.afull_idx+2-(closure_index+1))] = -sigma_closure[(closure_index+1):(self.afull_idx+1)]
+        if closure_index==-1:
+            du_da_shortened_iniguess[0] = -sigma_closure[0]*self.dx
+            pass
+        
+        du_da_shortened_iniguess[1:(self.afull_idx+2-(closure_index+1))] = -sigma_closure[(closure_index+1):(self.afull_idx+1)]*self.dx
 
         
         
@@ -213,7 +240,8 @@ class sc_params(object):
         assert(abs((slowcalc-fastcalc)/slowcalc) < 1e-6)
         
         du_da_shortened=res.x
-        du_da = np.concatenate(((du_da_shortened[0],),np.zeros(closure_index+1,dtype='d'),du_da_shortened[1:],np.zeros(self.xsteps - self.afull_idx - 2 ,dtype='d')))
+        #du_da = np.concatenate(((du_da_shortened[0],),np.zeros(closure_index+1,dtype='d'),du_da_shortened[1:],np.zeros(self.xsteps - self.afull_idx - 2 ,dtype='d')))
+        du_da = duda__from_duda_shortened(self,res.x,closure_index)
         
         (contact_stress,displacement) = sigmacontact_from_displacement(self,du_da)
 
@@ -298,8 +326,7 @@ def initialize_contact_goal_function(du_da_shortened,scp,sigma_closure,closure_i
     """ NOTE: This should be kept identical functionally to initialize_contact_goal_function_accel in soft_closure_accel.pyx"""
 
     #du_da = np.concatenate((np.zeros(closure_index+1,dtype='d'),du_da_shortened,np.zeros(scp.xsteps*scp.fine_refinement - scp.afull_idx_fine - 2 ,dtype='d')))
-    du_da_short = np.concatenate(((du_da_shortened[0],),np.zeros(closure_index+1,dtype='d'),du_da_shortened[1:]))  # short version goes only up to afull_idx_fine as last element (afull_idx_fine+1 elements total)
-    
+    du_da_short = duda_short__from_duda_shortened(du_da_shortened,closure_index)
 
     #last_closureidx = np.where(x_bnd >= a)[0][0]
 
@@ -485,8 +512,7 @@ def soft_closure_goal_function(du_da_shortened,scp,closure_index):
 
 
     #du_da = np.concatenate((np.zeros(closure_index+1,dtype='d'),du_da_shortened,np.zeros(scp.xsteps*scp.fine_refinement - scp.afull_idx_fine - 2 ,dtype='d')))
-    du_da_short = np.concatenate(((du_da_shortened[0],),np.zeros(closure_index+1,dtype='d'),du_da_shortened[1:]))  # short version goes only up to afull_idx_fine as last element (afull_idx_fine+1 elements total)
-  
+    du_da_short = duda_short__from_duda_shortened(du_da_shortened,closure_index)
 
     
 
@@ -567,7 +593,8 @@ def calc_contact(scp,sigma_ext):
 
     def load_constraint_fun(du_da_shortened):
 
-        du_da_short = np.concatenate(((du_da_shortened[0],),np.zeros(closure_index+1,dtype='d'),du_da_shortened[1:]))        
+        #du_da_short = np.concatenate(((du_da_shortened[0],),np.zeros(closure_index+1,dtype='d'),du_da_shortened[1:]))        
+        du_da_short = duda_short__from_duda_shortened(du_da_shortened,closure_index)
         
         
         
@@ -647,8 +674,8 @@ def calc_contact(scp,sigma_ext):
         
         
         du_da_shortened=res.x
-        du_da = np.concatenate(((du_da_shortened[0],),np.zeros(closure_index+1,dtype='d'),du_da_shortened[1:],np.zeros(scp.xsteps - scp.afull_idx - 2 ,dtype='d')))        
-
+        #du_da = np.concatenate(((du_da_shortened[0],),np.zeros(closure_index+1,dtype='d'),du_da_shortened[1:],np.zeros(scp.xsteps - scp.afull_idx - 2 ,dtype='d')))        
+        du_da = duda__from_duda_shortened(scp,du_da_shortened,closure_index)
 
         pass
     else:
@@ -739,8 +766,8 @@ def calc_contact(scp,sigma_ext):
 
         #du_da = np.concatenate((du_da_shortened,np.zeros(scp.xsteps*scp.fine_refinement - scp.afull_idx_fine - 2 ,dtype='d')))
         assert(closure_index==-1)
-        du_da = np.concatenate(((du_da_shortened[0],),np.zeros(closure_index+1,dtype='d'),du_da_shortened[1:],np.zeros(scp.xsteps - scp.afull_idx - 2 ,dtype='d')))        
-
+        #du_da = np.concatenate(((du_da_shortened[0],),np.zeros(closure_index+1,dtype='d'),du_da_shortened[1:],np.zeros(scp.xsteps - scp.afull_idx - 2 ,dtype='d')))        
+        du_da = duda__from_duda_shortened(scp,du_da_shortened,closure_index)
 
         #(contact_stress,displacement) = sigmacontact_from_displacement(scp,du_da)
         
