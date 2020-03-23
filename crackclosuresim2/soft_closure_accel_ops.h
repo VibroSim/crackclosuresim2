@@ -61,7 +61,7 @@ static void sigmacontact_from_displacement(double *du_da_short,
   
   if (crack_model.modeltype==CMT_THROUGH) {
     for (aidx=afull_idx;aidx >= 0;aidx--) {
-      du_da_shortened_index = aidx+2 + closure_index_for_gradient;
+      du_da_shortened_index = aidx - closure_index_for_gradient;
 
       for (cnt=0;cnt < aidx;cnt++) {
 	displacement[cnt] += (4.0/crack_model.modeldat.through.Eeff)*du_da_short[aidx+1]*sqrt((x0+aidx*dx + x0+cnt*dx)*(x0+aidx*dx - x0-cnt*dx))*dx;
@@ -84,7 +84,7 @@ static void sigmacontact_from_displacement(double *du_da_short,
     }
   } else if (crack_model.modeltype==CMT_TADA) {
     for (aidx=afull_idx;aidx >= 0;aidx--) {
-      du_da_shortened_index = aidx+2 + closure_index_for_gradient;
+      du_da_shortened_index = aidx - closure_index_for_gradient;
       
       for (cnt=0;cnt < aidx;cnt++) {
 	displacement[cnt] += (8.0*(1.0-pow(crack_model.modeldat.tada.nu,2.0))/(M_PI*crack_model.modeldat.tada.E))*du_da_short[aidx+1]*sqrt((x0+aidx*dx + x0+cnt*dx)*(x0+aidx*dx - x0-cnt*dx))*dx;
@@ -167,7 +167,7 @@ static void sigmacontact_from_stress(double *du_da_short,
   }
   
   for (aidx=0;aidx <= afull_idx;aidx++) {
-    du_da_shortened_index = aidx+2 + closure_index_for_gradient;
+    du_da_shortened_index = aidx - closure_index_for_gradient;
 
     
     a = x0 + aidx*dx;

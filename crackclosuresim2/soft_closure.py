@@ -176,7 +176,17 @@ class sc_params(object):
                
         # Check gradient
     
+        #try: 
         grad_eval = initialize_contact_goal_function_with_gradient(du_da_shortened_iniguess,self,sigma_closure,closure_index)[1]
+        #    pass
+        #except:
+        #    import pdb
+        #    import traceback
+        #    exctype, value, tb = sys.exc_info()
+        #    traceback.print_exc()
+        #    pdb.post_mortem(tb)
+        #    pass
+
         grad_approx = scipy.optimize.approx_fprime(du_da_shortened_iniguess,lambda x: initialize_contact_goal_function_with_gradient(x,self,sigma_closure,closure_index)[0],(abs(np.mean(sigma_closure))+10e6)/self.dx/1e6)
         grad_sumsquareddiff = np.sqrt(np.sum((grad_eval-grad_approx)**2.0))
         grad_sumsquared = np.sqrt(np.sum(grad_eval**2.0))
@@ -426,7 +436,7 @@ def sigmacontact_from_displacement(scp,du_da,closure_index_for_gradient=None):
 
             if closure_index_for_gradient is not None:
                 if aidx+1 >= closure_index_for_gradient+2:
-                    du_da_shortened_index = aidx+2 + closure_index_for_gradient
+                    du_da_shortened_index = aidx -  closure_index_for_gradient
                     displacement_gradient[:aidx,du_da_shortened_index] += (4.0/scp.crack_model.Eeff)*np.sqrt((x[aidx]+x[:aidx])*(x[aidx]-x[:aidx]))*da
                     displacement_gradient[aidx,du_da_shortened_index] += (4.0/scp.crack_model.Eeff)*np.sqrt(2.0*x[aidx])*(da/2.0)**(3.0/2.0)
                     pass
@@ -459,7 +469,7 @@ def sigmacontact_from_displacement(scp,du_da,closure_index_for_gradient=None):
 
             if closure_index_for_gradient is not None:
                 if aidx+1 >= closure_index_for_gradient+2:
-                    du_da_shortened_index = aidx+2 + closure_index_for_gradient
+                    du_da_shortened_index = aidx - closure_index_for_gradient
                     displacement_gradient[:aidx,du_da_shortened_index] += (8.0*(1.0-scp.crack_model.nu**2.0)/(np.pi*scp.crack_model.E))*np.sqrt((x[aidx]+x[:aidx])*(x[aidx]-x[:aidx]))*da
                     displacement_gradient[aidx,du_da_shortened_index] += (8.0*(1.0-scp.crack_model.nu**2.0)/(np.pi*scp.crack_model.E))*np.sqrt(2.0*x[aidx])*(da/2.0)**(3.0/2.0)
                     pass
@@ -564,7 +574,7 @@ def sigmacontact_from_stress(scp,du_da,closure_index_for_gradient=None):
 
         if closure_index_for_gradient is not None:
             if aidx+1 >= closure_index_for_gradient+2:
-                du_da_shortened_index = aidx+2 + closure_index_for_gradient
+                du_da_shortened_index = aidx - closure_index_for_gradient
                 sigma_contact_gradient[(aidx+1):,du_da_shortened_index] -= ((sqrt(betaval)/sqrt(2.0))*sqrt(a/r)*exp(-r/(scp.crack_model.r0_over_a*a)) + 1.0)*da
                 sigma_contact_gradient[aidx,du_da_shortened_index] -= ( (sqrt(betaval)/sqrt(2.0))*np.sqrt(x[aidx])*sqrt(np.pi*scp.crack_model.r0_over_a*a)*erf(sqrt(da/(2.0*scp.crack_model.r0_over_a*a))) + da/2.0 )
                 pass
