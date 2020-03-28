@@ -728,8 +728,12 @@ def calc_contact(scp,sigma_ext):
     grad_sumsquareddiff = np.sqrt(np.sum((grad_eval-grad_approx)**2.0))
     grad_sumsquared = np.sqrt(np.sum(grad_eval**2.0))
 
+    print("grad_sumsquared=%g; grad_sumsquareddiff=%g" % (grad_sumsquared,grad_sumsquareddiff))
     
-    assert(grad_sumsquareddiff/grad_sumsquared < 1e-4) # NOTE: In the obscure case where our initial guess is at a relative minimum, this might fail extraneously
+    if (grad_sumsquareddiff/grad_sumsquared >= 1e-4):
+        raise ValueError("Grad error too high: FAIL grad_sumsquared=%g; grad_sumsquareddiff=%g" % (grad_sumsquared,grad_sumsquareddiff))
+    
+        #assert(grad_sumsquareddiff/grad_sumsquared < 1e-4) # NOTE: In the obscure case where our initial guess is at a relative minimum, this might fail extraneously
 
     
     # check accelerated gradient
@@ -919,7 +923,7 @@ def calc_contact(scp,sigma_ext):
 
 
     
-    contact_stress_from_stress = sigmacontact_from_stress(scp,du_da_short)
+    contact_stress_from_stress = sigmacontact_from_stress(scp,du_da)
     (contact_stress_from_displacement,displacement) = sigmacontact_from_displacement(scp,du_da)
 
     residual = res.fun
