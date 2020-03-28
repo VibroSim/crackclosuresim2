@@ -214,8 +214,9 @@ class sc_params(object):
         epsvalscaled = epsval
         terminate=False
         starting_value=du_da_shortened_iniguess
-
-
+        goal_stress_fit_error_pascals = 150e3 # Amount of stress error to allow in fitting process. If we have more than this we keep trying to minimize
+        goal_residual = (goal_stress_fit_error_pascals**2.0)*self.afull_idx
+        
         while niter < total_maxiter and not terminate: 
             this_niter=10000
             res = scipy.optimize.minimize(initialize_contact_goal_function_with_gradient_accel,starting_value,args=(self,sigma_closure,closure_index), # was initialize_contact_goal_function_accel
@@ -226,7 +227,14 @@ class sc_params(object):
                                                    "maxiter": this_niter,
                                                    "ftol": self.afull_idx*(abs(np.mean(sigma_closure))+20e6)**2.0/1e14})
             if res.status != 9 and res.status != 7:  # anything but reached iteration limit or eps increase
-                terminate=True
+                if res.fun <= goal_residual:
+                    terminate=True
+                    pass 
+                else:
+                    # ... otherwise keep trying!
+                    epsvalscaled = epsval # reset eps to nominal value
+                    starting_value = res.x # Next iteration starts where this one left off
+                    pass
                 pass
             elif res.status==7:
                 # Rank-deficient equality constraint subproblem HFTI 
@@ -236,6 +244,8 @@ class sc_params(object):
                     starting_value = res.x # Next iteration starts where this one left off
                     pass
                 else:
+                    print("WARNING: initialize_contact(): repeated rank-deficient equality constraint subproblem HFTI... Terminating!\n")
+
                     terminate=True  # Don't allow eps to grow too much
                     pass
                 pass
@@ -743,6 +753,8 @@ def calc_contact(scp,sigma_ext):
     
     assert(grad_sumsquareddiff_accel/grad_sumsquared_accel < 1e-4) # NOTE: In the obscure case where our initial guess is at a relative minimum, this might fail extraneously
         
+    goal_stress_fit_error_pascals = 150e3 # Amount of stress error to allow in fitting process. If we have more than this we keep trying to minimize
+    goal_residual = (goal_stress_fit_error_pascals**2.0)*self.afull_idx
     
     
     if sigma_ext > 0: # Tensile
@@ -766,6 +778,8 @@ def calc_contact(scp,sigma_ext):
         epsvalscaled = epsval
         terminate=False
         starting_value=du_da_shortened_iniguess
+
+
         while niter < total_maxiter and not terminate: 
             this_niter=10000
             #print("calling scipy.optimize.minimize; sigma_ext=%g; eps=%g maxiter=%d ftol=%g" % (sigma_ext,epsvalscaled,this_niter,scp.afull_idx_fine*(np.abs(sigma_ext)+20e6)**2.0/1e14))
@@ -778,7 +792,14 @@ def calc_contact(scp,sigma_ext):
                                                    "ftol": scp.afull_idx*(np.abs(sigma_ext)+20e6)**2.0/1e14})
             #print("res=%s" % (str(res)))
             if res.status != 9 and res.status != 7:  # anything but reached iteration limit or eps increase
-                terminate=True
+                if res.fun <= goal_residual:
+                    terminate=True
+                    pass 
+                else:
+                    # ... otherwise keep trying!
+                    epsvalscaled = epsval # reset eps to nominal value
+                    starting_value = res.x # Next iteration starts where this one left off
+                    pass
                 pass
             elif res.status==7:
                 # Rank-deficient equality constraint subproblem HFTI 
@@ -788,6 +809,7 @@ def calc_contact(scp,sigma_ext):
                     starting_value = res.x # Next iteration starts where this one left off
                     pass
                 else:
+                    print("WARNING: initialize_contact(): repeated rank-deficient equality constraint subproblem HFTI... Terminating!\n")
                     terminate=True  # Don't allow eps to grow too much
                     pass
                 pass
@@ -869,7 +891,14 @@ def calc_contact(scp,sigma_ext):
                                                    "maxiter": this_niter,
                                                    "ftol": scp.afull_idx*(np.abs(sigma_ext)+20e6)**2.0/1e14})
             if res.status != 9 and res.status != 7: # anything but reached iteration limit or eps increase needed
-                terminate=True
+                if res.fun <= goal_residual:
+                    terminate=True
+                    pass
+                else:
+                    # ... otherwise keep trying!
+                    epsvalscaled = epsval # reset eps to nominal value
+                    starting_value = res.x # Next iteration starts where this one left off
+                    pass
                 pass
             elif res.status==7:
                 # Rank-deficient equality constraint subproblem HFTI 
@@ -879,6 +908,8 @@ def calc_contact(scp,sigma_ext):
                     starting_value = res.x # Next iteration starts where this one left off
                     pass
                 else:
+                    print("WARNING: initialize_contact(): repeated rank-deficient equality constraint subproblem HFTI... Terminating!\n")
+
                     terminate=True  # Don't allow eps to grow too much
                     pass
                 pass
