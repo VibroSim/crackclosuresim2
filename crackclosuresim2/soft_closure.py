@@ -837,7 +837,7 @@ def calc_contact(scp,sigma_ext):
         #crack_open_constraint = { "type": "ineq",
         #                          "fun": crack_open_constraint_fun }
         
-
+        
         
         constraints = [ load_constraint ]
         
@@ -919,11 +919,13 @@ def calc_contact(scp,sigma_ext):
 
 
     
-    (contact_stress,displacement) = sigmacontact_from_displacement(scp,du_da)
+    contact_stress_from_stress = sigmacontact_from_stress(scp,du_da_short)
+    (contact_stress_from_displacement,displacement) = sigmacontact_from_displacement(scp,du_da)
 
-
+    residual = res.fun
     
-    return (du_da,contact_stress,displacement)
+    
+    return (du_da,contact_stress_from_displacement,displacement,contact_stress_from_stress,residual)
     
 
 

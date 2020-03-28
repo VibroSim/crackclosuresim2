@@ -98,7 +98,7 @@ if __name__=="__main__":
     sigma_ext_compressive=-50e6
     
 
-    (du_da_compressive,contact_stress_compressive,displacement_compressive) = calc_contact(scp,sigma_ext_compressive)
+    (du_da_compressive,contact_stress_compressive,displacement_compressive,contact_stress_compressive_from_stress,residual_compressive) = calc_contact(scp,sigma_ext_compressive)
 
     (sigmacontact_plot_compressive,duda_plot_compressive,displacement_plot_compressive) = soft_closure_plots(scp,du_da_compressive,titleprefix="Compressive: ")
 
@@ -115,7 +115,7 @@ if __name__=="__main__":
     sigma_ext_tensile=50e6
     
 
-    (du_da_tensile,contact_stress_tensile,displacement_tensile) = calc_contact(scp,sigma_ext_tensile)
+    (du_da_tensile,contact_stress_tensile,displacement_tensile,contact_stress_tensile_from_stress,residual_tensile) = calc_contact(scp,sigma_ext_tensile)
 
     (sigmacontact_plot_tensile,duda_plot_tensile,displacement_plot_tensile) = soft_closure_plots(scp,du_da_tensile,titleprefix="Tensile: ")
 

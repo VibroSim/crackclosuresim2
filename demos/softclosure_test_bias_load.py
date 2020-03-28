@@ -98,7 +98,7 @@ if __name__=="__main__":
     sigma_ext_compressive=sigma_ext_bias-50e6
     
 
-    (du_da_compressive,contact_stress_compressive,displacement_compressive) = calc_contact(scp,sigma_ext_compressive)
+    (du_da_compressive,contact_stress_compressive,displacement_compressive,contact_stress_compressive_from_stress,residual_compressive) = calc_contact(scp,sigma_ext_compressive)
 
     soft_closure_plots(scp,du_da_compressive,titleprefix="Compressive: ")
 
@@ -106,7 +106,7 @@ if __name__=="__main__":
     sigma_ext_tensile=sigma_ext_bias+50e6
     
 
-    (du_da_tensile,contact_stress_tensile,displacement_tensile) = calc_contact(scp,sigma_ext_tensile)
+    (du_da_tensile,contact_stress_tensile,displacement_tensile,contact_stress_tensile_from_stress,residual_tensile) = calc_contact(scp,sigma_ext_tensile)
 
     soft_closure_plots(scp,du_da_tensile,titleprefix="Tensile: ")
 
@@ -114,7 +114,7 @@ if __name__=="__main__":
     # Demonstrate applying bias load to crack with scp.setcrackstate()
     
     # Step #1: Evaluate bias condition
-    (du_da_bias,contact_stress_bias,displacement_bias) = calc_contact(scp,sigma_ext_bias)
+    (du_da_bias,contact_stress_bias,displacement_bias,contact_stress_bias_from_stress,residual_bias) = calc_contact(scp,sigma_ext_bias)
 
     soft_closure_plots(scp,du_da_bias,titleprefix="Bias: ")
 
@@ -136,7 +136,7 @@ if __name__=="__main__":
     sigma_ext_compressive_biased=-50e6
     
 
-    (du_da_compressive_biased,contact_stress_compressive_biased,displacement_compressive_biased) = calc_contact(scp,sigma_ext_compressive_biased)
+    (du_da_compressive_biased,contact_stress_compressive_biased,displacement_compressive_biased,contact_stress_compressive_biased_from_stress,residual_compressive_biased) = calc_contact(scp,sigma_ext_compressive_biased)
 
     soft_closure_plots(scp,du_da_compressive_biased,titleprefix="Compressive with bias: ")
 
@@ -144,7 +144,7 @@ if __name__=="__main__":
     sigma_ext_tensile_biased=50e6
     
 
-    (du_da_tensile_biased,contact_stress_tensile_biased,displacement_tensile_biased) = calc_contact(scp,sigma_ext_tensile_biased)
+    (du_da_tensile_biased,contact_stress_tensile_biased,displacement_tensile_biased,contact_stress_tensile_biased_from_stress,residuale_tensile_biased) = calc_contact(scp,sigma_ext_tensile_biased)
 
     soft_closure_plots(scp,du_da_tensile_biased,titleprefix="Tensile with bias: ")
 
