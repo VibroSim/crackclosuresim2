@@ -214,7 +214,8 @@ class sc_params(object):
         epsvalscaled = epsval
         terminate=False
         starting_value=du_da_shortened_iniguess
-        goal_stress_fit_error_pascals = 150e3 # Amount of stress error to allow in fitting process. If we have more than this we keep trying to minimize
+        #goal_stress_fit_error_pascals = 150e3 # Amount of stress error to allow in fitting process. If we have more than this we keep trying to minimize
+        goal_stress_fit_error_pascals = 4500e3 # Amount of stress error to allow in fitting process. If we have more than this we keep trying to minimize
         goal_residual = (goal_stress_fit_error_pascals**2.0)*self.afull_idx
         
         while niter < total_maxiter and not terminate: 
@@ -225,13 +226,17 @@ class sc_params(object):
                                           jac=True,
                                           options={"eps": epsvalscaled,
                                                    "maxiter": this_niter,
-                                                   "ftol": self.afull_idx*(abs(np.mean(sigma_closure))+20e6)**2.0/1e14})
+                                                   "ftol": 1e-6}) #self.afull_idx*(abs(np.mean(sigma_closure))+20e6)**2.0/1e14})
             if res.status != 9 and res.status != 7:  # anything but reached iteration limit or eps increase
-                if res.fun <= goal_residual:
+                if res.fun <= goal_residual or res.nit==0:
                     terminate=True
                     pass 
                 else:
-                    # ... otherwise keep trying!
+                    ## ... otherwise keep trying!
+                    #if res.nit==1:
+                    #    import pdb
+                    #    pdb.set_trace()
+                    #    pass
                     epsvalscaled = epsval # reset eps to nominal value
                     starting_value = res.x # Next iteration starts where this one left off
                     pass
@@ -253,8 +258,13 @@ class sc_params(object):
                 epsvalscaled = epsval # reset eps to nominal value
                 starting_value = res.x # Next iteration starts where this one left off
                 pass
-            niter += this_niter
+            niter += this_niter #res.nit
             pass
+
+        if niter >= total_maxiter and res.fun > goal_residual:
+            print("soft_closure/initialize_contact: WARNING Maximum number of iterations (%d) reached and residual (%g) exceeds goal (%g)" % (total_maxiter,res.fun,goal_residual))
+            pass
+
         
         if not res.success: #  and res.status != 4:
             # (ignore incompatible constraint, because our constraints are
@@ -753,8 +763,9 @@ def calc_contact(scp,sigma_ext):
     
     assert(grad_sumsquareddiff_accel/grad_sumsquared_accel < 1e-4) # NOTE: In the obscure case where our initial guess is at a relative minimum, this might fail extraneously
         
-    goal_stress_fit_error_pascals = 150e3 # Amount of stress error to allow in fitting process. If we have more than this we keep trying to minimize
-    goal_residual = (goal_stress_fit_error_pascals**2.0)*self.afull_idx
+    #goal_stress_fit_error_pascals = 150e3 # Amount of stress error to allow in fitting process. If we have more than this we keep trying to minimize
+    goal_stress_fit_error_pascals = 1500e3 # Amount of stress error to allow in fitting process. If we have more than this we keep trying to minimize
+    goal_residual = (goal_stress_fit_error_pascals**2.0)*scp.afull_idx
     
     
     if sigma_ext > 0: # Tensile
@@ -789,14 +800,19 @@ def calc_contact(scp,sigma_ext):
                                           jac=True,
                                           options={"eps": epsvalscaled,
                                                    "maxiter": this_niter,
-                                                   "ftol": scp.afull_idx*(np.abs(sigma_ext)+20e6)**2.0/1e14})
+                                                   "ftol": 1e-6})#scp.afull_idx*(np.abs(sigma_ext)+20e6)**2.0/1e14})
             #print("res=%s" % (str(res)))
+            print("niter = %d; residual = %g; res.message=%s" % (niter+res.nit,res.fun,res.message))
             if res.status != 9 and res.status != 7:  # anything but reached iteration limit or eps increase
-                if res.fun <= goal_residual:
+                if res.fun <= goal_residual or res.nit==0:
                     terminate=True
                     pass 
                 else:
                     # ... otherwise keep trying!
+                    #if res.nit==1:
+                    #    import pdb
+                    #    pdb.set_trace()
+                    #    pass
                     epsvalscaled = epsval # reset eps to nominal value
                     starting_value = res.x # Next iteration starts where this one left off
                     pass
@@ -817,8 +833,13 @@ def calc_contact(scp,sigma_ext):
                 epsvalscaled = epsval # reset eps to nominal value
                 starting_value = res.x # Next iteration starts where this one left off
                 pass
-            niter += this_niter
+            niter += this_niter #res.nit
             pass
+
+        if niter >= total_maxiter and res.fun > goal_residual:
+            print("soft_closure/calc_contact (tensile): WARNING Maximum number of iterations (%d) reached and residual (%g) exceeds goal (%g)" % (total_maxiter,res.fun,goal_residual))
+            pass
+
         #res = scipy.optimize.minimize(goal_function,du_da_shortened_iniguess,method='nelder-mead',options={"maxfev": 15000})
         if not res.success: # and res.status != 4:
             # (ignore incompatible constraint, because our constraints are
@@ -889,9 +910,9 @@ def calc_contact(scp,sigma_ext):
                                           jac=True,
                                           options={"eps": epsvalscaled,
                                                    "maxiter": this_niter,
-                                                   "ftol": scp.afull_idx*(np.abs(sigma_ext)+20e6)**2.0/1e14})
+                                                   "ftol": 1e-6})  # scp.afull_idx*(np.abs(sigma_ext)+20e6)**2.0/1e14})
             if res.status != 9 and res.status != 7: # anything but reached iteration limit or eps increase needed
-                if res.fun <= goal_residual:
+                if res.fun <= goal_residual or res.nit==0:
                     terminate=True
                     pass
                 else:
@@ -917,9 +938,13 @@ def calc_contact(scp,sigma_ext):
                 epsvalscaled = epsval # reset eps to nominal value
                 starting_value = res.x # Next iteration starts where this one left off
                 pass
-            niter += this_niter
+            niter += this_niter #res.nit
             pass
             
+        if niter >= total_maxiter and res.fun > goal_residual:
+            print("soft_closure/calc_contact (compressive): WARNING Maximum number of iterations (%d) reached and residual (%g) exceeds goal (%g)" % (total_maxiter,res.fun,goal_residual))
+            pass
+
         #res = scipy.optimize.minimize(goal_function,du_da_shortened_iniguess,method='nelder-mead',options={"maxfev": 15000})
         if not res.success: #  and res.status != 4:
             # (ignore incompatible constraint, because our constraints are
