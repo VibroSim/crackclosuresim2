@@ -214,8 +214,7 @@ class sc_params(object):
         epsvalscaled = epsval
         terminate=False
         starting_value=du_da_shortened_iniguess
-        #goal_stress_fit_error_pascals = 150e3 # Amount of stress error to allow in fitting process. If we have more than this we keep trying to minimize
-        goal_stress_fit_error_pascals = 4500e3 # Amount of stress error to allow in fitting process. If we have more than this we keep trying to minimize
+        goal_stress_fit_error_pascals = 150e3 # Amount of stress error to allow in fitting process. If we have more than this we keep trying to minimize
         goal_residual = (goal_stress_fit_error_pascals**2.0)*self.afull_idx
         
         while niter < total_maxiter and not terminate: 
@@ -282,8 +281,8 @@ class sc_params(object):
         if abs((slowcalc-fastcalc)/slowcalc) >= 1e-6:
             from VibroSim_Simulator.function_as_script import scriptify
             (slowcalc2,slowcalc2_grad) = scriptify(initialize_contact_goal_function_with_gradient)(res.x,self,sigma_closure,closure_index)
-            raise ValueError("Accelerated calculation mismatch: %g vs %g" % (slowcalc2,fastcalc))
-            pass
+            raise ValueError("Accelerated initialize contact calculation mismatch: %g vs %g" % (slowcalc2,fastcalc))
+            
         assert(abs((slowcalc-fastcalc)/slowcalc) < 1e-6)
         
         du_da_shortened=res.x
@@ -568,23 +567,44 @@ def sigmacontact_from_stress(scp,du_da,closure_index_for_gradient=None):
 
         a = x[aidx]
         r = (x[(aidx+1):]-a)
-        sigmacontact[(aidx+1):] -= du_da[aidx+1]*((sqrt(betaval)/sqrt(2.0))*sqrt(a/r)*exp(-r/(scp.crack_model.r0_over_a*a)) + 1.0)*da # + 1.0 represents stress when a large distance away from effective tip
+        #sigmacontact[(aidx+1):] -= du_da[aidx+1]*((sqrt(betaval)/sqrt(2.0))*sqrt(a/r)*exp(-r/(scp.crack_model.r0_over_a*a)) + 1.0)*da # + 1.0 represents stress when a large distance away from effective tip
+        sigmacontact[(aidx+1):] -= du_da[aidx+1]*((sqrt(betaval)/sqrt(2.0))*sqrt(a/r)* (r0_over_a*a)**2.0/(r**2.0 + (r0_over_a*a)**2.0)  + 1.0)*da # + 1.0 represents stress when a large distance away from effective tip
 
         # Need to include integral 
-        # of (du/da)[(1/sqrt(2))sqrt(a/(x-a))exp(-(x-a)/r0) + 1]da
+        # of (du/da)[(1/sqrt(2))sqrt(a/(x-a))*(r0^2)/(r0^2 + (x-a)^2) + 1]da
         # as a goes from x[aidx]-da/2 to x[aidx]
-        # approximate sqrt(x-a)*exp(-(x-a)/r0) as only a dependence
-        # (du/da)*(1/sqrt(2))*sqrt(a)*integral of sqrt(1/(x-a))*exp(-(x-a)/r0) da + integral of du/da da
-        # as a goes from x[aidx]-da/2 to x[aidx]
-        # = (du/da)(1/sqrt(2))*sqrt(a) * (-sqrt(pi*r0)*erf(sqrt(x-a)/sqrt(r0))) as a goes from x[aidx]-da/2 to x[aidx]  ...  + (du/da)(da/2)
+        # approximate sqrt(x-a)*(r0^2)/(r0^2 + (x-a)^2) as only a dependence
+        # let v = x-a -> dv = -da 
+        # (du/da)*(1/sqrt(2))*sqrt(a)*integral of -sqrt(1/v)*(r0^2)/(r0^2 + v^2)dv  + integral of du/da da
+        # as a goes from x[aidx]-da/2 to x[aidx] and v goes from x-x[aidx]+da/2 to x-x[aidx]  + (du/da)(da/2)
+        # as v goes from da/2 to 0     + (du/da)(da/2)
+        # By Wolfram Alpha the integral is 
+        # = (du/da)*(1/sqrt(2))*sqrt(a)* [ (1/(2*sqrt(2))) * sqrt(r0) * {ln(-sqrt(2*r0*v) + r0 +v) - ln(sqrt(2*r0*v) + r0+v) + 2*atan(1-sqrt(2*v/r0)) - 2*atan(sqrt(2*v/r0)+1)} ] as v goes from da/2 to 0  ... + (du/da)*(da/2)
 
-        # = (du/da)(1/sqrt(2))*sqrt(a) * [ -sqrt(pi*r0)*erf(sqrt(x-x[aidx])/sqrt(r0)) + sqrt(pi*r0)*erf(sqrt(x-x[aidx]+da/2)/sqrt(r0)) ] + (du/da)(da/2)
 
-        # = (du/da)(1/sqrt(2))*sqrt(a) * [ -sqrt(pi*r0)*erf(sqrt(0)/sqrt(r0)) + sqrt(pi*r0)*erf(sqrt(da/2)/sqrt(r0)) ] + (du/da)(da/2)
+        # = (du/da)*(1/sqrt(2))*sqrt(a)* [ (1/(2*sqrt(2))) * sqrt(r0) * {ln(r0) - ln(r0) + 2*atan(1) - 2*atan(1)} - [ (1/(2*sqrt(2))) * sqrt(r0) * {ln(-sqrt(2*r0*da/2) + r0 + da/2) - ln(sqrt(2*r0*da/2) + r0+da/2) + 2*atan(1-sqrt(2*(da/2)/r0)) - 2*atan(sqrt(2*(da/2)/r0)+1)} ]  + (du/da)*(da/2)
+        sigmacontact[aidx]  -= (du_da[aidx+1])*(sqrt(betaval)/sqrt(2.0))*sqrt(a)* ( (1/(2*sqrt(2))) * sqrt(r0) * -(ln(-sqrt(2*(r0_over_a*x[aidx])*da/2) + r0_over_a*a + da/2) - log(sqrt(2*(r0_over_a*a)*da/2) + r0_over_a*a+da/2) + 2.0*arctan(1-sqrt(2*(da/2.0)/(r0_over_a*a))) - 2*arctan(sqrt(2*(da/2.0)/(r0_over_a*a))+1))) + du_da[aidx+1]*da/2.0
+        
+        print(" sigmacontact update: New: %g Old: %g VeryOld: %g" % ((du_da[aidx+1])*(sqrt(betaval)/sqrt(2.0))*sqrt(a)* ( (1/(2*sqrt(2))) * sqrt(r0) * -(ln(-sqrt(2*(r0_over_a*x[aidx])*da/2) + r0_over_a*a + da/2) - log(sqrt(2*(r0_over_a*a)*da/2) + r0_over_a*a+da/2) + 2.0*arctan(1-sqrt(2*(da/2.0)/(r0_over_a*a))) - 2*arctan(sqrt(2*(da/2.0)/(r0_over_a*a))+1))),du_da[aidx+1]*(sqrt(betaval)/sqrt(2.0))*np.sqrt(x[aidx])*sqrt(np.pi*scp.crack_model.r0_over_a*a)*erf(sqrt(da/(2.0*scp.crack_model.r0_over_a*a))),du_da[aidx+1]*(sqrt(betaval)/sqrt(2.0))*np.sqrt(x_fine[aidx])*2.0*sqrt(da/2.0)))
 
+        #sigmacontact[aidx] -= (du_da[aidx+1]*(sqrt(betaval)/sqrt(2.0))*np.sqrt(x[aidx])*sqrt(np.pi*scp.crack_model.r0_over_a*a)*erf(sqrt(da/(2.0*scp.crack_model.r0_over_a*a))) + du_da[aidx+1]*da/2.0)
+        
+        # # *** OBSOLETE: 
+        # # Need to include integral 
+        # # of (du/da)[(1/sqrt(2))sqrt(a/(x-a))exp(-(x-a)/r0) + 1]da
+        # # as a goes from x[aidx]-da/2 to x[aidx]
+        # # approximate sqrt(x-a)*exp(-(x-a)/r0) as only a dependence
+        # # (du/da)*(1/sqrt(2))*sqrt(a)*integral of sqrt(1/(x-a))*exp(-(x-a)/r0) da + integral of du/da da
+        # # as a goes from x[aidx]-da/2 to x[aidx]
+        # # = (du/da)(1/sqrt(2))*sqrt(a) * (-sqrt(pi*r0)*erf(sqrt(x-a)/sqrt(r0))) as a goes from x[aidx]-da/2 to x[aidx]  ...  + (du/da)(da/2)
+        #
+        # # = (du/da)(1/sqrt(2))*sqrt(a) * [ -sqrt(pi*r0)*erf(sqrt(x-x[aidx])/sqrt(r0)) + sqrt(pi*r0)*erf(sqrt(x-x[aidx]+da/2)/sqrt(r0)) ] + (du/da)(da/2)
+        #
+        # # = (du/da)(1/sqrt(2))*sqrt(a) * [ -sqrt(pi*r0)*erf(sqrt(0)/sqrt(r0)) + sqrt(pi*r0)*erf(sqrt(da/2)/sqrt(r0)) ] + (du/da)(da/2)
+        # 
         # = (du/da)(1/sqrt(2))*sqrt(a) * [ sqrt(pi*r0)*erf(sqrt(da/2)/sqrt(r0)) ] + (du/da)(da/2)
-
-        sigmacontact[aidx] -= (du_da[aidx+1]*(sqrt(betaval)/sqrt(2.0))*np.sqrt(x[aidx])*sqrt(np.pi*scp.crack_model.r0_over_a*a)*erf(sqrt(da/(2.0*scp.crack_model.r0_over_a*a))) + du_da[aidx+1]*da/2.0)
+        #
+        # sigmacontact[aidx] -= (du_da[aidx+1]*(sqrt(betaval)/sqrt(2.0))*np.sqrt(x[aidx])*sqrt(np.pi*scp.crack_model.r0_over_a*a)*erf(sqrt(da/(2.0*scp.crack_model.r0_over_a*a))) + du_da[aidx+1]*da/2.0)
         
         ## OBSOLETE
         ## = (du/da)(1/sqrt(2))*sqrt(a) * (-2sqrt(x-x) + 2sqrt(x-a+da/2))  + (du/da)(da/2)
@@ -763,8 +783,7 @@ def calc_contact(scp,sigma_ext):
     
     assert(grad_sumsquareddiff_accel/grad_sumsquared_accel < 1e-4) # NOTE: In the obscure case where our initial guess is at a relative minimum, this might fail extraneously
         
-    #goal_stress_fit_error_pascals = 150e3 # Amount of stress error to allow in fitting process. If we have more than this we keep trying to minimize
-    goal_stress_fit_error_pascals = 1500e3 # Amount of stress error to allow in fitting process. If we have more than this we keep trying to minimize
+    goal_stress_fit_error_pascals = 150e3 # Amount of stress error to allow in fitting process. If we have more than this we keep trying to minimize
     goal_residual = (goal_stress_fit_error_pascals**2.0)*scp.afull_idx
     
     
@@ -802,7 +821,7 @@ def calc_contact(scp,sigma_ext):
                                                    "maxiter": this_niter,
                                                    "ftol": 1e-6})#scp.afull_idx*(np.abs(sigma_ext)+20e6)**2.0/1e14})
             #print("res=%s" % (str(res)))
-            print("niter = %d; residual = %g; res.message=%s" % (niter+res.nit,res.fun,res.message))
+            #print("niter = %d; residual = %g; res.message=%s" % (niter+res.nit,res.fun,res.message))
             if res.status != 9 and res.status != 7:  # anything but reached iteration limit or eps increase
                 if res.fun <= goal_residual or res.nit==0:
                     terminate=True
@@ -853,6 +872,11 @@ def calc_contact(scp,sigma_ext):
         # Verify proper operation of accelerated code
         (slowcalc,slowcalc_gradient) = soft_closure_goal_function_with_gradient(res.x,scp,closure_index)
         (fastcalc,fastcalc_gradient) = soft_closure_goal_function_with_gradient_accel(res.x,scp,closure_index)
+        if abs((slowcalc-fastcalc)/slowcalc) >= 1e-6:
+            from VibroSim_Simulator.function_as_script import scriptify
+            (slowcalc2,slowcalc2_grad) = scriptify(initialize_contact_goal_function_with_gradient)(res.x,self,sigma_closure,closure_index)
+            raise ValueError("Accelerated goal calculation mismatch: %g vs %g" % (slowcalc2,fastcalc))
+
         assert(abs((slowcalc-fastcalc)/slowcalc) < 1e-6)
         
         
@@ -960,6 +984,12 @@ def calc_contact(scp,sigma_ext):
         # Verify proper operation of accelerated code
         (slowcalc,slowcalc_gradient) = soft_closure_goal_function_with_gradient(res.x,scp,closure_index)
         (fastcalc,fastcalc_gradient) = soft_closure_goal_function_with_gradient_accel(res.x,scp,closure_index)
+
+        if abs((slowcalc-fastcalc)/slowcalc) >= 1e-6:
+            from VibroSim_Simulator.function_as_script import scriptify
+            (slowcalc2,slowcalc2_grad) = scriptify(initialize_contact_goal_function_with_gradient)(res.x,self,sigma_closure,closure_index)
+            raise ValueError("Accelerated goal calculation mismatch: %g vs %g" % (slowcalc2,fastcalc))
+
         assert(abs((slowcalc-fastcalc)/slowcalc) < 1e-6)
 
         #du_da = np.concatenate((du_da_shortened,np.zeros(scp.xsteps*scp.fine_refinement - scp.afull_idx_fine - 2 ,dtype='d')))
