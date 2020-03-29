@@ -143,7 +143,8 @@ static void sigmacontact_from_stress(double *du_da_short,
   double a;
   double r;
   double r0_over_a;
-  
+  double r0;
+
   for (cnt=0;cnt < du_da_short_len-1;cnt++) {
     from_stress[cnt] = scp_sigma_closure_interp[cnt] - du_da_short[0]*dx;
     
@@ -172,25 +173,29 @@ static void sigmacontact_from_stress(double *du_da_short,
     
     a = x0 + aidx*dx;
     
+    r0 = r0_over_a*a;
+
     for (cnt=aidx+1;cnt <= afull_idx;cnt++) {
       r = x0+cnt*dx - a;
       //from_stress[cnt] -= du_da_short[aidx+1]*((sqrt_betaval/M_SQRT2)*sqrt((x0+aidx*dx)/(x0+cnt*dx - x0-aidx*dx)) + 1.0)*dx;
       //from_stress[cnt] -= du_da_short[aidx+1]*((sqrt_betaval/M_SQRT2)*sqrt(a/r) + 1.0)*dx;
       //from_stress[cnt] -= du_da_short[aidx+1]*((sqrt_betaval/M_SQRT2)*sqrt(a/r)*exp(-r/(r0_over_a*a)) + 1.0)*dx;
-      from_stress[cnt] -= du_da_short[aidx+1]*((sqrt_betaval/M_SQRT2)*sqrt(a/r)*pow(r0_over_a*a,2.0)/(pow(r,2.0)+pow(r0_over_a*a,2.0)) + 1.0)*dx;
+      from_stress[cnt] -= du_da_short[aidx+1]*((sqrt_betaval/M_SQRT2)*sqrt(a/r)*pow(r0,2.0)/(pow(r,2.0)+pow(r0,2.0)) + 1.0)*dx;
     }
     //from_stress[aidx] -= (du_da_short[aidx+1]*(sqrt_betaval/M_SQRT2)*sqrt(x0+aidx*dx)*2.0*sqrt(dx/2.0) + du_da_short[aidx+1]*dx/2.0);
     //from_stress[aidx] -= (du_da_short[aidx+1]*(sqrt_betaval/M_SQRT2)*sqrt(a)*2.0*sqrt(dx/2.0) + du_da_short[aidx+1]*dx/2.0);
     //from_stress[aidx] -= (du_da_short[aidx+1]*(sqrt_betaval/M_SQRT2)*sqrt(a)*sqrt(M_PI*r0_over_a*a)*erf(sqrt(dx/(2.0*r0_over_a*a))) + du_da_short[aidx+1]*dx/2.0);
-    from_stress[aidx] -= (du_da_short[aidx+1]*(sqrt_betaval/M_SQRT2))*sqrt(a)* ( (1.0/(2.0*M_SQRT2))*sqrt(r0_over_a*a)*(-(log(-sqrt(2.0*(r0_over_a*a)*dx/2.0)+r0_over_a*a + dx/2.0)-log(sqrt(2.0*(r0_over_a*a)*dx/2.0) + r0_over_a*a + dx/2.0) + 2.0*atan(1-sqrt(2.0*(dx/2.0)/(r0_over_a*a))) -2.0*atan(sqrt(2.0*(dx/2.0)/(r0_over_a*a))+1.0)))) + du_da_short[aidx+1]*dx/2.0;
+    from_stress[aidx] -= (du_da_short[aidx+1]*(sqrt_betaval/M_SQRT2))*sqrt(a)* ( (1.0/(2.0*M_SQRT2))*sqrt(r0)*(-(log(-sqrt(2.0*(r0)*dx/2.0)+r0 + dx/2.0)-log(sqrt(2.0*(r0)*dx/2.0) + r0 + dx/2.0) + 2.0*atan(1-sqrt(2.0*(dx/2.0)/(r0))) -2.0*atan(sqrt(2.0*(dx/2.0)/(r0))+1.0)))) + du_da_short[aidx+1]*dx/2.0;
     
     if (aidx+1 >= closure_index_for_gradient+2) {
       for (cnt=aidx+1;cnt <= afull_idx;cnt++) {
 	r = x0+cnt*dx - a;
-	from_stress_gradient[cnt*du_da_shortened_len + du_da_shortened_index] -= ((sqrt_betaval/M_SQRT2)*sqrt(a/r)*exp(-r/(r0_over_a*a)) + 1.0)*dx;
-	
+	//from_stress_gradient[cnt*du_da_shortened_len + du_da_shortened_index] -= ((sqrt_betaval/M_SQRT2)*sqrt(a/r)*exp(-r/(r0_over_a*a)) + 1.0)*dx;
+	from_stress_gradient[cnt*du_da_shortened_len + du_da_shortened_index] -= ((sqrt_betaval/M_SQRT2)*sqrt(a/r)*pow(r0,2.0)/(pow(r,2.0)+pow(r0,2.0)) + 1.0)*da
       }
-      from_stress_gradient[aidx*du_da_shortened_len + du_da_shortened_index] -= (sqrt_betaval/M_SQRT2)*sqrt(a)*sqrt(M_PI*r0_over_a*a)*erf(sqrt(dx/(2.0*r0_over_a*a))) + dx/2.0;
+      //from_stress_gradient[aidx*du_da_shortened_len + du_da_shortened_index] -= (sqrt_betaval/M_SQRT2)*sqrt(a)*sqrt(M_PI*r0_over_a*a)*erf(sqrt(dx/(2.0*r0_over_a*a))) + dx/2.0;
+
+      from_stress_gradient[aidx*du_da_shortened_len + du_da_shortened_index] -= (sqrt_betaval/M_SQRT2)*sqrt(a)* ( (1.0/(2.0*M_SQRT2))*sqrt(r0)*(-(log(-sqrt(2.0*(r0)*dx/2.0)+r0 + dx/2.0)-log(sqrt(2.0*(r0)*dx/2.0) + r0 + dx/2.0) + 2.0*atan(1-sqrt(2.0*(dx/2.0)/(r0))) -2.0*atan(sqrt(2.0*(dx/2.0)/(r0))+1.0)))) + dx/2.0;
     }
     //if (aidx==0) {
     //  printf("fs[0] subtraction=%g\n",(du_da_short[aidx+1]*(sqrt_betaval/M_SQRT2)*sqrt(a)*sqrt(M_PI*r0_over_a*a)*erf(sqrt(dx/(2.0*r0_over_a*a))) + du_da_short[aidx+1]*dx/2.0));
