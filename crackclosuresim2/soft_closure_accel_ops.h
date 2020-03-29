@@ -182,7 +182,7 @@ static void sigmacontact_from_stress(double *du_da_short,
     //from_stress[aidx] -= (du_da_short[aidx+1]*(sqrt_betaval/M_SQRT2)*sqrt(x0+aidx*dx)*2.0*sqrt(dx/2.0) + du_da_short[aidx+1]*dx/2.0);
     //from_stress[aidx] -= (du_da_short[aidx+1]*(sqrt_betaval/M_SQRT2)*sqrt(a)*2.0*sqrt(dx/2.0) + du_da_short[aidx+1]*dx/2.0);
     //from_stress[aidx] -= (du_da_short[aidx+1]*(sqrt_betaval/M_SQRT2)*sqrt(a)*sqrt(M_PI*r0_over_a*a)*erf(sqrt(dx/(2.0*r0_over_a*a))) + du_da_short[aidx+1]*dx/2.0);
-    from_stress[aidx] -= (du_da_short[aidx+1]*(sqrt_betaval/M_SQRT2))*sqrt(a)* ( (1.0/(2.0*M_SQRT2))*sqrt(r0_over_a*a)*(-(log(-sqrt(2.0*(r0_over_a*a)*dx/2.0)+r0_over_a*a + dx/2.0)-log(sqrt(2.0*(r0_over_a*a)*dx/2.0) + r0_over_a*a + da/2.0) + 2.0*atan(1-sqrt(2.0*(dx/2.0)/(r0_over_a*a))) -2.0*atan(sqrt(2.0*(dx/2.0)/(r0_over_a*a))+1.0)))) + du_da_short[aidx+1]*dx/2.0;
+    from_stress[aidx] -= (du_da_short[aidx+1]*(sqrt_betaval/M_SQRT2))*sqrt(a)* ( (1.0/(2.0*M_SQRT2))*sqrt(r0_over_a*a)*(-(log(-sqrt(2.0*(r0_over_a*a)*dx/2.0)+r0_over_a*a + dx/2.0)-log(sqrt(2.0*(r0_over_a*a)*dx/2.0) + r0_over_a*a + dx/2.0) + 2.0*atan(1-sqrt(2.0*(dx/2.0)/(r0_over_a*a))) -2.0*atan(sqrt(2.0*(dx/2.0)/(r0_over_a*a))+1.0)))) + du_da_short[aidx+1]*dx/2.0;
     
     if (aidx+1 >= closure_index_for_gradient+2) {
       for (cnt=aidx+1;cnt <= afull_idx;cnt++) {
