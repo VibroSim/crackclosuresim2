@@ -206,7 +206,7 @@ class sc_params(object):
         
         # Allow total iterations to be broken into pieces separated by failures with minimize error 9 (Iteration limit exceeded)
         # (for some reason, restarting the minimizer where it left off seems to help get it to the goal)
-        total_maxiter=100000
+        total_maxiter=1000000
         niter = 0
         epsval1 = 50e6/self.a/5000.0
         epsval2 = np.max(np.abs(sigma_closure))/self.a/5000.0
@@ -800,7 +800,7 @@ def calc_contact(scp,sigma_ext):
         
         # Allow total iterations to be broken into pieces separated by failures with minimize error 9 (Iteration limit exceeded)
         # (for some reason, restarting the minimizer where it left off seems to help get it to the goal)
-        total_maxiter=100000
+        total_maxiter=1000000
         niter = 0
         epsval1 = np.abs(sigma_ext)/scp.a/5000.0
         epsval2 = np.max(np.abs(scp.sigma_closure))/scp.a/5000.0
@@ -918,7 +918,7 @@ def calc_contact(scp,sigma_ext):
         #    constraints.append(nonpositive_constraint)
         #    pass
 
-        total_maxiter=100000
+        total_maxiter=1000000
         niter = 0
         epsval1 = np.abs(sigma_ext)/scp.a/5000.0
         epsval2 = np.max(np.abs(scp.sigma_closure))/scp.a/5000.0
