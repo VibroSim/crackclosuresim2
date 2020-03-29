@@ -191,7 +191,7 @@ static void sigmacontact_from_stress(double *du_da_short,
       for (cnt=aidx+1;cnt <= afull_idx;cnt++) {
 	r = x0+cnt*dx - a;
 	//from_stress_gradient[cnt*du_da_shortened_len + du_da_shortened_index] -= ((sqrt_betaval/M_SQRT2)*sqrt(a/r)*exp(-r/(r0_over_a*a)) + 1.0)*dx;
-	from_stress_gradient[cnt*du_da_shortened_len + du_da_shortened_index] -= ((sqrt_betaval/M_SQRT2)*sqrt(a/r)*pow(r0,2.0)/(pow(r,2.0)+pow(r0,2.0)) + 1.0)*da
+	from_stress_gradient[cnt*du_da_shortened_len + du_da_shortened_index] -= ((sqrt_betaval/M_SQRT2)*sqrt(a/r)*pow(r0,2.0)/(pow(r,2.0)+pow(r0,2.0)) + 1.0)*dx;
       }
       //from_stress_gradient[aidx*du_da_shortened_len + du_da_shortened_index] -= (sqrt_betaval/M_SQRT2)*sqrt(a)*sqrt(M_PI*r0_over_a*a)*erf(sqrt(dx/(2.0*r0_over_a*a))) + dx/2.0;
 
