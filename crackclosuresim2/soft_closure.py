@@ -774,27 +774,30 @@ def calc_contact(scp,sigma_ext):
         
     
     # Check gradient
-    
-    grad_eval = soft_closure_goal_function_with_gradient(du_da_shortened_iniguess,scp,closure_index)[1]
-    grad_approx = scipy.optimize.approx_fprime(du_da_shortened_iniguess,lambda x: soft_closure_goal_function_with_gradient(x,scp,closure_index)[0],sigma_ext/scp.dx/1e6)
-    grad_sumsquareddiff = np.sqrt(np.sum((grad_eval-grad_approx)**2.0))
-    grad_sumsquared = np.sqrt(np.sum(grad_eval**2.0))
 
-    print("grad_sumsquared=%g; grad_sumsquareddiff=%g" % (grad_sumsquared,grad_sumsquareddiff))
-    
-    if (grad_sumsquareddiff/grad_sumsquared >= 1e-4):
-        raise ValueError("Grad error too high: FAIL grad_sumsquared=%g; grad_sumsquareddiff=%g" % (grad_sumsquared,grad_sumsquareddiff))
-    
+    if sigma_ext != 0.0: # don't verify where the verification would fail with NaN
+        grad_eval = soft_closure_goal_function_with_gradient(du_da_shortened_iniguess,scp,closure_index)[1]
+        grad_approx = scipy.optimize.approx_fprime(du_da_shortened_iniguess,lambda x: soft_closure_goal_function_with_gradient(x,scp,closure_index)[0],sigma_ext/scp.dx/1e6)
+        grad_sumsquareddiff = np.sqrt(np.sum((grad_eval-grad_approx)**2.0))
+        grad_sumsquared = np.sqrt(np.sum(grad_eval**2.0))
+        
+        print("grad_sumsquared=%g; grad_sumsquareddiff=%g" % (grad_sumsquared,grad_sumsquareddiff))
+        
+        if (grad_sumsquareddiff/grad_sumsquared >= 1e-4):
+            raise ValueError("Grad error too high: FAIL grad_sumsquared=%g; grad_sumsquareddiff=%g" % (grad_sumsquared,grad_sumsquareddiff))
+            
         #assert(grad_sumsquareddiff/grad_sumsquared < 1e-4) # NOTE: In the obscure case where our initial guess is at a relative minimum, this might fail extraneously
 
     
-    # check accelerated gradient
-    grad_eval_accel = soft_closure_goal_function_with_gradient_accel(du_da_shortened_iniguess,scp,closure_index)[1]
-    grad_sumsquareddiff_accel = np.sqrt(np.sum((grad_eval_accel-grad_approx)**2.0))
-    grad_sumsquared_accel = np.sqrt(np.sum(grad_eval_accel**2.0))
+        # check accelerated gradient
+        grad_eval_accel = soft_closure_goal_function_with_gradient_accel(du_da_shortened_iniguess,scp,closure_index)[1]
+        grad_sumsquareddiff_accel = np.sqrt(np.sum((grad_eval_accel-grad_approx)**2.0))
+        grad_sumsquared_accel = np.sqrt(np.sum(grad_eval_accel**2.0))
     
-    assert(grad_sumsquareddiff_accel/grad_sumsquared_accel < 1e-4) # NOTE: In the obscure case where our initial guess is at a relative minimum, this might fail extraneously
-        
+        assert(grad_sumsquareddiff_accel/grad_sumsquared_accel < 1e-4) # NOTE: In the obscure case where our initial guess is at a relative minimum, this might fail extraneously
+        pass
+
+
     goal_stress_fit_error_pascals = 150e3 # Amount of stress error to allow in fitting process. If we have more than this we keep trying to minimize
     goal_residual = (goal_stress_fit_error_pascals**2.0)*scp.afull_idx
     
