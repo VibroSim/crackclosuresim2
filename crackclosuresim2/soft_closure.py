@@ -212,7 +212,7 @@ class sc_params(object):
         
         # Allow total iterations to be broken into pieces separated by failures with minimize error 9 (Iteration limit exceeded)
         # (for some reason, restarting the minimizer where it left off seems to help get it to the goal)
-        total_maxiter=1000000
+        total_maxiter=10000000
         niter = 0
         epsval1 = 50e6/self.a/5000.0
         epsval2 = np.max(np.abs(sigma_closure))/self.a/5000.0
@@ -224,7 +224,7 @@ class sc_params(object):
         goal_residual = (goal_stress_fit_error_pascals**2.0)*self.afull_idx
         
         while niter < total_maxiter and not terminate: 
-            this_niter=10000
+            this_niter=100000
             res = scipy.optimize.minimize(initialize_contact_goal_function_with_gradient_accel,starting_value,args=(self,sigma_closure,closure_index), # was initialize_contact_goal_function_accel
                                           constraints = constraints,
                                           method="SLSQP",
@@ -821,7 +821,7 @@ def calc_contact(scp,sigma_ext):
         
         # Allow total iterations to be broken into pieces separated by failures with minimize error 9 (Iteration limit exceeded)
         # (for some reason, restarting the minimizer where it left off seems to help get it to the goal)
-        total_maxiter=1000000
+        total_maxiter=10000000
         niter = 0
         epsval1 = np.abs(sigma_ext)/scp.a/5000.0
         epsval2 = np.max(np.abs(scp.sigma_closure))/scp.a/5000.0
@@ -832,7 +832,7 @@ def calc_contact(scp,sigma_ext):
 
 
         while niter < total_maxiter and not terminate: 
-            this_niter=10000
+            this_niter=100000
             #print("calling scipy.optimize.minimize; sigma_ext=%g; eps=%g maxiter=%d ftol=%g" % (sigma_ext,epsvalscaled,this_niter,scp.afull_idx_fine*(np.abs(sigma_ext)+20e6)**2.0/1e14))
             res = scipy.optimize.minimize(soft_closure_goal_function_with_gradient_accel,starting_value,args=(scp,closure_index),   # was soft_closure_goal_function_accel
                                           constraints = [ load_constraint ], #[ nonnegative_constraint, load_constraint ],
@@ -939,7 +939,7 @@ def calc_contact(scp,sigma_ext):
         #    constraints.append(nonpositive_constraint)
         #    pass
 
-        total_maxiter=1000000
+        total_maxiter=10000000
         niter = 0
         epsval1 = np.abs(sigma_ext)/scp.a/5000.0
         epsval2 = np.max(np.abs(scp.sigma_closure))/scp.a/5000.0
@@ -948,7 +948,7 @@ def calc_contact(scp,sigma_ext):
         terminate=False
         starting_value=du_da_shortened_iniguess
         while niter < total_maxiter and not terminate: 
-            this_niter=10000
+            this_niter=100000
             res = scipy.optimize.minimize(soft_closure_goal_function_with_gradient_accel,starting_value,args=(scp,closure_index),   # was soft_closure_goal_function_accel
                                           constraints = constraints,
                                           method="SLSQP",
