@@ -570,28 +570,31 @@ def sigmacontact_from_stress(scp,du_da,closure_index_for_gradient=None):
 
         #sigmacontact[(aidx+1):] -= du_da[aidx+1]*((betaval/sqrt(2.0))*sqrt(x_fine[aidx]/(x_fine[(aidx+1):]-x_fine[aidx])) + 1.0)*da # + 1.0 represents stress when a large distance away from effective tip
 
+        # !!!*** Could improve this approximation by using the explicit integration for more than just the
+        # term on top of the crack tip ***!!! 
+        
         a = x[aidx]
         r = (x[(aidx+1):]-a)
-        r0 = scp.crack_model.r0_over_a*a
-        #sigmacontact[(aidx+1):] -= du_da[aidx+1]*((sqrt(betaval)/sqrt(2.0))*sqrt(a/r)*exp(-r/(scp.crack_model.r0_over_a*a)) + 1.0)*da # + 1.0 represents stress when a large distance away from effective tip
-        sigmacontact[(aidx+1):] -= du_da[aidx+1]*((sqrt(betaval)/sqrt(2.0))*sqrt(a/r)* (r0)**2.0/(r**2.0 + (r0)**2.0)  + 1.0)*da # + 1.0 represents stress when a large distance away from effective tip
+        r0 = scp.crack_model.r0_over_a(a)*a
+        sigmacontact[(aidx+1):] -= du_da[aidx+1]*((sqrt(betaval)/sqrt(2.0))*sqrt(a/r)*( (r0)**2.0/(r + r0)**2.0 ) + 1.0)*da # + 1.0 represents stress when a large distance away from effective tip
 
         # Need to include integral 
-        # of (du/da)[(1/sqrt(2))sqrt(a/(x-a))*(r0^2)/(r0^2 + (x-a)^2) + 1]da
+        # of (du/da)[(1/sqrt(2))sqrt(a/(x-a))*(r0^2)/(r0 + (x-a))^2 + 1]da
         # as a goes from x[aidx]-da/2 to x[aidx]
-        # approximate sqrt(x-a)*(r0^2)/(r0^2 + (x-a)^2) as only a dependence
-        # let v = x-a -> dv = -da 
-        # (du/da)*(1/sqrt(2))*sqrt(a)*integral of -sqrt(1/v)*(r0^2)/(r0^2 + v^2)dv  + integral of du/da da
-        # as a goes from x[aidx]-da/2 to x[aidx] and v goes from x-x[aidx]+da/2 to x-x[aidx]  + (du/da)(da/2)
-        # as v goes from da/2 to 0     + (du/da)(da/2)
-        # By Wolfram Alpha the integral is 
-        # = (du/da)*(1/sqrt(2))*sqrt(a)* [ (1/(2*sqrt(2))) * sqrt(r0) * {ln(-sqrt(2*r0*v) + r0 +v) - ln(sqrt(2*r0*v) + r0+v) + 2*atan(1-sqrt(2*v/r0)) - 2*atan(sqrt(2*v/r0)+1)} ] as v goes from da/2 to 0  ... + (du/da)*(da/2)
 
-
-        # = (du/da)*(1/sqrt(2))*sqrt(a)* [ (1/(2*sqrt(2))) * sqrt(r0) * {ln(r0) - ln(r0) + 2*atan(1) - 2*atan(1)} - [ (1/(2*sqrt(2))) * sqrt(r0) * {ln(-sqrt(2*r0*da/2) + r0 + da/2) - ln(sqrt(2*r0*da/2) + r0+da/2) + 2*atan(1-sqrt(2*(da/2)/r0)) - 2*atan(sqrt(2*(da/2)/r0)+1)} ]  + (du/da)*(da/2)
-        sigmacontact[aidx]  -= (du_da[aidx+1])*(sqrt(betaval)/sqrt(2.0))*sqrt(a)* ( (1.0/(2.0*sqrt(2))) * sqrt(r0) * (-(log(-sqrt(2*(r0)*da/2) + r0 + da/2) - log(sqrt(2*(r0)*da/2) + r0+da/2) + 2.0*arctan(1-sqrt(2*(da/2.0)/(r0))) - 2*arctan(sqrt(2*(da/2.0)/(r0))+1)))) + du_da[aidx+1]*da/2.0
+        # Pulling out the constant term and leading factors, we have 
+        # (du/da)(sqrt(beta)/sqrt(2))integral sqrt(a/(x-a))*(r0^2)/(r0 + (x-a))^2 + integral (du/da)da
+        # with integrals as a goes from x[aidx]-da/2 to x[aidx]
         
-        #print(" sigmacontact update: New: %g Old: %g VeryOld: %g" % ((du_da[aidx+1])*(sqrt(betaval)/sqrt(2.0))*sqrt(a)* ( (1.0/(2*sqrt(2))) * sqrt(r0) * -(log(-sqrt(2*(r0)*da/2) + r0 + da/2) - log(sqrt(2*(r0)*da/2) + r0+da/2) + 2.0*arctan(1-sqrt(2*(da/2.0)/(r0))) - 2*arctan(sqrt(2*(da/2.0)/(r0))+1))),du_da[aidx+1]*(sqrt(betaval)/sqrt(2.0))*np.sqrt(x[aidx])*sqrt(np.pi*scp.crack_model.r0_over_a*a)*erf(sqrt(da/(2.0*scp.crack_model.r0_over_a*a))),du_da[aidx+1]*(sqrt(betaval)/sqrt(2.0))*np.sqrt(x[aidx])*2.0*sqrt(da/2.0)))
+        # The integral on the right is trivial. The solution to the integral on the left is given
+        # by crackclosure.indef_integral_of_crack_tip_singularity_times_1_over_r2_pos_crossterm_decay(crack_model,x,xt)
+        
+        sigmacontact[aidx] -= du_da[aidx+1]*(sqrt(betaval)/sqrt(2.0))*(indef_integral_of_crack_tip_singularity_times_1_over_r2_pos_crossterm_decay(crack_model,x[aidx],x[aidx])-indef_integral_of_crack_tip_singularity_times_1_over_r2_pos_crossterm_decay(crack_model,x[aidx],x[aidx]-da/2.0)) + du_da[aidx+1]*da/2.0 
+        
+        # = (du/da)*(1/sqrt(2))*sqrt(a)* [ (1/(2*sqrt(2))) * sqrt(r0) * {ln(r0) - ln(r0) + 2*atan(1) - 2*atan(1)} - [ (1/(2*sqrt(2))) * sqrt(r0) * {ln(-sqrt(2*r0*da/2) + r0 + da/2) - ln(sqrt(2*r0*da/2) + r0+da/2) + 2*atan(1-sqrt(2*(da/2)/r0)) - 2*atan(sqrt(2*(da/2)/r0)+1)} ]  + (du/da)*(da/2)
+        # sigmacontact[aidx]  -= (du_da[aidx+1])*(sqrt(betaval)/sqrt(2.0))*sqrt(a)* ( (1.0/(2.0*sqrt(2))) * sqrt(r0) * (-(log(-sqrt(2*(r0)*da/2) + r0 + da/2) - log(sqrt(2*(r0)*da/2) + r0+da/2) + 2.0*arctan(1-sqrt(2*(da/2.0)/(r0))) - 2*arctan(sqrt(2*(da/2.0)/(r0))+1)))) + du_da[aidx+1]*da/2.0
+        
+        print(" sigmacontact update: New: %g Old: %g VeryOld: %g VeryVeryOld: %g" % (du_da[aidx+1]*(sqrt(betaval)/sqrt(2.0))*(indef_integral_of_crack_tip_singularity_times_1_over_r2_pos_crossterm_decay(crack_model,x[aidx],x[aidx])-indef_integral_of_crack_tip_singularity_times_1_over_r2_pos_crossterm_decay(crack_model,x[aidx],x[aidx]-da/2.0)) + du_da[aidx+1]*da/2.0,(du_da[aidx+1])*(sqrt(betaval)/sqrt(2.0))*sqrt(a)* ( (1.0/(2*sqrt(2))) * sqrt(r0) * -(log(-sqrt(2*(r0)*da/2) + r0 + da/2) - log(sqrt(2*(r0)*da/2) + r0+da/2) + 2.0*arctan(1-sqrt(2*(da/2.0)/(r0))) - 2*arctan(sqrt(2*(da/2.0)/(r0))+1))),du_da[aidx+1]*(sqrt(betaval)/sqrt(2.0))*np.sqrt(x[aidx])*sqrt(np.pi*scp.crack_model.r0_over_a*a)*erf(sqrt(da/(2.0*scp.crack_model.r0_over_a*a))),du_da[aidx+1]*(sqrt(betaval)/sqrt(2.0))*np.sqrt(x[aidx])*2.0*sqrt(da/2.0)))
 
         #sigmacontact[aidx] -= (du_da[aidx+1]*(sqrt(betaval)/sqrt(2.0))*np.sqrt(x[aidx])*sqrt(np.pi*scp.crack_model.r0_over_a*a)*erf(sqrt(da/(2.0*scp.crack_model.r0_over_a*a))) + du_da[aidx+1]*da/2.0)
         
@@ -621,14 +624,16 @@ def sigmacontact_from_stress(scp,du_da,closure_index_for_gradient=None):
         if closure_index_for_gradient is not None:
             if aidx+1 >= closure_index_for_gradient+2:
                 du_da_shortened_index = aidx - closure_index_for_gradient
-                sigma_contact_gradient[(aidx+1):,du_da_shortened_index] -= ((sqrt(betaval)/sqrt(2.0))*sqrt(a/r)* (r0)**2.0/(r**2.0 + (r0)**2.0)  + 1.0)*da # + 1.0 represents stress when a large distance away from effective tip
+                sigma_contact_gradient[(aidx+1):,du_da_shortened_index] -= ((sqrt(betaval)/sqrt(2.0))*sqrt(a/r)*( (r0)**2.0/(r + r0)**2.0 )  + 1.0)*da # + 1.0 represents stress when a large distance away from effective tip
 
-                sigma_contact_gradient[aidx,du_da_shortened_index] -= (sqrt(betaval)/sqrt(2.0))*sqrt(a)* ( (1.0/(2.0*sqrt(2))) * sqrt(r0) * (-(log(-sqrt(2*(r0)*da/2) + r0 + da/2) - log(sqrt(2*(r0)*da/2) + r0+da/2) + 2.0*arctan(1-sqrt(2*(da/2.0)/(r0))) - 2*arctan(sqrt(2*(da/2.0)/(r0))+1)))) + da/2.0
+                sigma_contact_gradient[aidx,du_da_shortened_index] -= (sqrt(betaval)/sqrt(2.0))*(indef_integral_of_crack_tip_singularity_times_1_over_r2_pos_crossterm_decay(crack_model,x[aidx],x[aidx])-indef_integral_of_crack_tip_singularity_times_1_over_r2_pos_crossterm_decay(crack_model,x[aidx],x[aidx]-da/2.0)) + da/2.0
         
 
                 # # OBSOLETE
                 # sigma_contact_gradient[(aidx+1):,du_da_shortened_index] -= ((sqrt(betaval)/sqrt(2.0))*sqrt(a/r)*exp(-r/(scp.crack_model.r0_over_a*a)) + 1.0)*da
                 # sigma_contact_gradient[aidx,du_da_shortened_index] -= ( (sqrt(betaval)/sqrt(2.0))*np.sqrt(x[aidx])*sqrt(np.pi*scp.crack_model.r0_over_a*a)*erf(sqrt(da/(2.0*scp.crack_model.r0_over_a*a))) + da/2.0 )
+                # sigma_contact_gradient[aidx,du_da_shortened_index] -= (sqrt(betaval)/sqrt(2.0))*sqrt(a)* ( (1.0/(2.0*sqrt(2))) * sqrt(r0) * (-(log(-sqrt(2*(r0)*da/2) + r0 + da/2) - log(sqrt(2*(r0)*da/2) + r0+da/2) + 2.0*arctan(1-sqrt(2*(da/2.0)/(r0))) - 2*arctan(sqrt(2*(da/2.0)/(r0))+1)))) + da/2.0
+
                 pass
                 
             pass
@@ -889,7 +894,7 @@ def calc_contact(scp,sigma_ext):
         (fastcalc,fastcalc_gradient) = soft_closure_goal_function_with_gradient_accel(res.x,scp,closure_index)
         if abs((slowcalc-fastcalc)/slowcalc) >= 1e-6:
             from VibroSim_Simulator.function_as_script import scriptify
-            (slowcalc2,slowcalc2_grad) = scriptify(initialize_contact_goal_function_with_gradient)(res.x,self,sigma_closure,closure_index)
+            (slowcalc2,slowcalc2_grad) = scriptify(initialize_contact_goal_function_with_gradient)(res.x,scp,sigma_closure,closure_index)
             raise ValueError("Accelerated goal calculation mismatch: %g vs %g" % (slowcalc2,fastcalc))
 
         assert(abs((slowcalc-fastcalc)/slowcalc) < 1e-6)
@@ -1002,7 +1007,7 @@ def calc_contact(scp,sigma_ext):
 
         if abs((slowcalc-fastcalc)/slowcalc) >= 1e-6:
             from VibroSim_Simulator.function_as_script import scriptify
-            (slowcalc2,slowcalc2_grad) = scriptify(initialize_contact_goal_function_with_gradient)(res.x,self,sigma_closure,closure_index)
+            (slowcalc2,slowcalc2_grad) = scriptify(initialize_contact_goal_function_with_gradient)(res.x,scp,sigma_closure,closure_index)
             raise ValueError("Accelerated goal calculation mismatch: %g vs %g" % (slowcalc2,fastcalc))
 
         assert(abs((slowcalc-fastcalc)/slowcalc) < 1e-6)

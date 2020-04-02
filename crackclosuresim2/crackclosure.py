@@ -224,6 +224,12 @@ class ModeI_Beta_WeightFunction(ModeI_crack_model):
 
 
 def indef_integral_of_simple_squareroot_quotients(a,u):
+    """ This routine is no longer used because integrated out 
+    to infinity the form of solution kernel that goes with this
+    fails load balancing... See 
+    indef_integral_of_crack_tip_singularity_times_1_over_r2_pos_crossterm_decay(crack_model,x,xt) 
+    for the replacement"""
+
     (a,u) = np.broadcast_arrays(a,u) # make sure a and u are the same shape
     # From Wolfram Alpha: integral of (sqrt(u)/sqrt(a-u)) du
     #  = a*arctan(sqrt(u)/sqrt(a-u)) - sqrt(u)*sqrt(a-u)
@@ -252,6 +258,107 @@ def indef_integral_of_simple_squareroot_quotients(a,u):
     integral[divzero] = np.pi*a[divzero]/2.0
     return integral
 
+def indef_integral_of_crack_tip_singularity_times_1_over_r2_pos_crossterm_decay(crack_model,x,xt):
+    """
+    This is the indefinite integral of the crack tip stress solution for an 
+    open linear elastic crack.
+         ___
+     / \/x_t    /   r0   \2
+     | --===- * |--------|  dx_t
+     / \/ r     \(r + r0)/
+     
+    where r is implicitly defined as x - x_t. 
+
+    The first factor represents the standard sqrt(a) divided by the square 
+    root of the radius away from the crack decay that is found in standard 
+    crack tip stress solutions e.g. Anderson (2004), and Tada (2000). 
+    However, this alone does not accurate account for the load balance in 
+    of the load that would have been carried by half of the crack surface 
+    and the load that would be added ahead of the crack tip. There is 
+    presumed to be another constant term outside this integral matching
+    the load at infinity. 
+    
+    The second factor in the integral represents additional decay of the 
+    1/sqrt(r) singularity which, combined with the outside constant term)
+    enforces the load balance of the stress state as r is integrated to 
+    infinity. 
+    
+    This function of r0 complicates the integral because not only is 
+    r = x - x_t a function of x_t (the variable of integration), r0 is also a 
+    function of x_t (r0 is presumed to have the form constant*x_t, where 
+     this constant will 
+    be refered to as b=r0_over_a). 
+         
+    The resulting integral is:
+            ___
+     /    \/x_t      /       b*x_t       \2
+     | --=======- *  |-------------------|  dx_t
+     / \/x - x_t     \((x - x_t) + b*x_t)/
+    
+    The function inputs are:
+    
+        crack_model - contains the values describing the particular 1/sqrt(r)
+              LEFM tip model desired, including a function returning 
+              the r0_over_a value needed for the integral. The assumption
+              is that r0_over_a, even though it is given parameters including
+              x_t, is not actually dependent on x_t. If there is dependence on
+              x_t then this solution is not correct (but may be close enough
+              for practical purposes). 
+
+        x  -  the x value or range along the crack that the evaluated 
+              integral is being 
+              calculated over, not the variable of integration
+        
+        xt -  the value or range of half crack length that the indefinite
+              integral is being evaluated at
+        
+    
+    This function then returns the indefinite integral evaluated at
+    (x,x_t)
+        
+    """
+    (x,xt) = np.broadcast_arrays(x,xt) # make sure x and xt are the same shape
+    #From Wolfram Alpha: 
+    #   integrate ((sqrt(u))/(sqrt(a-u)))*((b*u)/((a-u)+b*u))^2 du =
+    #Plain-Text Wolfram Alpha output
+    #   (b^2 (-(((-1 + b) Sqrt[a - u] Sqrt[u] (a (1 + b) + (-1 + b) b u))/(b 
+    #   (a + (-1 + b) u))) + a (-5 + b) ArcTan[Sqrt[u]/Sqrt[a - u]] + (a (-1 + 
+    #   5 b) ArcTan[(Sqrt[b] Sqrt[u])/Sqrt[a - u]])/b^(3/2)))/(-1 + b)^3
+    
+    #where b*u = r0 --> b = r0_over_a, u = xt, and a = x
+
+    # Calculate division-by-zero and
+    # non division-by-zero regimes separately
+    
+    # Limiting case as x-xt -> 0:
+    # Let r = x-xt -> xt = x-r
+    #
+    # The limit approaches ((b**2)/(b-1)**3)*(pi/2.0)*((x*(5*b-1)/(b**(3./2.)))
+    #                               +(x*(b-5))) as r->0
+    
+    divzero = (x==xt) | ((np.abs(x-xt) < 1e-10*x) & (np.abs(x-xt) < 1e-10*xt))
+    
+    #if np.count_nonzero(x < xt) > 0:
+    #    import pdb
+    #    pdb.set_trace()
+    #    pass
+    
+    b = crack_model.r0_over_a(xt)
+    
+    f1=sqrt(xt[~divzero])
+    f2=sqrt(x[~divzero]-xt[~divzero])
+
+    A=((b**2)/(b-1)**3)
+    B=((x[~divzero]*(5*b-1)*arctan((sqrt(b)*f1)/(f2)))/(b**(3./2.)))
+    C=((b-1)*(f1)*(f2)*(x[~divzero]*(b+1)+(b-1)*b*xt[~divzero]))
+    D=(b*(x[~divzero]+(b-1)*xt[~divzero]))
+    E=(x[~divzero]*(b-5)*arctan(f1/f2))
+
+    integral = np.zeros(x.shape[0],dtype='d')
+    integral[~divzero] =A*(B-(C/D)+E)
+    
+    integral[divzero] = ((b**2)/(b-1)**3)*(pi/2.0)*x[divzero]*(((5*b-1)/(b**(3./2.)))+(b-5))
+    return integral
 
 
 
@@ -345,10 +452,30 @@ def integral_tensilestress_growing_effective_crack_length_byxt(x,sigmaext1,sigma
     So sigmaI_theta0_times_rootr_over_sqrt_a_over_sigmaext = ([ integral_0^(a-epsilon) M(x,a)/sqrt(a-x) dx + M(a,a)*2sqrt(epsilon) ] / (sqrt(2*pi*a)))
 
     Then we can rewrite the incremental normal stress as: 
-    integral_sigmaext1^sigmaext2 of 1.0 + sigmaI_theta0_times_rootr_over_sqrt_a_over_sigmaext*sqrt(xt)/sqrt(x-xt) dsigmaext
+    integral_sigmaext1^sigmaext2 of sigmaI_theta0_times_rootr_over_sqrt_a_over_sigmaext*sqrt(xt)/sqrt(x-xt) dsigmaext
+    if the entire stress field is presumed to come from the crack tip
+    singularity. 
     Here, xt is still dependent on sigmaext... sigmaI_theta0_times_rootr_over_sqrt_a_over_sigmaext also has 
     some dependence on a (i.e. xt), but as xt isn't moving much this is presumed to be small 
 
+    if we assume that a long way from the effective tip the stress is 
+    unform, we add 1.0 into the integral
+    
+    integral_sigmaext1^sigmaext2 of 1.0 + sigmaI_theta0_times_rootr_over_sqrt_a_over_sigmaext*sqrt(xt)/sqrt(x-xt) dsigmaext
+
+    From force balancing (see total_load_matching.pdf) but using a 
+    (r0^2/(r+r0)^2) decay factor (see total_load_matching_crossterm_r2_work.pdf)
+    we can apply that decay factor to the singular term, 
+
+    integral_sigmaext1^sigmaext2 of 1.0 + (r0^2/(r+r0)^2)*sigmaI_theta0_times_rootr_over_sqrt_a_over_sigmaext*sqrt(xt)/sqrt(x-xt) dsigmaext
+
+    Here r is defined as sqrt(x-xt), and r0 -- evaluated per the above 
+    .pdfs -- is 8*xt/(pi^2*beta) (through crack, beta typically 1) or 
+    (2^(1/3))*xt/(pi^(2/3)*beta^(1/3)) (half penny surface crack, 
+    beta typically 4/(pi^2).  ... because r and r0 are functions of 
+    xt, they are implicitly dependent on xt and need to be 
+    considered in the integration. 
+    
     this will give normal stress
     as a function of position (x). 
 
@@ -360,16 +487,23 @@ def integral_tensilestress_growing_effective_crack_length_byxt(x,sigmaext1,sigma
     between xt1 and xt2
     
     So our incremental tension is
-    integral_sigmaext1^sigmaext2 (1.0 + sigmaI_theta0_times_rootr_over_sqrt_a_over_sigmaext sqrt(xt)/sqrt(x-xt)) dsigmaext
+    integral_sigmaext1^sigmaext2 (1.0 + sigmaI_theta0_times_rootr_over_sqrt_a_over_sigmaext r0^2/(r+r0)^2 * sqrt(xt)/sqrt(x-xt)) dsigmaext
     where we ignore any contributions corresponding to (x-xt) <= 0
 
-    (the new 1.0 term represents that beyond the effective tip the external 
+    (the 1.0 term represents that beyond the effective tip the external 
     load directly increments the stress state, in addition to the stress 
-    concentration caused by the presence of the open region)    
+    concentration caused by the presence of the open region; the 
+    r0^2/(r+r0)^2 actor makes the stress concentration integrate to the 
+    right load -- with r0 (proportional to xt) selected on that basis
+    as discussed above and in the previously mentioned .pdfs.  
 
+    representing r0 as r0_over_xt*xt, and r by x-xt, the r0^2/(r+r0)^2 factor
+    becomes r0_over_xt^2*xt^2/(x-xt+r0_over_xt*xt)^2
+    
     pull out constant term
 
-    (sigmaext2-sigmaext1) + integral_sigmaext1^sigmaext2 sigmaI_theta0_times_rootr_over_sqrt_a_over_sigmaext sqrt(xt)/sqrt(x-xt) dsigmaext
+    (sigmaext2-sigmaext1) + integral_sigmaext1^sigmaext2 sigmaI_theta0_times_rootr_over_sqrt_a_over_sigmaext r0_over_xt^2*xt^2/(x-xt+r0_over_xt*xt)^2 * sqrt(xt)/sqrt(x-xt) dsigmaext
+
 
     Perform change of integration variable sigmaext -> xt: 
        Derivative of xt:
@@ -378,19 +512,22 @@ def integral_tensilestress_growing_effective_crack_length_byxt(x,sigmaext1,sigma
 
 
     So the  incremental normal stress we are solving for is
-    (sigmaext2-sigmaext1) + integral_xt1^xt2 sigmaI_theta0_times_rootr_over_sqrt_a_over_sigmaext sqrt(xt)*F/sqrt(x-xt)  dxt
+    (sigmaext2-sigmaext1) + integral_xt1^xt2 sigmaI_theta0_times_rootr_over_sqrt_a_over_sigmaext r0_over_xt^2*xt^2/(x-xt+r0_over_xt*xt)^2   sqrt(xt)*F/sqrt(x-xt)  dxt
     where we ignore any contributions corresponding to (x-xt) <= 0
 
     and sigmaext2 = sigmaext1 + (xt2-xt1)*F 
  
     F is a constant and sigmaI_theta0_times_rootr_over_sqrt_a_over_sigmaext is treated as constant so have 
-    F*(xt2-xt1)  +  F * sigmaI_theta0_times_rootr_over_sqrt_a_over_sigmaext * integral_xt1^xt2 sqrt(xt)/(sqrt(x-xt))  dxt
+    F*(xt2-xt1)  +  F * sigmaI_theta0_times_rootr_over_sqrt_a_over_sigmaext * integral_xt1^xt2 r0_over_xt^2*xt^2/(x-xt+r0_over_xt*xt)^2   sqrt(xt)/(sqrt(x-xt))  dxt
 
+    The right hand term is then the integral of 
+      r0_over_xt^2*xt^2/(x-xt+r0_over_xt*xt)^2  * (sqrt(xt)/sqrt(x-xt)) dxt
 
-    This is then the integral of (sqrt(u)/sqrt(a-bu)) du
-       where u = xt, 
-    with solution given by
-       indef_integral_of_simple_squareroot_quotients(x,xt2) - indef_integral_of_simple_squareroot_quotients(x,xt1)
+      with solution to the indefinite integral given by 
+       indef_integral_of_crack_tip_singularity_times_1_over_r2_pos_crossterm_decay(crack_model,x,xt)
+
+      so the definite integral is given by 
+        indef_integral_of_crack_tip_singularity_times_1_over_r2_pos_crossterm_decay(crack_model,x,xt2) - indef_integral_of_crack_tip_singularity_times_1_over_r2_pos_crossterm_decay(crack_model,x,xt1)
 
     Well almost. We only consider the region of this integral where 
     x-xt > 0. This can be accomplished by shifting the bounds when 
@@ -404,13 +541,13 @@ def integral_tensilestress_growing_effective_crack_length_byxt(x,sigmaext1,sigma
     Integral upper bound =  x where xt1 < x < xt2
     Integral upper bound = xt2 where x > xt2
 
-       indef_integral_of_simple_squareroot_quotients(x,upper_bound) - indef_integral_of_simple_squareroot_quotients(x,xt1)
+       indef_integral_of_crack_tip_singularity_times_1_over_r2_pos_crossterm_decay(crack_model,x,upper_bound) - indef_integral_of_crack_tip_singularity_times_1_over_r2_pos_crossterm_decay(crack_model,x,xt1)
     
     So our actual solution putting everything together is:
     0 where x < xt1 
     otherwise: 
     upper_bound = min(x, xt2) 
-    F*(upper_bound-xt1) + (sigmaI_theta0_times_rootr_over_sqrt_a_over_sigmaext*F)*(indef_integral_of_simple_squareroot_quotients(x,upper_bound) - indef_integral_of_simple_squareroot_quotients(x,xt1))
+    F*(upper_bound-xt1) + (sigmaI_theta0_times_rootr_over_sqrt_a_over_sigmaext*F)*(indef_integral_of_crack_tip_singularity_times_1_over_r2_pos_crossterm_decay(crack_model,x,upper_bound) - indef_integral_of_crack_tip_singularity_times_1_over_r2_pos_crossterm_decay(crack_model,x,xt1))
 
     """
     
@@ -456,6 +593,7 @@ def integral_tensilestress_growing_effective_crack_length_byxt(x,sigmaext1,sigma
 
     sigmaI_theta0_times_rootr_over_sqrt_a_over_sigmaext = crack_model.eval_sigmaI_theta0_times_rootr_over_sqrt_a_over_sigmaext(xtavg)
     
+    
     # KI/(sigma_ext*sqrt(a))    
     # evaluated from basic formula: 
     #  KI = sigma_ext * sqrt(pi*a)   from Suresh
@@ -483,8 +621,12 @@ def integral_tensilestress_growing_effective_crack_length_byxt(x,sigmaext1,sigma
     #  ... = (2+pi)/(2*pi*sqrt(2))... = .578 by wolfram alpha
     #  ... or a factor of (2+pi)/(2*pi)=.818 smaller than the .707
     # of the simple formula
-    res[nonzero] = F*(upper_bound[nonzero]-xt1)  +  (sigmaI_theta0_times_rootr_over_sqrt_a_over_sigmaext*F) * (indef_integral_of_simple_squareroot_quotients(x[nonzero],upper_bound[nonzero]) - indef_integral_of_simple_squareroot_quotients(x[nonzero],xt1))
-    
+
+    # old version that fails load balance 
+    #res[nonzero] = F*(upper_bound[nonzero]-xt1)  +  (sigmaI_theta0_times_rootr_over_sqrt_a_over_sigmaext*F) * (indef_integral_of_simple_squareroot_quotients(x[nonzero],upper_bound[nonzero]) - indef_integral_of_simple_squareroot_quotients(x[nonzero],xt1))
+
+    res[nonzero] = F*(upper_bound[nonzero]-xt1)  +  (sigmaI_theta0_times_rootr_over_sqrt_a_over_sigmaext*F) * (indef_integral_of_crack_tip_singularity_times_1_over_r2_pos_crossterm_decay(crack_model,x[nonzero],upper_bound[nonzero]) - indef_integral_of_crack_tip_singularity_times_1_over_r2_pos_crossterm_decay(crack_model,x[nonzero],xt1))
+
     
 
     return (use_xt2,sigmaext2,res)
@@ -575,7 +717,13 @@ but for compression. """
     #  ... = (2+pi)/(2*pi*sqrt(2))... = .578 by wolfram alpha
     #  ... or a factor of (2+pi)/(2*pi)=.818 smaller than the .707
     # of the simple formula
-    res[nonzero] = -F*(upper_bound[nonzero]-use_xt1)  -  (sigmaI_theta0_times_rootr_over_sqrt_a_over_sigmaext*F) * (indef_integral_of_simple_squareroot_quotients(x[nonzero],upper_bound[nonzero]) - indef_integral_of_simple_squareroot_quotients(x[nonzero],use_xt1))
+
+    # old version that fails load balance 
+    #res[nonzero] = -F*(upper_bound[nonzero]-use_xt1)  -  (sigmaI_theta0_times_rootr_over_sqrt_a_over_sigmaext*F) * (indef_integral_of_simple_squareroot_quotients(x[nonzero],upper_bound[nonzero]) - indef_integral_of_simple_squareroot_quotients(x[nonzero],use_xt1))
+
+    res[nonzero] = -F*(upper_bound[nonzero]-use_xt1)  -  (sigmaI_theta0_times_rootr_over_sqrt_a_over_sigmaext*F) * (indef_integral_of_crack_tip_singularity_times_1_over_r2_pos_crossterm_decay(crack_model,x[nonzero],upper_bound[nonzero]) - indef_integral_of_crack_tip_singularity_times_1_over_r2_pos_crossterm_decay(crack_model,x[nonzero],use_xt1))
+
+
     
     
 
@@ -1759,8 +1907,7 @@ def ModeI_throughcrack_weightfun(Eeff,x,epsx):
                                      use_surrogate=True)
 
 class ModeI_throughcrack_CODformula(ModeI_Beta_COD_Formula):
-    @property
-    def r0_over_a(self):
+    def r0_over_a(self,xt):
         """
         The baseline approximation of the stress field beyond the crack
         tip is K/sqrt(2*pi*r), but this is only valid within perhaps a/10
@@ -1773,20 +1920,22 @@ class ModeI_throughcrack_CODformula(ModeI_Beta_COD_Formula):
         to converge!). 
 
         So our fix is to approximate the stress field as 
-        (K/sqrt(2*pi*r))*exp(-r/r0) + sigma_infty, where 
+        (K/sqrt(2*pi*r))*(r0^2/(r+r0)^2) + sigma_infty, where 
         r0 is selected to satisfy force balance between the load 
         not held over the cracked region and the stress concentration
         beyond the tip. 
 
 
-        r0 is the characteristic radius for exponential decay 
+        r0 is the characteristic radius for the 1/r^2 decay 
         of the 1/sqrt(r) term
 
         Assuming K has the form sigma*sqrt(pi*a*beta) for a through
-        crack in a thin plate, then per total_load_matching.xoj, 
-        r0 = 2a/(pi*beta) 
+        crack in a thin plate, then per 
+            total_load_matching_crossterm_r2_work.pdf
+
+        r0 = 8a/(pi^2*beta) 
         """
-        return 2.0/(np.pi*self.beta(self))
+        return 8.0/((np.pi**2.0)*self.beta(self))
     
         
     def __init__(self,Eeff):
@@ -1820,10 +1969,10 @@ class ModeI_throughcrack_CODformula(ModeI_Beta_COD_Formula):
 
 
 class Tada_ModeI_CircularCrack_along_midline(ModeI_Beta_COD_Formula):
-    @property
-    def r0_over_a(self):
-        """Based on calculation given in total_load_matching_hhmolden_2D_half_penny_crack.pdf"""
-        return (2.0/(np.pi*self.beta(self)))**(1.0/3.0)
+    def r0_over_a(self,xt):
+        """Based on calculation given in total_load_matching_crossterm_r2_work.pdf
+"""
+        return (2.0**(1.0/3.0)/((np.pi**(2.0/3.0))*(self.beta(self)**(1.0/3.0)))
     
     def __init__(self,E,nu):
         def u(E,nu,sigma_applied,x,xt):

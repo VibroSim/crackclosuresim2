@@ -26,7 +26,118 @@ struct crack_model_t
 
 #define CMT_THROUGH 0
 #define CMT_TADA 1
+
+
+
+double indef_integral_of_crack_tip_singularity_times_1_over_r2_pos_crossterm_decay(double r0_over_a,double x,double xt)
+{
+  // This is the indefinite integral of the crack tip stress solution for an 
+  // open linear elastic crack.
+  //        ___
+  //    / \/x_t    /   r0   \2
+  //    | --===- * |--------|  dx_t
+  //    / \/ r     \(r + r0)/
+  //
+  //   where r is implicitly defined as x - x_t. 
+  //
+  //   The first factor represents the standard sqrt(a) divided by the square 
+  //   root of the radius away from the crack decay that is found in standard 
+  //   crack tip stress solutions e.g. Anderson (2004), and Tada (2000). 
+  //   However, this alone does not accurate account for the load balance in 
+  //   of the load that would have been carried by half of the crack surface 
+  //   and the load that would be added ahead of the crack tip. There is 
+  //   presumed to be another constant term outside this integral matching
+  //   the load at infinity. 
+  // 
+  //   The second factor in the integral represents additional decay of the 
+  //   1/sqrt(r) singularity which, combined with the outside constant term)
+  //   enforces the load balance of the stress state as r is integrated to 
+  //   infinity. 
+  // 
+  //   This function of r0 complicates the integral because not only is 
+  //   r = x - x_t a function of x_t (the variable of integration), r0 is also a 
+  //   function of x_t (r0 is presumed to have the form constant*x_t, where 
+  //   this constant will 
+  //   be refered to as b=r0_over_a). 
+  //         
+  //   The resulting integral is:
+  //           ___
+  //    /    \/x_t      /       b*x_t       \2
+  //    | --=======- *  |-------------------|  dx_t
+  //    / \/x - x_t     \((x - x_t) + b*x_t)/
+  //   
+  //   The function inputs are:
+  //   
+  //       crack_model - contains the values describing the particular 1/sqrt(r)
+  //             LEFM tip model desired, including a function returning 
+  //             the r0_over_a value needed for the integral. The assumption
+  //             is that r0_over_a, even though it is given parameters including
+  //             x_t, is not actually dependent on x_t. If there is dependence on
+  //             x_t then this solution is not correct (but may be close enough
+  //             for practical purposes). 
+  // 
+  //       x  -  the x value or range along the crack that the evaluated 
+  //             integral is being 
+  //             calculated over, not the variable of integration
+  //       
+  //       xt -  the value or range of half crack length that the indefinite
+  //             integral is being evaluated at
+  //       
+  //   
+  //   This function then returns the indefinite integral evaluated at
+  //   (x,x_t)
+
+  // From Wolfram Alpha: 
+  //   integrate ((sqrt(u))/(sqrt(a-u)))*((b*u)/((a-u)+b*u))^2 du =
+  // Plain-Text Wolfram Alpha output
+  //    (b^2 (-(((-1 + b) Sqrt[a - u] Sqrt[u] (a (1 + b) + (-1 + b) b u))/(b 
+  //   (a + (-1 + b) u))) + a (-5 + b) ArcTan[Sqrt[u]/Sqrt[a - u]] + (a (-1 + 
+  //   5 b) ArcTan[(Sqrt[b] Sqrt[u])/Sqrt[a - u]])/b^(3/2)))/(-1 + b)^3
+    
+  // where b*u = r0 --> b = r0_over_a, u = xt, and a = x
+
+  // Calculate division-by-zero and
+  // non division-by-zero regimes separately
+    
+  // Limiting case as x-xt -> 0:
+  // Let r = x-xt -> xt = x-r
+  // 
+  // The limit approaches ((b**2)/(b-1)**3)*(pi/2.0)*((x*(5*b-1)/(b**(3./2.)))
+  //                                +(x*(b-5))) as r->0
+
+  int divzero;
+  double b; // alias of r0_over_a for consistency with Python version
+  double integral;
+  double A,B,C,D,E;
+  double f1,f2;
   
+  divzero = (x==xt) || ((fabs(x-xt) < 1e-10*x) && (fabs(x-xt) < 1e-10*xt));
+    
+  b = r0_over_a;
+
+  if (divzero) {
+    integral = (b*b/pow(b-1,3.0)*(M_PI/2.0)*x*(((5*b-1)/pow(b,3./2.))+(b-5)))
+
+  } else {
+    // !divzero case
+    f1=sqrt(xt);
+    f2=sqrt(x-xt);
+
+    A=(b*b)/pow(b-1,3.0);
+    B=((x*(5*b-1)*atan((sqrt(b)*f1)/(f2)))/pow(b,(3./2.)));
+    C=((b-1)*(f1)*(f2)*(x*(b+1)+(b-1)*b*xt));
+    D=(b*(x+(b-1)*xt));
+    E=(x*(b-5)*atan(f1/f2));
+    integral = A*(B-(C/D)+E);
+
+  }
+  
+  return integral;
+}
+      
+
+
+
 static void sigmacontact_from_displacement(double *du_da_short,
 					   int du_da_short_len,
 					   int du_da_shortened_len,
@@ -180,22 +291,27 @@ static void sigmacontact_from_stress(double *du_da_short,
       //from_stress[cnt] -= du_da_short[aidx+1]*((sqrt_betaval/M_SQRT2)*sqrt((x0+aidx*dx)/(x0+cnt*dx - x0-aidx*dx)) + 1.0)*dx;
       //from_stress[cnt] -= du_da_short[aidx+1]*((sqrt_betaval/M_SQRT2)*sqrt(a/r) + 1.0)*dx;
       //from_stress[cnt] -= du_da_short[aidx+1]*((sqrt_betaval/M_SQRT2)*sqrt(a/r)*exp(-r/(r0_over_a*a)) + 1.0)*dx;
-      from_stress[cnt] -= du_da_short[aidx+1]*((sqrt_betaval/M_SQRT2)*sqrt(a/r)*pow(r0,2.0)/(pow(r,2.0)+pow(r0,2.0)) + 1.0)*dx;
+      //from_stress[cnt] -= du_da_short[aidx+1]*((sqrt_betaval/M_SQRT2)*sqrt(a/r)*pow(r0,2.0)/(pow(r,2.0)+pow(r0,2.0)) + 1.0)*dx;
+      from_stress[cnt] -= du_da_short[aidx+1]*((sqrt_betaval/M_SQRT2)*sqrt(a/r)*pow(r0,2.0)/pow(r+r0,2.0) + 1.0)*dx;
     }
     //from_stress[aidx] -= (du_da_short[aidx+1]*(sqrt_betaval/M_SQRT2)*sqrt(x0+aidx*dx)*2.0*sqrt(dx/2.0) + du_da_short[aidx+1]*dx/2.0);
     //from_stress[aidx] -= (du_da_short[aidx+1]*(sqrt_betaval/M_SQRT2)*sqrt(a)*2.0*sqrt(dx/2.0) + du_da_short[aidx+1]*dx/2.0);
     //from_stress[aidx] -= (du_da_short[aidx+1]*(sqrt_betaval/M_SQRT2)*sqrt(a)*sqrt(M_PI*r0_over_a*a)*erf(sqrt(dx/(2.0*r0_over_a*a))) + du_da_short[aidx+1]*dx/2.0);
-    from_stress[aidx] -= (du_da_short[aidx+1]*(sqrt_betaval/M_SQRT2))*sqrt(a)* ( (1.0/(2.0*M_SQRT2))*sqrt(r0)*(-(log(-sqrt(2.0*(r0)*dx/2.0)+r0 + dx/2.0)-log(sqrt(2.0*(r0)*dx/2.0) + r0 + dx/2.0) + 2.0*atan(1-sqrt(2.0*(dx/2.0)/(r0))) -2.0*atan(sqrt(2.0*(dx/2.0)/(r0))+1.0)))) + du_da_short[aidx+1]*dx/2.0;
+    //from_stress[aidx] -= (du_da_short[aidx+1]*(sqrt_betaval/M_SQRT2))*sqrt(a)* ( (1.0/(2.0*M_SQRT2))*sqrt(r0)*(-(log(-sqrt(2.0*(r0)*dx/2.0)+r0 + dx/2.0)-log(sqrt(2.0*(r0)*dx/2.0) + r0 + dx/2.0) + 2.0*atan(1-sqrt(2.0*(dx/2.0)/(r0))) -2.0*atan(sqrt(2.0*(dx/2.0)/(r0))+1.0)))) + du_da_short[aidx+1]*dx/2.0;
+    from_stress[aidx] -= (du_da_short[aidx+1]*(sqrt_betaval/M_SQRT2))*(indef_integral_of_crack_tip_singularity_times_1_over_r2_pos_crossterm_decay(r0_over_a,x[aidx],x[aidx])-indef_integral_of_crack_tip_singularity_times_1_over_r2_pos_crossterm_decay(r0_over_a,a,a-dx/2.0)) + du_da_short[aidx+1]*dx/2.0;
     
     if (aidx+1 >= closure_index_for_gradient+2) {
       for (cnt=aidx+1;cnt <= afull_idx;cnt++) {
 	r = x0+cnt*dx - a;
 	//from_stress_gradient[cnt*du_da_shortened_len + du_da_shortened_index] -= ((sqrt_betaval/M_SQRT2)*sqrt(a/r)*exp(-r/(r0_over_a*a)) + 1.0)*dx;
-	from_stress_gradient[cnt*du_da_shortened_len + du_da_shortened_index] -= ((sqrt_betaval/M_SQRT2)*sqrt(a/r)*pow(r0,2.0)/(pow(r,2.0)+pow(r0,2.0)) + 1.0)*dx;
+	//from_stress_gradient[cnt*du_da_shortened_len + du_da_shortened_index] -= ((sqrt_betaval/M_SQRT2)*sqrt(a/r)*pow(r0,2.0)/(pow(r,2.0)+pow(r0,2.0)) + 1.0)*dx;
+	from_stress_gradient[cnt*du_da_shortened_len + du_da_shortened_index] -= ((sqrt_betaval/M_SQRT2)*sqrt(a/r)*pow(r0,2.0)/pow(r+r0,2.0) + 1.0)*dx;
+	
       }
       //from_stress_gradient[aidx*du_da_shortened_len + du_da_shortened_index] -= (sqrt_betaval/M_SQRT2)*sqrt(a)*sqrt(M_PI*r0_over_a*a)*erf(sqrt(dx/(2.0*r0_over_a*a))) + dx/2.0;
 
-      from_stress_gradient[aidx*du_da_shortened_len + du_da_shortened_index] -= (sqrt_betaval/M_SQRT2)*sqrt(a)* ( (1.0/(2.0*M_SQRT2))*sqrt(r0)*(-(log(-sqrt(2.0*(r0)*dx/2.0)+r0 + dx/2.0)-log(sqrt(2.0*(r0)*dx/2.0) + r0 + dx/2.0) + 2.0*atan(1-sqrt(2.0*(dx/2.0)/(r0))) -2.0*atan(sqrt(2.0*(dx/2.0)/(r0))+1.0)))) + dx/2.0;
+      //from_stress_gradient[aidx*du_da_shortened_len + du_da_shortened_index] -= (sqrt_betaval/M_SQRT2)*sqrt(a)* ( (1.0/(2.0*M_SQRT2))*sqrt(r0)*(-(log(-sqrt(2.0*(r0)*dx/2.0)+r0 + dx/2.0)-log(sqrt(2.0*(r0)*dx/2.0) + r0 + dx/2.0) + 2.0*atan(1-sqrt(2.0*(dx/2.0)/(r0))) -2.0*atan(sqrt(2.0*(dx/2.0)/(r0))+1.0)))) + dx/2.0;
+      from_stress_gradient[aidx*du_da_shortened_len + du_da_shortened_index] -= (sqrt_betaval/M_SQRT2)* ( indef_integral_of_crack_tip_singularity_times_1_over_r2_pos_crossterm_decay(r0_over_a,x[aidx],x[aidx])-indef_integral_of_crack_tip_singularity_times_1_over_r2_pos_crossterm_decay(r0_over_a,a,a-dx/2.0) ) + dx/2.0;
     }
     //if (aidx==0) {
     //  printf("fs[0] subtraction=%g\n",(du_da_short[aidx+1]*(sqrt_betaval/M_SQRT2)*sqrt(a)*sqrt(M_PI*r0_over_a*a)*erf(sqrt(dx/(2.0*r0_over_a*a))) + du_da_short[aidx+1]*dx/2.0));
