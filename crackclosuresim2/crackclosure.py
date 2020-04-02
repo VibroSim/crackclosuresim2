@@ -1972,7 +1972,7 @@ class Tada_ModeI_CircularCrack_along_midline(ModeI_Beta_COD_Formula):
     def r0_over_a(self,xt):
         """Based on calculation given in total_load_matching_crossterm_r2_work.pdf
 """
-        return (2.0**(1.0/3.0)/((np.pi**(2.0/3.0))*(self.beta(self)**(1.0/3.0)))
+        return (2.0**(1.0/3.0))/((np.pi**(2.0/3.0))*(self.beta(self)**(1.0/3.0)))
     
     def __init__(self,E,nu):
         def u(E,nu,sigma_applied,x,xt):
