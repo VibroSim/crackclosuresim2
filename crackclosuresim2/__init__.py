@@ -49,7 +49,7 @@ from .crackclosure import Tada_ModeI_CircularCrack_along_midline
 from .crackclosure import perform_inverse_closure
 from .crackclosure import save_closurestress
 from .crackclosure import load_closurestress
-
+from .crackclosure import indef_integral_of_crack_tip_singularity_times_1_over_r2_pos_crossterm_decay
 
 
 from .shear_stickslip import ModeII_crack_model

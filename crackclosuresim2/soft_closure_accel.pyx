@@ -64,14 +64,14 @@ def initialize_contact_goal_function_with_gradient_accel(np.ndarray[np.float64_t
         crack_model.modeltype=CMT_THROUGH
         crack_model.modeldat.through.Eeff = scp.crack_model.Eeff
         crack_model.modeldat.through.Beta = scp.crack_model.beta(scp.crack_model)
-        crack_model.modeldat.through.r0_over_a = scp.crack_model.r0_over_a
+        crack_model.modeldat.through.r0_over_a = scp.crack_model.r0_over_a(np.nan) # Should be independent of crack length, so we provide nan as parameter to be sure. 
         pass
     elif isinstance(scp.crack_model,Tada_ModeI_CircularCrack_along_midline):
         crack_model.modeltype=CMT_TADA
         crack_model.modeldat.tada.E = scp.crack_model.E
         crack_model.modeldat.tada.nu = scp.crack_model.nu
         crack_model.modeldat.tada.Beta = scp.crack_model.beta(scp.crack_model)
-        crack_model.modeldat.tada.r0_over_a = scp.crack_model.r0_over_a
+        crack_model.modeldat.tada.r0_over_a = scp.crack_model.r0_over_a(np.nan) # Should be independent of crack length, so we provide nan as parameter to be sure.
         pass
     
     gradient = np.empty(du_da_shortened.shape[0],dtype='d')
@@ -111,14 +111,16 @@ def soft_closure_goal_function_with_gradient_accel(np.ndarray[np.float64_t,ndim=
         crack_model.modeltype=CMT_THROUGH
         crack_model.modeldat.through.Eeff = scp.crack_model.Eeff
         crack_model.modeldat.through.Beta = scp.crack_model.beta(scp.crack_model)
-        crack_model.modeldat.through.r0_over_a = scp.crack_model.r0_over_a
+        crack_model.modeldat.through.r0_over_a = scp.crack_model.r0_over_a(np.nan) # Should be independent of crack length, so we provide nan as parameter to be sure.
+
         pass
     elif isinstance(scp.crack_model,Tada_ModeI_CircularCrack_along_midline):
         crack_model.modeltype=CMT_TADA
         crack_model.modeldat.tada.E = scp.crack_model.E
         crack_model.modeldat.tada.nu = scp.crack_model.nu
         crack_model.modeldat.tada.Beta = scp.crack_model.beta(scp.crack_model)
-        crack_model.modeldat.tada.r0_over_a = scp.crack_model.r0_over_a
+        crack_model.modeldat.tada.r0_over_a = scp.crack_model.r0_over_a(np.nan) # Should be independent of crack length, so we provide nan as parameter to be sure.
+
     else:
         crack_model.modeltype=CMT_THROUGH
         crack_model.modeldat.through.Eeff = 0.0

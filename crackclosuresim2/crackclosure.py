@@ -354,7 +354,7 @@ def indef_integral_of_crack_tip_singularity_times_1_over_r2_pos_crossterm_decay(
     D=(b*(x[~divzero]+(b-1)*xt[~divzero]))
     E=(x[~divzero]*(b-5)*arctan(f1/f2))
 
-    integral = np.zeros(x.shape[0],dtype='d')
+    integral = np.zeros(x.shape,dtype='d')
     integral[~divzero] =A*(B-(C/D)+E)
     
     integral[divzero] = ((b**2)/(b-1)**3)*(pi/2.0)*x[divzero]*(((5*b-1)/(b**(3./2.)))+(b-5))
