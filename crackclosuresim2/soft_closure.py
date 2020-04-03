@@ -36,6 +36,15 @@ def duda_short__from_duda_shortened(du_da_shortened,closure_index):
     du_da_short = np.concatenate(((du_da_shortened[0],),np.zeros(closure_index+1,dtype='d'),du_da_shortened[1:]))  # short version goes only up to afull_idx_fine+1 as last element (afull_idx_fine+2 elements total)
     return du_da_short
 
+def duda_shortened__from_duda(du_da,afull_idx,closure_index):
+    """Evaluate du_da_shortened from duda or duda_short"""
+
+    assert((du_da[1:(closure_index+2)]==0).all())
+    du_da_shortened_ext = np.concatenate(((du_da[0],),du_da[(closure_index+2):]))
+    du_da_shortened = du_da_shortened_ext[:(afull_idx+2)]
+    return du_da_shortened
+    
+    
 def duda__from_duda_shortened(scp,du_da_shortened,closure_index):
     du_da = np.concatenate(((du_da_shortened[0],),np.zeros(closure_index+1,dtype='d'),du_da_shortened[1:],np.zeros(scp.xsteps - scp.afull_idx - 2, dtype='d')))  # full version goes all the way up to and including scp.xsteps. 
     return du_da
@@ -75,6 +84,54 @@ class sc_params(object):
         assert(isinstance(self.crack_model,ModeI_Beta_COD_Formula))
         
         pass
+
+    def save_debug_pickle(self,sigma_ext,du_da,closure_index,sigma_closure=None,filename=None):
+        import os
+        import pickle
+        import inspect
+        import copy
+          
+        scp_copy=copy.deepcopy(self)
+  
+        caller_lineno = inspect.getframeinfo(inspect.stack()[1][0]).lineno
+
+        if filename is None:
+            filename="/tmp/scdebug%d_line_%d.pickle" % (os.getpid(),caller_lineno)
+            pass
+
+        picklefh=open(filename,"wb")
+
+        (contact_stress_from_displacement,displacement,contact_stress_from_displacement_gradient,displacement_gradient) = sigmacontact_from_displacement(self,du_da,closure_index_for_gradient=closure_index)
+        (contact_stress_from_stress,contact_stress_from_stress_gradient) = sigmacontact_from_stress(self,du_da,closure_index_for_gradient=closure_index)
+
+
+        scp_copy.crack_model = None
+        to_pickle = {
+            "scp": scp_copy,
+            "E": self.crack_model.E,
+            "nu": self.crack_model.nu,
+            "crack_model_class": self.crack_model.__class__.__name__,
+            "sigma_ext": sigma_ext,
+
+            "du_da": du_da,
+            "closure_index": closure_index,
+            "contact_stress_from_stress": contact_stress_from_stress,
+            "contact_stress_from_stress_gradient": contact_stress_from_stress_gradient,
+            "contact_stress_from_displacement": contact_stress_from_displacement,
+            "displacement": displacement, 
+            "contact_stress_from_displacement_gradient": contact_stress_from_displacement_gradient,
+            "displacement_gradient": displacement_gradient, 
+        }
+
+        if sigma_closure is not None:
+            to_pickle["sigma_closure"]=sigma_closure
+            pass
+            
+
+        pickle.dump(to_pickle,picklefh)
+        picklefh.close()
+        pass
+
 
     def setcrackstate(self,sigma_closure,crack_initial_opening):
         self.sigma_closure=sigma_closure
@@ -231,7 +288,7 @@ class sc_params(object):
                                           jac=True,
                                           options={"eps": epsvalscaled,
                                                    "maxiter": this_niter,
-                                                   "ftol": 1e-6}) #self.afull_idx*(abs(np.mean(sigma_closure))+20e6)**2.0/1e14})
+                                                   "ftol": 1e-12}) #self.afull_idx*(abs(np.mean(sigma_closure))+20e6)**2.0/1e14})
             if res.status != 9 and res.status != 7:  # anything but reached iteration limit or eps increase
                 if res.fun <= goal_residual or res.nit==0:
                     terminate=True
@@ -268,6 +325,7 @@ class sc_params(object):
 
         if niter >= total_maxiter and res.fun > goal_residual:
             print("soft_closure/initialize_contact: WARNING Maximum number of iterations (%d) reached and residual (%g) exceeds goal (%g)" % (total_maxiter,res.fun,goal_residual))
+            scp.save_debug_pickle(sigma_ext,duda__from_duda_shortened(scp,res.x,closure_index),closure_index,sigma_closure=sigma_closure)
             pass
 
         
@@ -840,7 +898,7 @@ def calc_contact(scp,sigma_ext):
                                           jac=True,
                                           options={"eps": epsvalscaled,
                                                    "maxiter": this_niter,
-                                                   "ftol": 1e-6})#scp.afull_idx*(np.abs(sigma_ext)+20e6)**2.0/1e14})
+                                                   "ftol": 1e-12})#scp.afull_idx*(np.abs(sigma_ext)+20e6)**2.0/1e14})
             #print("res=%s" % (str(res)))
             #print("niter = %d; residual = %g; res.message=%s" % (niter+res.nit,res.fun,res.message))
             if res.status != 9 and res.status != 7:  # anything but reached iteration limit or eps increase
@@ -878,6 +936,8 @@ def calc_contact(scp,sigma_ext):
 
         if niter >= total_maxiter and res.fun > goal_residual:
             print("soft_closure/calc_contact (tensile): WARNING Maximum number of iterations (%d) reached and residual (%g) exceeds goal (%g)" % (total_maxiter,res.fun,goal_residual))
+            scp.save_debug_pickle(sigma_ext,duda__from_duda_shortened(scp,res.x,closure_index),closure_index)
+
             pass
 
         #res = scipy.optimize.minimize(goal_function,du_da_shortened_iniguess,method='nelder-mead',options={"maxfev": 15000})
@@ -894,8 +954,10 @@ def calc_contact(scp,sigma_ext):
         (slowcalc,slowcalc_gradient) = soft_closure_goal_function_with_gradient(res.x,scp,closure_index)
         (fastcalc,fastcalc_gradient) = soft_closure_goal_function_with_gradient_accel(res.x,scp,closure_index)
         if abs((slowcalc-fastcalc)/slowcalc) >= 1e-4:
-            from VibroSim_Simulator.function_as_script import scriptify
-            (slowcalc2,slowcalc2_grad) = scriptify(initialize_contact_goal_function_with_gradient)(res.x,scp,sigma_closure,closure_index)
+            scp.save_debug_pickle(sigma_ext,duda__from_duda_shortened(scp,res.x,closure_index),closure_index)
+
+            #from VibroSim_Simulator.function_as_script import scriptify
+            #(slowcalc2,slowcalc2_grad) = scriptify(soft_closure_goal_function_with_gradient)(res.x,scp,closure_index)
             raise ValueError("Accelerated goal calculation mismatch: %g vs %g" % (slowcalc2,fastcalc))
 
         assert(abs((slowcalc-fastcalc)/slowcalc) < 1e-4)
@@ -955,7 +1017,7 @@ def calc_contact(scp,sigma_ext):
                                           jac=True,
                                           options={"eps": epsvalscaled,
                                                    "maxiter": this_niter,
-                                                   "ftol": 1e-6})  # scp.afull_idx*(np.abs(sigma_ext)+20e6)**2.0/1e14})
+                                                   "ftol": 1e-12})  # scp.afull_idx*(np.abs(sigma_ext)+20e6)**2.0/1e14})
             if res.status != 9 and res.status != 7: # anything but reached iteration limit or eps increase needed
                 if res.fun <= goal_residual or res.nit==0:
                     terminate=True
@@ -1007,8 +1069,8 @@ def calc_contact(scp,sigma_ext):
         (fastcalc,fastcalc_gradient) = soft_closure_goal_function_with_gradient_accel(res.x,scp,closure_index)
 
         if abs((slowcalc-fastcalc)/slowcalc) >= 1e-4:
-            from VibroSim_Simulator.function_as_script import scriptify
-            (slowcalc2,slowcalc2_grad) = scriptify(initialize_contact_goal_function_with_gradient)(res.x,scp,sigma_closure,closure_index)
+            #from VibroSim_Simulator.function_as_script import scriptify
+            #(slowcalc2,slowcalc2_grad) = scriptify(soft_closure_goal_function_with_gradient)(res.x,scp,closure_index)
             raise ValueError("Accelerated goal calculation mismatch: %g vs %g" % (slowcalc2,fastcalc))
 
         assert(abs((slowcalc-fastcalc)/slowcalc) < 1e-4)
