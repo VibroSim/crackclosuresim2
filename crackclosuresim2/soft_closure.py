@@ -284,12 +284,12 @@ class sc_params(object):
         (slowcalc,slowcalc_grad) = initialize_contact_goal_function_with_gradient(res.x,self,sigma_closure,closure_index)
         (fastcalc,fastcalc_grad) = initialize_contact_goal_function_with_gradient_accel(res.x,self,sigma_closure,closure_index)
 
-        if abs((slowcalc-fastcalc)/slowcalc) >= 1e-6:
+        if abs((slowcalc-fastcalc)/slowcalc) >= 1e-4:
             from VibroSim_Simulator.function_as_script import scriptify
             (slowcalc2,slowcalc2_grad) = scriptify(initialize_contact_goal_function_with_gradient)(res.x,self,sigma_closure,closure_index)
             raise ValueError("Accelerated initialize contact calculation mismatch: %g vs %g" % (slowcalc2,fastcalc))
             
-        assert(abs((slowcalc-fastcalc)/slowcalc) < 1e-6)
+        assert(abs((slowcalc-fastcalc)/slowcalc) < 1e-4)
         
         du_da_shortened=res.x
         #du_da = np.concatenate(((du_da_shortened[0],),np.zeros(closure_index+1,dtype='d'),du_da_shortened[1:],np.zeros(self.xsteps - self.afull_idx - 2 ,dtype='d')))
@@ -893,12 +893,12 @@ def calc_contact(scp,sigma_ext):
         # Verify proper operation of accelerated code
         (slowcalc,slowcalc_gradient) = soft_closure_goal_function_with_gradient(res.x,scp,closure_index)
         (fastcalc,fastcalc_gradient) = soft_closure_goal_function_with_gradient_accel(res.x,scp,closure_index)
-        if abs((slowcalc-fastcalc)/slowcalc) >= 1e-6:
+        if abs((slowcalc-fastcalc)/slowcalc) >= 1e-4:
             from VibroSim_Simulator.function_as_script import scriptify
             (slowcalc2,slowcalc2_grad) = scriptify(initialize_contact_goal_function_with_gradient)(res.x,scp,sigma_closure,closure_index)
             raise ValueError("Accelerated goal calculation mismatch: %g vs %g" % (slowcalc2,fastcalc))
 
-        assert(abs((slowcalc-fastcalc)/slowcalc) < 1e-6)
+        assert(abs((slowcalc-fastcalc)/slowcalc) < 1e-4)
         
         
         du_da_shortened=res.x
@@ -1006,12 +1006,12 @@ def calc_contact(scp,sigma_ext):
         (slowcalc,slowcalc_gradient) = soft_closure_goal_function_with_gradient(res.x,scp,closure_index)
         (fastcalc,fastcalc_gradient) = soft_closure_goal_function_with_gradient_accel(res.x,scp,closure_index)
 
-        if abs((slowcalc-fastcalc)/slowcalc) >= 1e-6:
+        if abs((slowcalc-fastcalc)/slowcalc) >= 1e-4:
             from VibroSim_Simulator.function_as_script import scriptify
             (slowcalc2,slowcalc2_grad) = scriptify(initialize_contact_goal_function_with_gradient)(res.x,scp,sigma_closure,closure_index)
             raise ValueError("Accelerated goal calculation mismatch: %g vs %g" % (slowcalc2,fastcalc))
 
-        assert(abs((slowcalc-fastcalc)/slowcalc) < 1e-6)
+        assert(abs((slowcalc-fastcalc)/slowcalc) < 1e-4)
 
         #du_da = np.concatenate((du_da_shortened,np.zeros(scp.xsteps*scp.fine_refinement - scp.afull_idx_fine - 2 ,dtype='d')))
         assert(closure_index==-1)
