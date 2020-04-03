@@ -193,7 +193,7 @@ class sc_params(object):
         grad_sumsquared = np.sqrt(np.sum(grad_eval**2.0))
     
         
-        print("grad_sumsquared=%g; grad_sumsquareddiff=%g" % (grad_sumsquared,grad_sumsquareddiff))
+        #print("grad_sumsquared=%g; grad_sumsquareddiff=%g" % (grad_sumsquared,grad_sumsquareddiff))
         
         if (grad_sumsquareddiff/grad_sumsquared >= 1e-4):
             raise ValueError("Grad error too high: FAIL grad_sumsquared=%g; grad_sumsquareddiff=%g" % (grad_sumsquared,grad_sumsquareddiff))
@@ -787,7 +787,7 @@ def calc_contact(scp,sigma_ext):
         grad_sumsquareddiff = np.sqrt(np.sum((grad_eval-grad_approx)**2.0))
         grad_sumsquared = np.sqrt(np.sum(grad_eval**2.0))
         
-        print("grad_sumsquared=%g; grad_sumsquareddiff=%g" % (grad_sumsquared,grad_sumsquareddiff))
+        #print("grad_sumsquared=%g; grad_sumsquareddiff=%g" % (grad_sumsquared,grad_sumsquareddiff))
         
         if (grad_sumsquareddiff/grad_sumsquared >= 1e-4):
             raise ValueError("Grad error too high: FAIL grad_sumsquared=%g; grad_sumsquareddiff=%g" % (grad_sumsquared,grad_sumsquareddiff))
