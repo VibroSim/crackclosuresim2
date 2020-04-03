@@ -329,10 +329,11 @@ class sc_params(object):
             pass
 
         
-        if not res.success: #  and res.status != 4:
+        if res.fun > goal_residual and not res.success: #  and res.status != 4:
             # (ignore incompatible constraint, because our constraints are
             # compatible by definition, and scipy 1.2 seems to diagnose
             # this incorrectly... should file bug report)
+            scp.save_debug_pickle(sigma_ext,duda__from_duda_shortened(scp,res.x,closure_index),closure_index,sigma_closure=sigma_closure)
             print("minimize error %d: %s" % (res.status,res.message))
             import pdb
             pdb.set_trace()
@@ -941,11 +942,12 @@ def calc_contact(scp,sigma_ext):
             pass
 
         #res = scipy.optimize.minimize(goal_function,du_da_shortened_iniguess,method='nelder-mead',options={"maxfev": 15000})
-        if not res.success: # and res.status != 4:
+        if res.fun > goal_residual and not res.success: # and res.status != 4:
             # (ignore incompatible constraint, because our constraints are
             # compatible by definition, and scipy 1.2 seems to diagnose
             # this incorrectly... should file bug report)
             print("minimize error %d: %s" % (res.status,res.message))
+            scp.save_debug_pickle(sigma_ext,duda__from_duda_shortened(scp,res.x,closure_index),closure_index)
             import pdb
             pdb.set_trace()
             pass
@@ -1053,11 +1055,12 @@ def calc_contact(scp,sigma_ext):
             pass
 
         #res = scipy.optimize.minimize(goal_function,du_da_shortened_iniguess,method='nelder-mead',options={"maxfev": 15000})
-        if not res.success: #  and res.status != 4:
+        if res.fun > goal_residual and not res.success: #  and res.status != 4:
             # (ignore incompatible constraint, because our constraints are
             # compatible by definition, and scipy 1.2 seems to diagnose
             # this incorrectly... should file bug report)
             print("minimize error %d: %s" % (res.status,res.message))
+            scp.save_debug_pickle(sigma_ext,duda__from_duda_shortened(scp,res.x,closure_index),closure_index)
             import pdb
             pdb.set_trace()
             pass

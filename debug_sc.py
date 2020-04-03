@@ -23,7 +23,7 @@ from crackclosuresim2.soft_closure import duda_short__from_duda_shortened
 # is run.
 
 
-pickle_filename = "/tmp/scdebug71116_line_930_AFVT007R.pickle"
+pickle_filename = "/tmp/scdebug77857_line_949.pickle"
 pickle_fh=open(pickle_filename,"rb")
 vars = pickle.load(pickle_fh)
 #scp = vars["scp"]
