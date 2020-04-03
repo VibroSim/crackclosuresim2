@@ -344,9 +344,9 @@ class sc_params(object):
         (fastcalc,fastcalc_grad) = initialize_contact_goal_function_with_gradient_accel(res.x,self,sigma_closure,closure_index)
 
         if abs((slowcalc-fastcalc)/slowcalc) >= 1e-4:
-            from VibroSim_Simulator.function_as_script import scriptify
-            (slowcalc2,slowcalc2_grad) = scriptify(initialize_contact_goal_function_with_gradient)(res.x,self,sigma_closure,closure_index)
-            raise ValueError("Accelerated initialize contact calculation mismatch: %g vs %g" % (slowcalc2,fastcalc))
+            #from VibroSim_Simulator.function_as_script import scriptify
+            #(slowcalc2,slowcalc2_grad) = scriptify(initialize_contact_goal_function_with_gradient)(res.x,self,sigma_closure,closure_index)
+            raise ValueError("Accelerated initialize contact calculation mismatch: %g vs %g" % (slowcalc,fastcalc))
             
         assert(abs((slowcalc-fastcalc)/slowcalc) < 1e-4)
         
@@ -960,7 +960,7 @@ def calc_contact(scp,sigma_ext):
 
             #from VibroSim_Simulator.function_as_script import scriptify
             #(slowcalc2,slowcalc2_grad) = scriptify(soft_closure_goal_function_with_gradient)(res.x,scp,closure_index)
-            raise ValueError("Accelerated goal calculation mismatch: %g vs %g" % (slowcalc2,fastcalc))
+            raise ValueError("Accelerated goal calculation mismatch: %g vs %g" % (slowcalc,fastcalc))
 
         assert(abs((slowcalc-fastcalc)/slowcalc) < 1e-4)
         
@@ -1074,7 +1074,7 @@ def calc_contact(scp,sigma_ext):
         if abs((slowcalc-fastcalc)/slowcalc) >= 1e-4:
             #from VibroSim_Simulator.function_as_script import scriptify
             #(slowcalc2,slowcalc2_grad) = scriptify(soft_closure_goal_function_with_gradient)(res.x,scp,closure_index)
-            raise ValueError("Accelerated goal calculation mismatch: %g vs %g" % (slowcalc2,fastcalc))
+            raise ValueError("Accelerated goal calculation mismatch: %g vs %g" % (slowcalc,fastcalc))
 
         assert(abs((slowcalc-fastcalc)/slowcalc) < 1e-4)
 
