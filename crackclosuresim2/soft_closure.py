@@ -296,7 +296,7 @@ class sc_params(object):
 
             if res.fun <= goal_residual:
                 terminate=True
-f                pass
+                pass
  
             if res.status != 9 and res.status != 7:  # anything but reached iteration limit or eps increase
                 if res.fun <= goal_residual or res.nit==0:
@@ -919,7 +919,7 @@ def calc_contact(scp,sigma_ext):
 
             if res.fun <= goal_residual:
                 terminate=True
-f                pass
+                pass
             
             if res.status != 9 and res.status != 7:  # anything but reached iteration limit or eps increase
                 if res.fun <= goal_residual or res.nit==0:
@@ -1044,7 +1044,7 @@ f                pass
 
             if res.fun <= goal_residual:
                 terminate=True
-f                pass
+                pass
  
             if res.status != 9 and res.status != 7: # anything but reached iteration limit or eps increase needed
                 if res.fun <= goal_residual or res.nit==0:
