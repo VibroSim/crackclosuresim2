@@ -353,7 +353,7 @@ def Fabrikant_ModeII_CircularCrack_along_midline(E,nu):
         pass
     
     # u(x,0.0,xt,tau_applied,obj.E,obj.nu)
-    uvec = np.vectorize(u)
+    uvec = np.vectorize(u,otypes=np.double)
     
     return ModeII_Beta_CSD_Formula(E=E,
                                    nu=nu,
