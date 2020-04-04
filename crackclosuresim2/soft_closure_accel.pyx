@@ -152,7 +152,7 @@ def soft_closure_goal_function_with_gradient_accel(np.ndarray[np.float64_t,ndim=
 
 def soft_closure_goal_function_with_gradient_normalized_accel(du_da_shortened_normalized,scp,closure_index,du_da_normalization,goal_function_normalization):
     (goal_function,gradient) = soft_closure_goal_function_with_gradient_accel(du_da_shortened_normalized*du_da_normalization,scp,closure_index)
-    goal_function_normalized = goal_function / goal_function_normalized 
+    goal_function_normalized = goal_function / goal_function_normalization
 
     # d_gfn/d_dudasn = d_gfn/d_gf * d_gf/d_dudas * d_dudas/d_dudasn  
     #  ... where d_gfn/d_gf = 1/goal_function_normalization

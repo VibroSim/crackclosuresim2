@@ -812,7 +812,7 @@ def soft_closure_goal_function_with_gradient(du_da_shortened,scp,closure_index):
 
 def soft_closure_goal_function_with_gradient_normalized(du_da_shortened_normalized,scp,closure_index,du_da_normalization,goal_function_normalization):
     (goal_function,gradient) = soft_closure_goal_function_with_gradient(du_da_shortened_normalized*du_da_normalization,scp,closure_index)
-    goal_function_normalized = goal_function / goal_function_normalized 
+    goal_function_normalized = goal_function / goal_function_normalization
 
     # d_gfn/d_dudasn = d_gfn/d_gf * d_gf/d_dudas * d_dudas/d_dudasn  
     #  ... where d_gfn/d_gf = 1/goal_function_normalization
@@ -894,13 +894,13 @@ def calc_contact(scp,sigma_ext):
     goal_residual = (goal_stress_fit_error_pascals**2.0)*scp.afull_idx
     goal_residual_str = str(goal_residual) # for gdb
     
-    du_da_normalization = max(abs(sigma_ext),10e6)/self.dx
+    du_da_normalization = max(abs(sigma_ext),10e6)/scp.dx
     goal_function_normalization = goal_residual
     load_constraint_fun_normalization = max(abs(sigma_ext),10e6)
 
     def load_constraint_fun_normalized(du_da_shortened_normalized):
 
-        du_da_shortened = du_da_shorted_normalized*du_da_normalization
+        du_da_shortened = du_da_shortened_normalized*du_da_normalization
         #du_da_short = np.concatenate(((du_da_shortened[0],),np.zeros(closure_index+1,dtype='d'),du_da_shortened[1:]))        
         du_da_short = duda_short__from_duda_shortened(du_da_shortened,closure_index)
         
@@ -940,7 +940,7 @@ def calc_contact(scp,sigma_ext):
         while niter < total_maxiter and not terminate: 
             this_niter=10000
             #print("calling scipy.optimize.minimize; sigma_ext=%g; eps=%g maxiter=%d ftol=%g" % (sigma_ext,epsvalscaled,this_niter,scp.afull_idx_fine*(np.abs(sigma_ext)+20e6)**2.0/1e14))
-            res = scipy.optimize.minimize(soft_closure_goal_function_with_gradient_accel,starting_value/du_da_normalization,args=(scp,closure_index,du_da_normalization,goal_function_normalization),   # was soft_closure_goal_function_accel
+            res = scipy.optimize.minimize(soft_closure_goal_function_with_gradient_normalized_accel,starting_value/du_da_normalization,args=(scp,closure_index,du_da_normalization,goal_function_normalization),   # was soft_closure_goal_function_accel
                                           constraints = [ load_constraint_normalized ], #[ nonnegative_constraint, load_constraint ],
                                           method="SLSQP",
                                           jac=True,
