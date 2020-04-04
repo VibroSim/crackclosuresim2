@@ -87,7 +87,7 @@ class sc_params(object):
         
         pass
 
-    def save_debug_pickle(self,sigma_ext,du_da,closure_index,sigma_closure=None,filename=None):
+    def save_debug_pickle(self,sigma_ext,du_da,closure_index,du_da_normalization,goal_function_normalization,sigma_closure=None,load_constraint_fun_normalization=None,filename=None):
         import os
         import pickle
         import inspect
@@ -123,10 +123,17 @@ class sc_params(object):
             "displacement": displacement, 
             "contact_stress_from_displacement_gradient": contact_stress_from_displacement_gradient,
             "displacement_gradient": displacement_gradient, 
+
+            "du_da_normalization": du_da_normalization,
+            "goal_function_normalization": goal_function_normalization,
         }
 
         if sigma_closure is not None:
             to_pickle["sigma_closure"]=sigma_closure
+            pass
+
+        if load_constraint_fun_normalization is not None:
+            to_pickle["load_constraint_fun_normalization"]=load_constraint_fun_normalization
             pass
             
 
@@ -276,7 +283,7 @@ class sc_params(object):
         #epsval1 = 50e6/self.a/5000.0
         #epsval2 = np.max(np.abs(sigma_closure))/self.a/5000.0
         #epsval = max(epsval1,epsval2)
-        epsval=1e-6
+        epsval=1e-4
         epsvalscaled = epsval
         terminate=False
         starting_value=du_da_shortened_iniguess
@@ -342,7 +349,7 @@ class sc_params(object):
 
         if niter >= total_maxiter and res_fun_denormalized > goal_residual:
             print("soft_closure/initialize_contact: WARNING Maximum number of iterations (%d) reached and residual (%g) exceeds goal (%g)" % (total_maxiter,res_fun_denormalized,goal_residual))
-            scp.save_debug_pickle(sigma_ext,duda__from_duda_shortened(scp,res.x*du_da_normalization,closure_index),closure_index,sigma_closure=sigma_closure)
+            self.save_debug_pickle(sigma_ext,duda__from_duda_shortened(self,res.x*du_da_normalization,closure_index),closure_index,du_da_normalization,goal_function_normalization,sigma_closure=sigma_closure)
             pass
 
         
@@ -350,7 +357,7 @@ class sc_params(object):
             # (ignore incompatible constraint, because our constraints are
             # compatible by definition, and scipy 1.2 seems to diagnose
             # this incorrectly... should file bug report)
-            scp.save_debug_pickle(sigma_ext,duda__from_duda_shortened(scp,res.x*du_da_normalization,closure_index),closure_index,sigma_closure=sigma_closure)
+            self.save_debug_pickle(sigma_ext,duda__from_duda_shortened(self,res.x*du_da_normalization,closure_index),closure_index,du_da_normalization,goal_function_normalization,sigma_closure=sigma_closure)
             print("minimize error %d: %s" % (res.status,res.message))
             import pdb
             pdb.set_trace()
@@ -930,7 +937,7 @@ def calc_contact(scp,sigma_ext):
         #epsval1 = np.abs(sigma_ext)/scp.a/5000.0
         #epsval2 = np.max(np.abs(scp.sigma_closure))/scp.a/5000.0
         #epsval = max(epsval1,epsval2)
-        epsval=1e-6
+        epsval=1e-4
         epsvalscaled = epsval
         terminate=False
         starting_value=du_da_shortened_iniguess
@@ -995,7 +1002,7 @@ def calc_contact(scp,sigma_ext):
 
         if niter >= total_maxiter and res_fun_denormalized > goal_residual:
             print("soft_closure/calc_contact (tensile): WARNING Maximum number of iterations (%d) reached and residual (%g) exceeds goal (%g)" % (total_maxiter,res_fun_denormalized,goal_residual))
-            scp.save_debug_pickle(sigma_ext,duda__from_duda_shortened(scp,res.x*du_da_normalization,closure_index),closure_index)
+            scp.save_debug_pickle(sigma_ext,duda__from_duda_shortened(scp,res.x*du_da_normalization,closure_index),closure_index,du_da_normalization,goal_function_normalization,load_constraint_fun_normalization=load_constraint_fun_normalization)
 
             pass
 
@@ -1005,7 +1012,7 @@ def calc_contact(scp,sigma_ext):
             # compatible by definition, and scipy 1.2 seems to diagnose
             # this incorrectly... should file bug report)
             print("minimize error %d: %s" % (res.status,res.message))
-            scp.save_debug_pickle(sigma_ext,duda__from_duda_shortened(scp,res.x*du_da_normalization,closure_index),closure_index)
+            scp.save_debug_pickle(sigma_ext,duda__from_duda_shortened(scp,res.x*du_da_normalization,closure_index),closure_index,du_da_normalization,goal_function_normalization,load_constraint_fun_normalization=load_constraint_fun_normalization)
             import pdb
             pdb.set_trace()
             pass
@@ -1014,7 +1021,7 @@ def calc_contact(scp,sigma_ext):
         (slowcalc,slowcalc_gradient) = soft_closure_goal_function_with_gradient(res.x*du_da_normalization,scp,closure_index)
         (fastcalc,fastcalc_gradient) = soft_closure_goal_function_with_gradient_accel(res.x*du_da_normalization,scp,closure_index)
         if abs((slowcalc-fastcalc)/slowcalc) >= 1e-4 and (slowcalc > goal_residual/100.0 or fastcalc > goal_residual/100.0):
-            scp.save_debug_pickle(sigma_ext,duda__from_duda_shortened(scp,res.x*du_da_normalization,closure_index),closure_index)
+            scp.save_debug_pickle(sigma_ext,duda__from_duda_shortened(scp,res.x*du_da_normalization,closure_index),closure_index,du_da_normalization,goal_function_normalization,load_constraint_fun_normalization=load_constraint_fun_normalization)
 
             #from VibroSim_Simulator.function_as_script import scriptify
             #(slowcalc2,slowcalc2_grad) = scriptify(soft_closure_goal_function_with_gradient)(res.x,scp,closure_index)
@@ -1065,7 +1072,7 @@ def calc_contact(scp,sigma_ext):
         #epsval1 = np.abs(sigma_ext)/scp.a/5000.0
         #epsval2 = np.max(np.abs(scp.sigma_closure))/scp.a/5000.0
         #epsval = max(epsval1,epsval2)
-        epsval=1e-6
+        epsval=1e-4
         epsvalscaled = epsval
         terminate=False
         starting_value=du_da_shortened_iniguess
@@ -1129,7 +1136,7 @@ def calc_contact(scp,sigma_ext):
             # compatible by definition, and scipy 1.2 seems to diagnose
             # this incorrectly... should file bug report)
             print("minimize error %d: %s" % (res.status,res.message))
-            scp.save_debug_pickle(sigma_ext,duda__from_duda_shortened(scp,res.x*du_da_normalization,closure_index),closure_index)
+            scp.save_debug_pickle(sigma_ext,duda__from_duda_shortened(scp,res.x*du_da_normalization,closure_index),closure_index,du_da_normalization,goal_function_normalization,load_constraint_fun_normalization=load_constraint_fun_normalization)
             import pdb
             pdb.set_trace()
             pass
