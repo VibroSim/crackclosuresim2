@@ -15,6 +15,8 @@ from . import ModeI_throughcrack_CODformula
 from . import Tada_ModeI_CircularCrack_along_midline
 from .soft_closure_accel import initialize_contact_goal_function_with_gradient_accel
 from .soft_closure_accel import soft_closure_goal_function_with_gradient_accel
+from .soft_closure_accel import initialize_contact_goal_function_with_gradient_normalized_accel
+from .soft_closure_accel import soft_closure_goal_function_with_gradient_normalized_accel
 
 
 # IMPORTANT:
@@ -180,7 +182,7 @@ class sc_params(object):
         # crack should not close. 
         du_da_shortened_iniguess=np.zeros(self.afull_idx+2-(closure_index+1),dtype='d')*(1.0/(self.afull_idx+1)) # * (-sigma_closure_avg_stress)/self.dx_fine  #
         if closure_index==-1:
-            du_da_shortened_iniguess[0] = -sigma_closure[0]*self.dx
+            du_da_shortened_iniguess[0] = -sigma_closure[0]/self.dx
             pass
         
         du_da_shortened_iniguess[1:(self.afull_idx+2-(closure_index+1))] = -sigma_closure[(closure_index+1):(self.afull_idx+1)]/self.dx
@@ -271,35 +273,41 @@ class sc_params(object):
         # (for some reason, restarting the minimizer where it left off seems to help get it to the goal)
         total_maxiter=10000000
         niter = 0
-        epsval1 = 50e6/self.a/5000.0
-        epsval2 = np.max(np.abs(sigma_closure))/self.a/5000.0
-        epsval = max(epsval1,epsval2)
+        #epsval1 = 50e6/self.a/5000.0
+        #epsval2 = np.max(np.abs(sigma_closure))/self.a/5000.0
+        #epsval = max(epsval1,epsval2)
+        epsval=1e-6
         epsvalscaled = epsval
         terminate=False
         starting_value=du_da_shortened_iniguess
         goal_stress_fit_error_pascals = 150e3 # Amount of stress error to allow in fitting process. If we have more than this we keep trying to minimize
         goal_residual = (goal_stress_fit_error_pascals**2.0)*self.afull_idx
         
+        du_da_normalization = max(np.max(np.abs(sigma_closure)),10e6)/self.dx
+        goal_function_normalization = goal_residual
+
         while niter < total_maxiter and not terminate: 
             this_niter=10000
-            res = scipy.optimize.minimize(initialize_contact_goal_function_with_gradient_accel,starting_value,args=(self,sigma_closure,closure_index), # was initialize_contact_goal_function_accel
+            res = scipy.optimize.minimize(initialize_contact_goal_function_with_gradient_normalized_accel,starting_value/du_da_normalization,args=(self,sigma_closure,closure_index,du_da_normalization,goal_function_normalization), # was initialize_contact_goal_function_accel
                                           constraints = constraints,
                                           method="SLSQP",
                                           jac=True,
                                           options={"eps": epsvalscaled,
                                                    "maxiter": this_niter,
                                                    "ftol": 1e-12}) #self.afull_idx*(abs(np.mean(sigma_closure))+20e6)**2.0/1e14})
+            
+            res_fun_denormalized = res.fun*goal_function_normalization
 
-           # Variables accessible from gdb)
+            # Variables accessible from gdb
             status = res.status
-            fun_str = str(res.fun)
+            fun_str = str(res_fun_denormalized)
 
-            if res.fun <= goal_residual:
+            if res_fun_denormalized <= goal_residual:
                 terminate=True
                 pass
  
             if res.status != 9 and res.status != 7:  # anything but reached iteration limit or eps increase
-                if res.fun <= goal_residual or res.nit==0:
+                if res_fun_denormalized <= goal_residual or res.nit==0:
                     terminate=True
                     pass 
                 else:
@@ -309,7 +317,7 @@ class sc_params(object):
                     #    pdb.set_trace()
                     #    pass
                     epsvalscaled = epsval # reset eps to nominal value
-                    starting_value = res.x # Next iteration starts where this one left off
+                    starting_value = res.x*du_da_normalization # Next iteration starts where this one left off
                     pass
                 pass
             elif res.status==7:
@@ -317,7 +325,7 @@ class sc_params(object):
                 # Generally indicates too fine epsilon...
                 if epsvalscaled/epsval < 10:
                     epsvalscaled *= 2 
-                    starting_value = res.x # Next iteration starts where this one left off
+                    starting_value = res.x*du_da_normalization # Next iteration starts where this one left off
                     pass
                 else:
                     print("WARNING: initialize_contact(): repeated rank-deficient equality constraint subproblem HFTI... Terminating!\n")
@@ -327,41 +335,41 @@ class sc_params(object):
                 pass
             else:
                 epsvalscaled = epsval # reset eps to nominal value
-                starting_value = res.x # Next iteration starts where this one left off
+                starting_value = res.x*du_da_normalization # Next iteration starts where this one left off
                 pass
             niter += this_niter #res.nit
             pass
 
-        if niter >= total_maxiter and res.fun > goal_residual:
-            print("soft_closure/initialize_contact: WARNING Maximum number of iterations (%d) reached and residual (%g) exceeds goal (%g)" % (total_maxiter,res.fun,goal_residual))
-            scp.save_debug_pickle(sigma_ext,duda__from_duda_shortened(scp,res.x,closure_index),closure_index,sigma_closure=sigma_closure)
+        if niter >= total_maxiter and res_fun_denormalized > goal_residual:
+            print("soft_closure/initialize_contact: WARNING Maximum number of iterations (%d) reached and residual (%g) exceeds goal (%g)" % (total_maxiter,res_fun_denormalized,goal_residual))
+            scp.save_debug_pickle(sigma_ext,duda__from_duda_shortened(scp,res.x*du_da_normalization,closure_index),closure_index,sigma_closure=sigma_closure)
             pass
 
         
-        if res.fun > goal_residual and not res.success: #  and res.status != 4:
+        if res_fun_denormalized > goal_residual and not res.success: #  and res.status != 4:
             # (ignore incompatible constraint, because our constraints are
             # compatible by definition, and scipy 1.2 seems to diagnose
             # this incorrectly... should file bug report)
-            scp.save_debug_pickle(sigma_ext,duda__from_duda_shortened(scp,res.x,closure_index),closure_index,sigma_closure=sigma_closure)
+            scp.save_debug_pickle(sigma_ext,duda__from_duda_shortened(scp,res.x*du_da_normalization,closure_index),closure_index,sigma_closure=sigma_closure)
             print("minimize error %d: %s" % (res.status,res.message))
             import pdb
             pdb.set_trace()
             pass
 
         # Verify proper operation of accelerated code
-        (slowcalc,slowcalc_grad) = initialize_contact_goal_function_with_gradient(res.x,self,sigma_closure,closure_index)
-        (fastcalc,fastcalc_grad) = initialize_contact_goal_function_with_gradient_accel(res.x,self,sigma_closure,closure_index)
+        (slowcalc,slowcalc_grad) = initialize_contact_goal_function_with_gradient(res.x*du_da_normalization,self,sigma_closure,closure_index)
+        (fastcalc,fastcalc_grad) = initialize_contact_goal_function_with_gradient_accel(res.x*du_da_normalization,self,sigma_closure,closure_index)
 
         if abs((slowcalc-fastcalc)/slowcalc) >= 1e-4 and (slowcalc > goal_residual/100.0 or fastcalc > goal_residual/100.0):
             #from VibroSim_Simulator.function_as_script import scriptify
-            #(slowcalc2,slowcalc2_grad) = scriptify(initialize_contact_goal_function_with_gradient)(res.x,self,sigma_closure,closure_index)
+            #(slowcalc2,slowcalc2_grad) = scriptify(initialize_contact_goal_function_with_gradient)(res.x*du_da_normalization,self,sigma_closure,closure_index)
             raise ValueError("Accelerated initialize contact calculation mismatch: %g vs %g" % (slowcalc,fastcalc))
             
         #assert(abs((slowcalc-fastcalc)/slowcalc) < 1e-4)
         
-        du_da_shortened=res.x
+        du_da_shortened=res.x*du_da_normalization
         #du_da = np.concatenate(((du_da_shortened[0],),np.zeros(closure_index+1,dtype='d'),du_da_shortened[1:],np.zeros(self.xsteps - self.afull_idx - 2 ,dtype='d')))
-        du_da = duda__from_duda_shortened(self,res.x,closure_index)
+        du_da = duda__from_duda_shortened(self,res.x*du_da_normalization,closure_index)
         
         (contact_stress,displacement) = sigmacontact_from_displacement(self,du_da)
 
@@ -474,8 +482,17 @@ def initialize_contact_goal_function_with_gradient(du_da_shortened,scp,sigma_clo
 
 
 
-
-
+def initialize_contact_goal_function_with_gradient_normalized(du_da_shortened_normalized,scp,sigma_closure,closure_index,du_da_normalization,goal_function_normalization):
+    (goal_function,gradient)=initialize_contact_goal_function_with_gradient(du_da_shortened_normalized*du_da_normalization,scp,sigma_closure,closure_index)
+    goal_function_normalized = goal_function / goal_function_normalization
+    
+    
+    # d_gfn/d_dudasn = d_gfn/d_gf * d_gf/d_dudas * d_dudas/d_dudasn  
+    #  ... where d_gfn/d_gf = 1/goal_function_normalization
+    #  dudasn = dudas/du_da_normalization so d_dudasn/d_dudas = 1/du_da_normalization so d_dudas/d_dudasn = du_da_normalization
+    # so d_gfn/d_dudasn = du_da_normalization/goal_function_normalization * d_gf/d_dudas
+    gradient_normalized = (du_da_normalization/goal_function_normalization) * gradient
+    return (goal_function_normalized,gradient_normalized)
 
 # du/da defined on x positions... represents distributed stress concentrations
 def sigmacontact_from_displacement(scp,du_da,closure_index_for_gradient=None):
@@ -793,6 +810,18 @@ def soft_closure_goal_function_with_gradient(du_da_shortened,scp,closure_index):
     return (goal_function,gradient)
 
 
+def soft_closure_goal_function_with_gradient_normalized(du_da_shortened_normalized,scp,closure_index,du_da_normalization,goal_function_normalization):
+    (goal_function,gradient) = soft_closure_goal_function_with_gradient(du_da_shortened_normalized*du_da_normalization,scp,closure_index)
+    goal_function_normalized = goal_function / goal_function_normalized 
+
+    # d_gfn/d_dudasn = d_gfn/d_gf * d_gf/d_dudas * d_dudas/d_dudasn  
+    #  ... where d_gfn/d_gf = 1/goal_function_normalization
+    #  dudasn = dudas/du_da_normalization so d_dudasn/d_dudas = 1/du_da_normalization so d_dudas/d_dudasn = du_da_normalization
+    # so d_gfn/d_dudasn = du_da_normalization/goal_function_normalization * d_gf/d_dudas
+    gradient_normalized = (du_da_normalization/goal_function_normalization) * gradient
+    return (goal_function_normalized,gradient_normalized)
+
+
 def calc_contact(scp,sigma_ext):
     """
     return (du_da, # distributed stress concentration field along crack, in Pa/m, positive tensile 
@@ -834,17 +863,6 @@ def calc_contact(scp,sigma_ext):
     du_da_shortened_iniguess=np.ones(scp.afull_idx+2-(closure_index+1),dtype='d')*(1.0/(scp.afull_idx+1))* sigma_ext/scp.dx  #
     #du_da_shortened_iniguess[0]=0.0
 
-    def load_constraint_fun(du_da_shortened):
-
-        #du_da_short = np.concatenate(((du_da_shortened[0],),np.zeros(closure_index+1,dtype='d'),du_da_shortened[1:]))        
-        du_da_short = duda_short__from_duda_shortened(du_da_shortened,closure_index)
-        
-        
-        
-        return (np.sum(du_da_short)*scp.dx)-sigma_ext  
-        
-    load_constraint = { "type": "eq",
-                        "fun": load_constraint_fun }
         
     
     # Check gradient
@@ -876,6 +894,24 @@ def calc_contact(scp,sigma_ext):
     goal_residual = (goal_stress_fit_error_pascals**2.0)*scp.afull_idx
     goal_residual_str = str(goal_residual) # for gdb
     
+    du_da_normalization = max(abs(sigma_ext),10e6)/self.dx
+    goal_function_normalization = goal_residual
+    load_constraint_fun_normalization = max(abs(sigma_ext),10e6)
+
+    def load_constraint_fun_normalized(du_da_shortened_normalized):
+
+        du_da_shortened = du_da_shorted_normalized*du_da_normalization
+        #du_da_short = np.concatenate(((du_da_shortened[0],),np.zeros(closure_index+1,dtype='d'),du_da_shortened[1:]))        
+        du_da_short = duda_short__from_duda_shortened(du_da_shortened,closure_index)
+        
+        
+        
+        return ((np.sum(du_da_short)*scp.dx)-sigma_ext)/load_constraint_fun_normalization
+        
+    load_constraint_normalized = { "type": "eq",
+                                   "fun": load_constraint_fun_normalized }
+
+
     if sigma_ext > 0: # Tensile
 
         #nonnegative_constraint = scipy.optimize.NonlinearConstraint(lambda du_da: du_da,0.0,np.inf)
@@ -891,9 +927,10 @@ def calc_contact(scp,sigma_ext):
         # (for some reason, restarting the minimizer where it left off seems to help get it to the goal)
         total_maxiter=10000000
         niter = 0
-        epsval1 = np.abs(sigma_ext)/scp.a/5000.0
-        epsval2 = np.max(np.abs(scp.sigma_closure))/scp.a/5000.0
-        epsval = max(epsval1,epsval2)
+        #epsval1 = np.abs(sigma_ext)/scp.a/5000.0
+        #epsval2 = np.max(np.abs(scp.sigma_closure))/scp.a/5000.0
+        #epsval = max(epsval1,epsval2)
+        epsval=1e-6
         epsvalscaled = epsval
         terminate=False
         starting_value=du_da_shortened_iniguess
@@ -903,8 +940,8 @@ def calc_contact(scp,sigma_ext):
         while niter < total_maxiter and not terminate: 
             this_niter=10000
             #print("calling scipy.optimize.minimize; sigma_ext=%g; eps=%g maxiter=%d ftol=%g" % (sigma_ext,epsvalscaled,this_niter,scp.afull_idx_fine*(np.abs(sigma_ext)+20e6)**2.0/1e14))
-            res = scipy.optimize.minimize(soft_closure_goal_function_with_gradient_accel,starting_value,args=(scp,closure_index),   # was soft_closure_goal_function_accel
-                                          constraints = [ load_constraint ], #[ nonnegative_constraint, load_constraint ],
+            res = scipy.optimize.minimize(soft_closure_goal_function_with_gradient_accel,starting_value/du_da_normalization,args=(scp,closure_index,du_da_normalization,goal_function_normalization),   # was soft_closure_goal_function_accel
+                                          constraints = [ load_constraint_normalized ], #[ nonnegative_constraint, load_constraint ],
                                           method="SLSQP",
                                           jac=True,
                                           options={"eps": epsvalscaled,
@@ -913,16 +950,18 @@ def calc_contact(scp,sigma_ext):
             #print("res=%s" % (str(res)))
             #print("niter = %d; residual = %g; res.message=%s" % (niter+res.nit,res.fun,res.message)
 
+            res_fun_denormalized = res.fun*goal_function_normalization
+
             # Variables accessible from gdb)
             status = res.status
-            fun_str = str(res.fun)
+            fun_str = str(res_fun_denormalized)
 
-            if res.fun <= goal_residual:
+            if res_fun_denormalized <= goal_residual:
                 terminate=True
                 pass
             
             if res.status != 9 and res.status != 7:  # anything but reached iteration limit or eps increase
-                if res.fun <= goal_residual or res.nit==0:
+                if res_fun_denormalized <= goal_residual or res.nit==0:
                     terminate=True
                     pass 
                 else:
@@ -932,7 +971,7 @@ def calc_contact(scp,sigma_ext):
                     #    pdb.set_trace()
                     #    pass
                     epsvalscaled = epsval # reset eps to nominal value
-                    starting_value = res.x # Next iteration starts where this one left off
+                    starting_value = res.x*du_da_normalization # Next iteration starts where this one left off
                     pass
                 pass
             elif res.status==7:
@@ -940,7 +979,7 @@ def calc_contact(scp,sigma_ext):
                 # Generally indicates too fine epsilon...
                 if epsvalscaled/epsval < 10:
                     epsvalscaled *= 2 
-                    starting_value = res.x # Next iteration starts where this one left off
+                    starting_value = res.x*du_da_normalization # Next iteration starts where this one left off
                     pass
                 else:
                     print("WARNING: initialize_contact(): repeated rank-deficient equality constraint subproblem HFTI... Terminating!\n")
@@ -949,33 +988,33 @@ def calc_contact(scp,sigma_ext):
                 pass
             else:
                 epsvalscaled = epsval # reset eps to nominal value
-                starting_value = res.x # Next iteration starts where this one left off
+                starting_value = res.x*du_da_normalization # Next iteration starts where this one left off
                 pass
             niter += this_niter #res.nit
             pass
 
-        if niter >= total_maxiter and res.fun > goal_residual:
-            print("soft_closure/calc_contact (tensile): WARNING Maximum number of iterations (%d) reached and residual (%g) exceeds goal (%g)" % (total_maxiter,res.fun,goal_residual))
-            scp.save_debug_pickle(sigma_ext,duda__from_duda_shortened(scp,res.x,closure_index),closure_index)
+        if niter >= total_maxiter and res_fun_denormalized > goal_residual:
+            print("soft_closure/calc_contact (tensile): WARNING Maximum number of iterations (%d) reached and residual (%g) exceeds goal (%g)" % (total_maxiter,res_fun_denormalized,goal_residual))
+            scp.save_debug_pickle(sigma_ext,duda__from_duda_shortened(scp,res.x*du_da_normalization,closure_index),closure_index)
 
             pass
 
         #res = scipy.optimize.minimize(goal_function,du_da_shortened_iniguess,method='nelder-mead',options={"maxfev": 15000})
-        if res.fun > goal_residual and not res.success: # and res.status != 4:
+        if res_fun_denormalized > goal_residual and not res.success: # and res.status != 4:
             # (ignore incompatible constraint, because our constraints are
             # compatible by definition, and scipy 1.2 seems to diagnose
             # this incorrectly... should file bug report)
             print("minimize error %d: %s" % (res.status,res.message))
-            scp.save_debug_pickle(sigma_ext,duda__from_duda_shortened(scp,res.x,closure_index),closure_index)
+            scp.save_debug_pickle(sigma_ext,duda__from_duda_shortened(scp,res.x*du_da_normalization,closure_index),closure_index)
             import pdb
             pdb.set_trace()
             pass
 
         # Verify proper operation of accelerated code
-        (slowcalc,slowcalc_gradient) = soft_closure_goal_function_with_gradient(res.x,scp,closure_index)
-        (fastcalc,fastcalc_gradient) = soft_closure_goal_function_with_gradient_accel(res.x,scp,closure_index)
+        (slowcalc,slowcalc_gradient) = soft_closure_goal_function_with_gradient(res.x*du_da_normalization,scp,closure_index)
+        (fastcalc,fastcalc_gradient) = soft_closure_goal_function_with_gradient_accel(res.x*du_da_normalization,scp,closure_index)
         if abs((slowcalc-fastcalc)/slowcalc) >= 1e-4 and (slowcalc > goal_residual/100.0 or fastcalc > goal_residual/100.0):
-            scp.save_debug_pickle(sigma_ext,duda__from_duda_shortened(scp,res.x,closure_index),closure_index)
+            scp.save_debug_pickle(sigma_ext,duda__from_duda_shortened(scp,res.x*du_da_normalization,closure_index),closure_index)
 
             #from VibroSim_Simulator.function_as_script import scriptify
             #(slowcalc2,slowcalc2_grad) = scriptify(soft_closure_goal_function_with_gradient)(res.x,scp,closure_index)
@@ -983,7 +1022,7 @@ def calc_contact(scp,sigma_ext):
 
         
         
-        du_da_shortened=res.x
+        du_da_shortened=res.x*du_da_normalization
         #du_da = np.concatenate(((du_da_shortened[0],),np.zeros(closure_index+1,dtype='d'),du_da_shortened[1:],np.zeros(scp.xsteps - scp.afull_idx - 2 ,dtype='d')))        
         du_da = duda__from_duda_shortened(scp,du_da_shortened,closure_index)
 
@@ -1013,7 +1052,7 @@ def calc_contact(scp,sigma_ext):
         
         
         
-        constraints = [ load_constraint ]
+        constraints = [ load_constraint_normalized ]
         
         #if sigma_ext < 0.0:
         #    # if we are applying compressive external load,
@@ -1023,37 +1062,41 @@ def calc_contact(scp,sigma_ext):
 
         total_maxiter=10000000
         niter = 0
-        epsval1 = np.abs(sigma_ext)/scp.a/5000.0
-        epsval2 = np.max(np.abs(scp.sigma_closure))/scp.a/5000.0
-        epsval = max(epsval1,epsval2)
+        #epsval1 = np.abs(sigma_ext)/scp.a/5000.0
+        #epsval2 = np.max(np.abs(scp.sigma_closure))/scp.a/5000.0
+        #epsval = max(epsval1,epsval2)
+        epsval=1e-6
         epsvalscaled = epsval
         terminate=False
         starting_value=du_da_shortened_iniguess
         while niter < total_maxiter and not terminate: 
             this_niter=10000
-            res = scipy.optimize.minimize(soft_closure_goal_function_with_gradient_accel,starting_value,args=(scp,closure_index),   # was soft_closure_goal_function_accel
+            res = scipy.optimize.minimize(soft_closure_goal_function_with_gradient_normalized_accel,starting_value/du_da_normalization,args=(scp,closure_index,du_da_normalization,goal_function_normalization),   # was soft_closure_goal_function_accel
                                           constraints = constraints,
                                           method="SLSQP",
                                           jac=True,
                                           options={"eps": epsvalscaled,
                                                    "maxiter": this_niter,
                                                    "ftol": 1e-12})  # scp.afull_idx*(np.abs(sigma_ext)+20e6)**2.0/1e14})
-           # Variables accessible from gdb)
-            status = res.status
-            fun_str = str(res.fun)
 
-            if res.fun <= goal_residual:
+            res_fun_denormalized = res.fun*goal_function_normalization
+
+            # Variables accessible from gdb
+            status = res.status
+            fun_str = str(res_fun_denormalized)
+
+            if res_fun_denormalized <= goal_residual:
                 terminate=True
                 pass
  
             if res.status != 9 and res.status != 7: # anything but reached iteration limit or eps increase needed
-                if res.fun <= goal_residual or res.nit==0:
+                if res_fun_denormalized <= goal_residual or res.nit==0:
                     terminate=True
                     pass
                 else:
                     # ... otherwise keep trying!
                     epsvalscaled = epsval # reset eps to nominal value
-                    starting_value = res.x # Next iteration starts where this one left off
+                    starting_value = res.x*du_da_normalization # Next iteration starts where this one left off
                     pass
                 pass
             elif res.status==7:
@@ -1061,7 +1104,7 @@ def calc_contact(scp,sigma_ext):
                 # Generally indicates too fine epsilon...
                 if epsvalscaled/epsval < 10:
                     epsvalscaled *= 2 
-                    starting_value = res.x # Next iteration starts where this one left off
+                    starting_value = res.x*du_da_normalization # Next iteration starts where this one left off
                     pass
                 else:
                     print("WARNING: initialize_contact(): repeated rank-deficient equality constraint subproblem HFTI... Terminating!\n")
@@ -1071,35 +1114,35 @@ def calc_contact(scp,sigma_ext):
                 pass
             else:
                 epsvalscaled = epsval # reset eps to nominal value
-                starting_value = res.x # Next iteration starts where this one left off
+                starting_value = res.x*du_da_normalization # Next iteration starts where this one left off
                 pass
             niter += this_niter #res.nit
             pass
             
-        if niter >= total_maxiter and res.fun > goal_residual:
-            print("soft_closure/calc_contact (compressive): WARNING Maximum number of iterations (%d) reached and residual (%g) exceeds goal (%g)" % (total_maxiter,res.fun,goal_residual))
+        if niter >= total_maxiter and res_fun_denormalized > goal_residual:
+            print("soft_closure/calc_contact (compressive): WARNING Maximum number of iterations (%d) reached and residual (%g) exceeds goal (%g)" % (total_maxiter,res_fun_denormalized,goal_residual))
             pass
 
         #res = scipy.optimize.minimize(goal_function,du_da_shortened_iniguess,method='nelder-mead',options={"maxfev": 15000})
-        if res.fun > goal_residual and not res.success: #  and res.status != 4:
+        if res_fun_denormalized > goal_residual and not res.success: #  and res.status != 4:
             # (ignore incompatible constraint, because our constraints are
             # compatible by definition, and scipy 1.2 seems to diagnose
             # this incorrectly... should file bug report)
             print("minimize error %d: %s" % (res.status,res.message))
-            scp.save_debug_pickle(sigma_ext,duda__from_duda_shortened(scp,res.x,closure_index),closure_index)
+            scp.save_debug_pickle(sigma_ext,duda__from_duda_shortened(scp,res.x*du_da_normalization,closure_index),closure_index)
             import pdb
             pdb.set_trace()
             pass
         
-        du_da_shortened=res.x
+        du_da_shortened=res.x*du_da_normalization
 
         # Verify proper operation of accelerated code
-        (slowcalc,slowcalc_gradient) = soft_closure_goal_function_with_gradient(res.x,scp,closure_index)
-        (fastcalc,fastcalc_gradient) = soft_closure_goal_function_with_gradient_accel(res.x,scp,closure_index)
+        (slowcalc,slowcalc_gradient) = soft_closure_goal_function_with_gradient(res.x*du_da_normalization,scp,closure_index)
+        (fastcalc,fastcalc_gradient) = soft_closure_goal_function_with_gradient_accel(res.x*du_da_normalization,scp,closure_index)
 
         if abs((slowcalc-fastcalc)/slowcalc) >= 1e-4 and (slowcalc > goal_residual/100.0 or fastcalc > goal_residual/100.0):
             #from VibroSim_Simulator.function_as_script import scriptify
-            #(slowcalc2,slowcalc2_grad) = scriptify(soft_closure_goal_function_with_gradient)(res.x,scp,closure_index)
+            #(slowcalc2,slowcalc2_grad) = scriptify(soft_closure_goal_function_with_gradient)(res.x*du_da_normalization,scp,closure_index)
             raise ValueError("Accelerated goal calculation mismatch: %g vs %g" % (slowcalc,fastcalc))
 
 
@@ -1123,7 +1166,7 @@ def calc_contact(scp,sigma_ext):
     contact_stress_from_stress = sigmacontact_from_stress(scp,du_da)
     (contact_stress_from_displacement,displacement) = sigmacontact_from_displacement(scp,du_da)
 
-    residual = res.fun
+    residual = res_fun_denormalized
     
     
     return (du_da,contact_stress_from_displacement,displacement,contact_stress_from_stress,residual)

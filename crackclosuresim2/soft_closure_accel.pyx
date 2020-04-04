@@ -81,6 +81,18 @@ def initialize_contact_goal_function_with_gradient_accel(np.ndarray[np.float64_t
     return (goal_function_value,gradient)
 
 
+def initialize_contact_goal_function_with_gradient_normalized_accel(du_da_shortened_normalized,scp,sigma_closure,closure_index,du_da_normalization,goal_function_normalization):
+    (goal_function,gradient)=initialize_contact_goal_function_with_gradient_accel(du_da_shortened_normalized*du_da_normalization,scp,sigma_closure,closure_index)
+    goal_function_normalized = goal_function / goal_function_normalization
+    
+    
+    # d_gfn/d_dudasn = d_gfn/d_gf * d_gf/d_dudas * d_dudas/d_dudasn  
+    #  ... where d_gfn/d_gf = 1/goal_function_normalization
+    #  dudasn = dudas/du_da_normalization so d_dudasn/d_dudas = 1/du_da_normalization so d_dudas/d_dudasn = du_da_normalization
+    # so d_gfn/d_dudasn = du_da_normalization/goal_function_normalization * d_gf/d_dudas
+    gradient_normalized = (du_da_normalization/goal_function_normalization) * gradient
+    return (goal_function_normalized,gradient_normalized)
+
 def soft_closure_goal_function_with_gradient_accel(np.ndarray[np.float64_t,ndim=1] du_da_shortened,scp,int closure_index):
     """ NOTE: This should be kept identical functionally to soft_closure_goal_function in soft_closure.py"""
     # ***NOTE: Could define a separate version that doesn't
@@ -135,4 +147,17 @@ def soft_closure_goal_function_with_gradient_accel(np.ndarray[np.float64_t,ndim=
 
     return (goal_function_value,gradient)
 
+
+
+
+def soft_closure_goal_function_with_gradient_normalized_accel(du_da_shortened_normalized,scp,closure_index,du_da_normalization,goal_function_normalization):
+    (goal_function,gradient) = soft_closure_goal_function_with_gradient_accel(du_da_shortened_normalized*du_da_normalization,scp,closure_index)
+    goal_function_normalized = goal_function / goal_function_normalized 
+
+    # d_gfn/d_dudasn = d_gfn/d_gf * d_gf/d_dudas * d_dudas/d_dudasn  
+    #  ... where d_gfn/d_gf = 1/goal_function_normalization
+    #  dudasn = dudas/du_da_normalization so d_dudasn/d_dudas = 1/du_da_normalization so d_dudas/d_dudasn = du_da_normalization
+    # so d_gfn/d_dudasn = du_da_normalization/goal_function_normalization * d_gf/d_dudas
+    gradient_normalized = (du_da_normalization/goal_function_normalization) * gradient
+    return (goal_function_normalized,gradient_normalized)
 
