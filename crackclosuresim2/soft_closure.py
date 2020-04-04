@@ -289,6 +289,15 @@ class sc_params(object):
                                           options={"eps": epsvalscaled,
                                                    "maxiter": this_niter,
                                                    "ftol": 1e-12}) #self.afull_idx*(abs(np.mean(sigma_closure))+20e6)**2.0/1e14})
+
+           # Variables accessible from gdb)
+            status = res.status
+            fun_str = str(res.fun)
+
+            if res.fun <= goal_residual:
+                terminate=True
+f                pass
+ 
             if res.status != 9 and res.status != 7:  # anything but reached iteration limit or eps increase
                 if res.fun <= goal_residual or res.nit==0:
                     terminate=True
@@ -865,7 +874,7 @@ def calc_contact(scp,sigma_ext):
 
     goal_stress_fit_error_pascals = 150e3 # Amount of stress error to allow in fitting process. If we have more than this we keep trying to minimize
     goal_residual = (goal_stress_fit_error_pascals**2.0)*scp.afull_idx
-    
+    goal_residual_str = str(goal_residual) # for gdb
     
     if sigma_ext > 0: # Tensile
 
@@ -888,7 +897,8 @@ def calc_contact(scp,sigma_ext):
         epsvalscaled = epsval
         terminate=False
         starting_value=du_da_shortened_iniguess
-
+        status=None
+        fun_str=None
 
         while niter < total_maxiter and not terminate: 
             this_niter=10000
@@ -901,7 +911,16 @@ def calc_contact(scp,sigma_ext):
                                                    "maxiter": this_niter,
                                                    "ftol": 1e-12})#scp.afull_idx*(np.abs(sigma_ext)+20e6)**2.0/1e14})
             #print("res=%s" % (str(res)))
-            #print("niter = %d; residual = %g; res.message=%s" % (niter+res.nit,res.fun,res.message))
+            #print("niter = %d; residual = %g; res.message=%s" % (niter+res.nit,res.fun,res.message)
+
+            # Variables accessible from gdb)
+            status = res.status
+            fun_str = str(res.fun)
+
+            if res.fun <= goal_residual:
+                terminate=True
+f                pass
+            
             if res.status != 9 and res.status != 7:  # anything but reached iteration limit or eps increase
                 if res.fun <= goal_residual or res.nit==0:
                     terminate=True
@@ -1019,6 +1038,14 @@ def calc_contact(scp,sigma_ext):
                                           options={"eps": epsvalscaled,
                                                    "maxiter": this_niter,
                                                    "ftol": 1e-12})  # scp.afull_idx*(np.abs(sigma_ext)+20e6)**2.0/1e14})
+           # Variables accessible from gdb)
+            status = res.status
+            fun_str = str(res.fun)
+
+            if res.fun <= goal_residual:
+                terminate=True
+f                pass
+ 
             if res.status != 9 and res.status != 7: # anything but reached iteration limit or eps increase needed
                 if res.fun <= goal_residual or res.nit==0:
                     terminate=True
