@@ -255,7 +255,7 @@ class sc_params(object):
         #    pdb.post_mortem(tb)
         #    pass
 
-        grad_approx = scipy.optimize.approx_fprime(du_da_shortened_iniguess,lambda x: initialize_contact_goal_function_with_gradient(x,self,sigma_closure,closure_index)[0],(abs(np.mean(sigma_closure))+10e6)/self.dx/1e6)
+        grad_approx = scipy.optimize.approx_fprime(du_da_shortened_iniguess,lambda x: initialize_contact_goal_function_with_gradient(x,self,sigma_closure,closure_index)[0],(abs(np.mean(sigma_closure))+10e6)/(self.dx*self.afull_idx)/3e3)
         grad_sumsquareddiff = np.sqrt(np.sum((grad_eval-grad_approx)**2.0))
         grad_sumsquared = np.sqrt(np.sum(grad_eval**2.0))
     
@@ -263,6 +263,7 @@ class sc_params(object):
         #print("grad_sumsquared=%g; grad_sumsquareddiff=%g" % (grad_sumsquared,grad_sumsquareddiff))
         
         if (grad_sumsquareddiff/grad_sumsquared >= 1e-4):
+            self.save_debug_pickle(sigma_ext,duda__from_duda_shortened(self,du_da_shortened_iniguess,closure_index),closure_index,du_da_normalization=None,goal_function_normalization=None,sigma_closure=sigma_closure)
             raise ValueError("Grad error too high: FAIL grad_sumsquared=%g; grad_sumsquareddiff=%g" % (grad_sumsquared,grad_sumsquareddiff))
             
         #assert(grad_sumsquareddiff/grad_sumsquared < 1e-4) # NOTE: In the obscure case where our initial guess is at a relative minimum, this might fail extraneously
@@ -912,13 +913,14 @@ def calc_contact_kernel(scp,sigma_ext,closure_index,du_da_shortened_iniguess):
 
     if sigma_ext != 0.0: # don't verify where the verification would fail with NaN
         grad_eval = soft_closure_goal_function_with_gradient(du_da_shortened_iniguess,scp,closure_index)[1]
-        grad_approx = scipy.optimize.approx_fprime(du_da_shortened_iniguess,lambda x: soft_closure_goal_function_with_gradient(x,scp,closure_index)[0],sigma_ext/scp.dx/1e6)
+        grad_approx = scipy.optimize.approx_fprime(du_da_shortened_iniguess,lambda x: soft_closure_goal_function_with_gradient(x,scp,closure_index)[0],sigma_ext/(scp.dx*scp.afull_idx)/3e5)
         grad_sumsquareddiff = np.sqrt(np.sum((grad_eval-grad_approx)**2.0))
         grad_sumsquared = np.sqrt(np.sum(grad_eval**2.0))
         
         #print("grad_sumsquared=%g; grad_sumsquareddiff=%g" % (grad_sumsquared,grad_sumsquareddiff))
         
         if (grad_sumsquareddiff/grad_sumsquared >= 1e-4):
+            scp.save_debug_pickle(sigma_ext,duda__from_duda_shortened(scp,du_da_shortened_iniguess,closure_index),closure_index,du_da_normalization=None,goal_function_normalization=None)
             raise ValueError("Grad error too high: FAIL grad_sumsquared=%g; grad_sumsquareddiff=%g" % (grad_sumsquared,grad_sumsquareddiff))
             
         #assert(grad_sumsquareddiff/grad_sumsquared < 1e-4) # NOTE: In the obscure case where our initial guess is at a relative minimum, this might fail extraneously
@@ -1037,12 +1039,12 @@ def calc_contact_kernel(scp,sigma_ext,closure_index,du_da_shortened_iniguess):
             pass
 
         if niter >= total_maxiter and res_fun_denormalized > goal_residual:
-            print("soft_closure/calc_contact (tensile): WARNING Maximum number of iterations (%d) reached and residual (%g) exceeds goal (%g)" % (total_maxiter,res_fun_denormalized,goal_residual))
+            print("soft_closure/calc_contact (tensile): WARNING Maximum number of iterations (%d) reached and residual (%g) exceeds goal (%g); res.status=%d" % (total_maxiter,res_fun_denormalized,goal_residual,res.status))
             scp.save_debug_pickle(sigma_ext,duda__from_duda_shortened(scp,res.x*du_da_normalization,closure_index),closure_index,du_da_normalization,goal_function_normalization,load_constraint_fun_normalization=load_constraint_fun_normalization)
 
             pass
 
-        if res.status==6 and res_fun_denormalized > goal_residual: 
+        if (res.status==6 and res_fun_denormalized > goal_residual) or abs(res.fun) > 1e25: 
             # Characteristic of a divergence failure 
             raise CalcContactDivergenceError("Maximum number of iterations (%d) reached and residual (%g) exceeds goal (%g)" % (total_maxiter,res_fun_denormalized,goal_residual))
             
