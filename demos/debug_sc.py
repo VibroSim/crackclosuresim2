@@ -23,7 +23,7 @@ from crackclosuresim2.soft_closure import duda_short__from_duda_shortened
 # is run.
 
 
-pickle_filename = "/tmp/scdebug51640_line_1008.pickle"
+pickle_filename = "/tmp/scdebug74457_line_1015.pickle"
 pickle_fh=open(pickle_filename,"rb")
 vars = pickle.load(pickle_fh)
 #scp = vars["scp"]
@@ -43,10 +43,18 @@ pl.plot(scp.x,contact_stress_from_stress,'-',
         scp.x,contact_stress_from_displacement,'-')
 
 
-epsval=1e-6
+epsval=1e-2
 epsvalscaled = epsval
 
 du_da_shortened=duda_shortened__from_duda(du_da,scp.afull_idx,closure_index)
+
+
+du_da_shortened_iniguess=np.ones(scp.afull_idx+2-(closure_index+1),dtype='d')*(1.0/(scp.afull_idx+1))* sigma_ext/scp.dx  #
+#du_da_shortened=du_da_shortened_iniguess
+
+
+(initial_residual,initial_gradient)=soft_closure_goal_function_with_gradient_normalized_accel(du_da_shortened/du_da_normalization,scp,closure_index,du_da_normalization,goal_function_normalization)
+
 res = scipy.optimize.minimize(soft_closure_goal_function_with_gradient_normalized_accel,du_da_shortened/du_da_normalization,args=(scp,closure_index,du_da_normalization,goal_function_normalization),   # was soft_closure_goal_function_accel
                               constraints = {"type":"eq","fun": lambda du_da_shortened_normalized: ((np.sum(duda_short__from_duda_shortened(du_da_shortened_normalized*du_da_normalization,closure_index))*scp.dx)-sigma_ext)/load_constraint_fun_normalization },
                               method="SLSQP",

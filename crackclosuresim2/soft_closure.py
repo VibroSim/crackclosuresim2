@@ -283,7 +283,7 @@ class sc_params(object):
         #epsval1 = 50e6/self.a/5000.0
         #epsval2 = np.max(np.abs(sigma_closure))/self.a/5000.0
         #epsval = max(epsval1,epsval2)
-        epsval=1e-4
+        epsval=1e-2
         epsvalscaled = epsval
         terminate=False
         starting_value=du_da_shortened_iniguess
@@ -937,7 +937,7 @@ def calc_contact(scp,sigma_ext):
         #epsval1 = np.abs(sigma_ext)/scp.a/5000.0
         #epsval2 = np.max(np.abs(scp.sigma_closure))/scp.a/5000.0
         #epsval = max(epsval1,epsval2)
-        epsval=1e-4
+        epsval=1e-2
         epsvalscaled = epsval
         terminate=False
         starting_value=du_da_shortened_iniguess
@@ -1072,7 +1072,7 @@ def calc_contact(scp,sigma_ext):
         #epsval1 = np.abs(sigma_ext)/scp.a/5000.0
         #epsval2 = np.max(np.abs(scp.sigma_closure))/scp.a/5000.0
         #epsval = max(epsval1,epsval2)
-        epsval=1e-4
+        epsval=1e-2
         epsvalscaled = epsval
         terminate=False
         starting_value=du_da_shortened_iniguess
