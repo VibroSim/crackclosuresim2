@@ -878,7 +878,7 @@ def calc_contact(scp,sigma_ext):
     du_da_shortened_first_iniguess=np.ones(scp.afull_idx+2-(closure_index+1),dtype='d')*(1.0/(scp.afull_idx+1))* sigma_ext/scp.dx  #
     du_da_shortened_iniguess = du_da_shortened_first_iniguess
     
-    Perturbation_amplitude_Pa=100000.0
+    perturbation_amplitude_Pa=100000.0
 
     # Attempt calc_contact_kernel with different initial guesses until we get convergence
     itercnt=0
