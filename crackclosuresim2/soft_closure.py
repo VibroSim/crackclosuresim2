@@ -2,6 +2,7 @@ import copy
 import sys
 import numpy as np
 from numpy import sqrt,log,pi,cos,arctan,exp
+import numpy.random
 from scipy.special import erf
 import scipy.optimize
 import scipy as sp
@@ -283,7 +284,7 @@ class sc_params(object):
         #epsval1 = 50e6/self.a/5000.0
         #epsval2 = np.max(np.abs(sigma_closure))/self.a/5000.0
         #epsval = max(epsval1,epsval2)
-        epsval=1e-2
+        epsval=1e-5
         epsvalscaled = epsval
         terminate=False
         starting_value=du_da_shortened_iniguess
@@ -828,6 +829,18 @@ def soft_closure_goal_function_with_gradient_normalized(du_da_shortened_normaliz
     gradient_normalized = (du_da_normalization/goal_function_normalization) * gradient
     return (goal_function_normalized,gradient_normalized)
 
+class CalcContactDivergenceError(Exception):
+    message = None
+
+    def __init__(self,message):
+        self.message=message
+        pass
+
+    def __str__(self):
+        return "CalcContactDivergence: %s" % (self.message)
+    pass
+
+
 
 def calc_contact(scp,sigma_ext):
     """
@@ -840,8 +853,8 @@ def calc_contact(scp,sigma_ext):
     n.b. displacement here is twice what you would get from solve_normalstress() for hard closure, 
          because solve_normalstress() gives you the displacement of each side whereas calc_contact() 
          gives you the dissplacement between the two sides! 
-"""
-
+    """
+    
     #iniguess=np.arange(scp.afull_idx+1,dtype='d')/(scp.afull_idx+1) * sigma_ext  # This iniguess was for u
     
     # now we use du_da_shortened
@@ -849,12 +862,7 @@ def calc_contact(scp,sigma_ext):
     # the distributed stress concentration
     # ... Note that the distributed stress concentration indices
     # have no effect to the left of the closure point
-    
-    # sigma_yield = scp.sigma_yield  # not a parameter yet... just use infinity for now
-    sigma_yield=np.inf
-    
-    #crack_model=scp.crack_model  # not a parameter yet...
-    #crack_model = ModeI_throughcrack_CODformula(scp.E)
+
 
     if sigma_ext > 0: # Tensile
 
@@ -867,8 +875,36 @@ def calc_contact(scp,sigma_ext):
         pass
 
     #du_da_shortened_iniguess=np.ones(scp.afull_idx_fine+1,dtype='d')*(1.0/(scp.afull_idx+1)) * sigma_ext/scp.dx_fine  #
-    du_da_shortened_iniguess=np.ones(scp.afull_idx+2-(closure_index+1),dtype='d')*(1.0/(scp.afull_idx+1))* sigma_ext/scp.dx  #
-    #du_da_shortened_iniguess[0]=0.0
+    du_da_shortened_first_iniguess=np.ones(scp.afull_idx+2-(closure_index+1),dtype='d')*(1.0/(scp.afull_idx+1))* sigma_ext/scp.dx  #
+    du_da_shortened_iniguess = du_da_shortened_first_iniguess
+    
+    Perturbation_amplitude_Pa=100000.0
+
+    # Attempt calc_contact_kernel with different initial guesses until we get convergence
+    itercnt=0
+    while True:
+        try: 
+            (du_da,contact_stress_from_displacement,displacement,contact_stress_from_stress,residual) = calc_contact_kernel(scp,sigma_ext,closure_index,du_da_shortened_iniguess)
+            return (du_da,contact_stress_from_displacement,displacement,contact_stress_from_stress,residual)
+        except CalcContactDivergenceError:
+            
+            du_da_shortened_iniguess = du_da_shortened_first_iniguess + (perturbation_amplitude_Pa/scp.dx)*np.random.randn(*du_da_shortened_first_iniguess.shape)
+            if itercnt==10: # up to 10 tries
+                raise
+            pass
+        itercnt+=1
+        pass
+
+
+def calc_contact_kernel(scp,sigma_ext,closure_index,du_da_shortened_iniguess):
+    """Kernel for calc_contact... can be rerun with a pertrurbed sigma_ext if it fails"""
+
+    
+    # sigma_yield = scp.sigma_yield  # not a parameter yet... just use infinity for now
+    sigma_yield=np.inf
+    
+    #crack_model=scp.crack_model  # not a parameter yet...
+    #crack_model = ModeI_throughcrack_CODformula(scp.E)
 
         
     
@@ -937,7 +973,7 @@ def calc_contact(scp,sigma_ext):
         #epsval1 = np.abs(sigma_ext)/scp.a/5000.0
         #epsval2 = np.max(np.abs(scp.sigma_closure))/scp.a/5000.0
         #epsval = max(epsval1,epsval2)
-        epsval=1e-2
+        epsval=1e-5
         epsvalscaled = epsval
         terminate=False
         starting_value=du_da_shortened_iniguess
@@ -1006,6 +1042,12 @@ def calc_contact(scp,sigma_ext):
 
             pass
 
+        if res.status==6 and res_fun_denormalized > goal_residual: 
+            # Characteristic of a divergence failure 
+            raise CalcContactDivergenceError("Maximum number of iterations (%d) reached and residual (%g) exceeds goal (%g)" % (total_maxiter,res_fun_denormalized,goal_residual))
+            
+
+
         #res = scipy.optimize.minimize(goal_function,du_da_shortened_iniguess,method='nelder-mead',options={"maxfev": 15000})
         if res_fun_denormalized > goal_residual and not res.success: # and res.status != 4:
             # (ignore incompatible constraint, because our constraints are
@@ -1072,7 +1114,7 @@ def calc_contact(scp,sigma_ext):
         #epsval1 = np.abs(sigma_ext)/scp.a/5000.0
         #epsval2 = np.max(np.abs(scp.sigma_closure))/scp.a/5000.0
         #epsval = max(epsval1,epsval2)
-        epsval=1e-2
+        epsval=1e-5
         epsvalscaled = epsval
         terminate=False
         starting_value=du_da_shortened_iniguess
@@ -1129,6 +1171,10 @@ def calc_contact(scp,sigma_ext):
         if niter >= total_maxiter and res_fun_denormalized > goal_residual:
             print("soft_closure/calc_contact (compressive): WARNING Maximum number of iterations (%d) reached and residual (%g) exceeds goal (%g)" % (total_maxiter,res_fun_denormalized,goal_residual))
             pass
+
+        if res.status==6 and res_fun_denormalized > goal_residual: 
+            # Characteristic of a divergence failure 
+            raise CalcContactDivergenceError("Maximum number of iterations (%d) reached and residual (%g) exceeds goal (%g)" % (total_maxiter,res_fun_denormalized,goal_residual))
 
         #res = scipy.optimize.minimize(goal_function,du_da_shortened_iniguess,method='nelder-mead',options={"maxfev": 15000})
         if res_fun_denormalized > goal_residual and not res.success: #  and res.status != 4:

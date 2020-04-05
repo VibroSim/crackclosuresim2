@@ -10,7 +10,7 @@ import scipy.optimize
 
 from VibroSim_Simulator.function_as_script import scriptify
 from crackclosuresim2 import Tada_ModeI_CircularCrack_along_midline
-from crackclosuresim2.soft_closure import soft_closure_goal_function_with_gradient_normalized
+from crackclosuresim2.soft_closure import soft_closure_goal_function_with_gradient_normalized,soft_closure_goal_function_with_gradient
 from crackclosuresim2.soft_closure_accel import soft_closure_goal_function_with_gradient_normalized_accel
 from crackclosuresim2.soft_closure import duda_shortened__from_duda
 from crackclosuresim2.soft_closure import duda_short__from_duda_shortened
@@ -62,3 +62,4 @@ res = scipy.optimize.minimize(soft_closure_goal_function_with_gradient_normalize
                               options={"eps": epsvalscaled,
                                        "maxiter": 100000,
                                        "ftol": 1e-12})#scp.afull_idx*(np.abs(sigma_ext)+20e6)**2.0/1e14})
+
