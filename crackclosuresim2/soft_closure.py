@@ -340,7 +340,7 @@ class sc_params(object):
                     pass
                 else:
                     print("WARNING: initialize_contact(): repeated rank-deficient equality constraint subproblem HFTI... Terminating!\n")
-
+                    sys.stdout.flush()
                     terminate=True  # Don't allow eps to grow too much
                     pass
                 pass
@@ -353,6 +353,7 @@ class sc_params(object):
 
         if niter >= total_maxiter and res_fun_denormalized > goal_residual:
             print("soft_closure/initialize_contact: WARNING Maximum number of iterations (%d) reached and residual (%g) exceeds goal (%g)" % (total_maxiter,res_fun_denormalized,goal_residual))
+            sys.stdout.flush()
             self.save_debug_pickle(sigma_ext,duda__from_duda_shortened(self,res.x*du_da_normalization,closure_index),closure_index,du_da_normalization,goal_function_normalization,sigma_closure=sigma_closure)
             pass
 
@@ -363,6 +364,7 @@ class sc_params(object):
             # this incorrectly... should file bug report)
             self.save_debug_pickle(sigma_ext,duda__from_duda_shortened(self,res.x*du_da_normalization,closure_index),closure_index,du_da_normalization,goal_function_normalization,sigma_closure=sigma_closure)
             print("minimize error %d: %s" % (res.status,res.message))
+            sys.stdout.flush()
             import pdb
             pdb.set_trace()
             pass
@@ -892,6 +894,7 @@ def calc_contact(scp,sigma_ext):
         except CalcContactFailure as Failure:
             
             print("calc_contact: Observed failure %s; retry #%d with different initial conditions" % (str(Failure,itercnt)))
+            sys.stdout.flush()
             du_da_shortened_iniguess = du_da_shortened_first_iniguess + (perturbation_amplitude_Pa/scp.dx)*np.random.randn(*du_da_shortened_first_iniguess.shape)
             if itercnt==10: # up to 10 tries
                 raise
@@ -1031,6 +1034,7 @@ def calc_contact_kernel(scp,sigma_ext,closure_index,du_da_shortened_iniguess):
                     pass
                 else:
                     print("WARNING: initialize_contact(): repeated rank-deficient equality constraint subproblem HFTI... Terminating!\n")
+                    sys.stdout.flush()
                     terminate=True  # Don't allow eps to grow too much
                     pass
                 pass
@@ -1043,6 +1047,7 @@ def calc_contact_kernel(scp,sigma_ext,closure_index,du_da_shortened_iniguess):
 
         if niter >= total_maxiter and res_fun_denormalized > goal_residual:
             print("soft_closure/calc_contact (tensile): WARNING Maximum number of iterations (%d) reached and residual (%g) exceeds goal (%g); res.status=%d" % (total_maxiter,res_fun_denormalized,goal_residual,res.status))
+            sys.stdout.flush()
             scp.save_debug_pickle(sigma_ext,duda__from_duda_shortened(scp,res.x*du_da_normalization,closure_index),closure_index,du_da_normalization,goal_function_normalization,load_constraint_fun_normalization=load_constraint_fun_normalization)
 
             pass
@@ -1061,6 +1066,7 @@ def calc_contact_kernel(scp,sigma_ext,closure_index,du_da_shortened_iniguess):
             # compatible by definition, and scipy 1.2 seems to diagnose
             # this incorrectly... should file bug report)
             print("minimize error %d: %s" % (res.status,res.message))
+            sys.stdout.flush()
             scp.save_debug_pickle(sigma_ext,duda__from_duda_shortened(scp,res.x*du_da_normalization,closure_index),closure_index,du_da_normalization,goal_function_normalization,load_constraint_fun_normalization=load_constraint_fun_normalization)
             import pdb
             pdb.set_trace()
@@ -1164,6 +1170,7 @@ def calc_contact_kernel(scp,sigma_ext,closure_index,du_da_shortened_iniguess):
                     pass
                 else:
                     print("WARNING: initialize_contact(): repeated rank-deficient equality constraint subproblem HFTI... Terminating!\n")
+                    sys.stdout.flush()
 
                     terminate=True  # Don't allow eps to grow too much
                     pass
@@ -1177,6 +1184,7 @@ def calc_contact_kernel(scp,sigma_ext,closure_index,du_da_shortened_iniguess):
             
         if niter >= total_maxiter and res_fun_denormalized > goal_residual:
             print("soft_closure/calc_contact (compressive): WARNING Maximum number of iterations (%d) reached and residual (%g) exceeds goal (%g)" % (total_maxiter,res_fun_denormalized,goal_residual))
+            sys.stdout.flush()
             pass
 
         if res.status==6 and res_fun_denormalized > goal_residual: 
@@ -1192,6 +1200,7 @@ def calc_contact_kernel(scp,sigma_ext,closure_index,du_da_shortened_iniguess):
             # compatible by definition, and scipy 1.2 seems to diagnose
             # this incorrectly... should file bug report)
             print("minimize error %d: %s" % (res.status,res.message))
+            sys.stdout.flush()
             scp.save_debug_pickle(sigma_ext,duda__from_duda_shortened(scp,res.x*du_da_normalization,closure_index),closure_index,du_da_normalization,goal_function_normalization,load_constraint_fun_normalization=load_constraint_fun_normalization)
             import pdb
             pdb.set_trace()
