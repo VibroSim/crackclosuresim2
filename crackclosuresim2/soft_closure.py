@@ -90,6 +90,8 @@ class sc_params(object):
 
     def save_debug_pickle(self,sigma_ext,du_da,closure_index,du_da_normalization,goal_function_normalization,sigma_closure=None,load_constraint_fun_normalization=None,filename=None):
         import os
+        import os.path
+        import tempfile
         import pickle
         import inspect
         import copy
@@ -99,9 +101,9 @@ class sc_params(object):
         caller_lineno = inspect.getframeinfo(inspect.stack()[1][0]).lineno
 
         if filename is None:
-            filename="/tmp/scdebug%d_line_%d.pickle" % (os.getpid(),caller_lineno)
+            filename=os.path.join(tempfile.gettempdir(),"scdebug%d_line_%d.pickle" % (os.getpid(),caller_lineno))
             pass
-
+            
         picklefh=open(filename,"wb")
 
         (contact_stress_from_displacement,displacement,contact_stress_from_displacement_gradient,displacement_gradient) = sigmacontact_from_displacement(self,du_da,closure_index_for_gradient=closure_index)
@@ -830,7 +832,7 @@ def soft_closure_goal_function_with_gradient_normalized(du_da_shortened_normaliz
     gradient_normalized = (du_da_normalization/goal_function_normalization) * gradient
     return (goal_function_normalized,gradient_normalized)
 
-class CalcContactDivergenceError(Exception):
+class CalcContactFailure(Exception):
     message = None
 
     def __init__(self,message):
@@ -838,7 +840,7 @@ class CalcContactDivergenceError(Exception):
         pass
 
     def __str__(self):
-        return "CalcContactDivergence: %s" % (self.message)
+        return "CalcContactFailure: %s" % (self.message)
     pass
 
 
@@ -887,8 +889,9 @@ def calc_contact(scp,sigma_ext):
         try: 
             (du_da,contact_stress_from_displacement,displacement,contact_stress_from_stress,residual) = calc_contact_kernel(scp,sigma_ext,closure_index,du_da_shortened_iniguess)
             return (du_da,contact_stress_from_displacement,displacement,contact_stress_from_stress,residual)
-        except CalcContactDivergenceError:
+        except CalcContactFailure as Failure:
             
+            print("calc_contact: Observed failure %s; retry #%d with different initial conditions" % (str(Failure,itercnt)))
             du_da_shortened_iniguess = du_da_shortened_first_iniguess + (perturbation_amplitude_Pa/scp.dx)*np.random.randn(*du_da_shortened_first_iniguess.shape)
             if itercnt==10: # up to 10 tries
                 raise
@@ -970,7 +973,7 @@ def calc_contact_kernel(scp,sigma_ext,closure_index,du_da_shortened_iniguess):
         
         # Allow total iterations to be broken into pieces separated by failures with minimize error 9 (Iteration limit exceeded)
         # (for some reason, restarting the minimizer where it left off seems to help get it to the goal)
-        total_maxiter=10000000
+        total_maxiter=1000000
         niter = 0
         #epsval1 = np.abs(sigma_ext)/scp.a/5000.0
         #epsval2 = np.max(np.abs(scp.sigma_closure))/scp.a/5000.0
@@ -1046,8 +1049,10 @@ def calc_contact_kernel(scp,sigma_ext,closure_index,du_da_shortened_iniguess):
 
         if (res.status==6 and res_fun_denormalized > goal_residual) or abs(res.fun) > 1e25: 
             # Characteristic of a divergence failure 
-            raise CalcContactDivergenceError("Maximum number of iterations (%d) reached and residual (%g) exceeds goal (%g)" % (total_maxiter,res_fun_denormalized,goal_residual))
+            raise CalcContactFailure("Divergence identified: Maximum number of iterations (%d) reached and residual (%g) exceeds goal (%g)" % (total_maxiter,res_fun_denormalized,goal_residual))
             
+        if (res.status==9 or res.status==0) and res_fun_denormalized > goal_residual:
+            raise CalcContactFailure("Maximum number of iterations (%d) reached and residual (%g) exceeds goal (%g)" % (total_maxiter,res_fun_denormalized,goal_residual))
 
 
         #res = scipy.optimize.minimize(goal_function,du_da_shortened_iniguess,method='nelder-mead',options={"maxfev": 15000})
@@ -1111,7 +1116,7 @@ def calc_contact_kernel(scp,sigma_ext,closure_index,du_da_shortened_iniguess):
         #    constraints.append(nonpositive_constraint)
         #    pass
 
-        total_maxiter=10000000
+        total_maxiter=1000000
         niter = 0
         #epsval1 = np.abs(sigma_ext)/scp.a/5000.0
         #epsval2 = np.max(np.abs(scp.sigma_closure))/scp.a/5000.0
@@ -1176,7 +1181,10 @@ def calc_contact_kernel(scp,sigma_ext,closure_index,du_da_shortened_iniguess):
 
         if res.status==6 and res_fun_denormalized > goal_residual: 
             # Characteristic of a divergence failure 
-            raise CalcContactDivergenceError("Maximum number of iterations (%d) reached and residual (%g) exceeds goal (%g)" % (total_maxiter,res_fun_denormalized,goal_residual))
+            raise CalcContactFailure("Divergence Identified: Maximum number of iterations (%d) reached and residual (%g) exceeds goal (%g)" % (total_maxiter,res_fun_denormalized,goal_residual))
+
+        if (res.status==9 or res.status==0) and res_fun_denormalized > goal_residual:
+            raise CalcContactFailure("Maximum number of iterations (%d) reached and residual (%g) exceeds goal (%g)" % (total_maxiter,res_fun_denormalized,goal_residual))
 
         #res = scipy.optimize.minimize(goal_function,du_da_shortened_iniguess,method='nelder-mead',options={"maxfev": 15000})
         if res_fun_denormalized > goal_residual and not res.success: #  and res.status != 4:
