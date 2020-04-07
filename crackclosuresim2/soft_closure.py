@@ -893,7 +893,7 @@ def calc_contact(scp,sigma_ext):
             return (du_da,contact_stress_from_displacement,displacement,contact_stress_from_stress,residual)
         except CalcContactFailure as Failure:
             
-            print("calc_contact: Observed failure %s; retry #%d with different initial conditions" % (str(Failure,itercnt)))
+            print("calc_contact: Observed failure %s; retry #%d with different initial conditions" % (str(Failure),itercnt))
             sys.stdout.flush()
             du_da_shortened_iniguess = du_da_shortened_first_iniguess + (perturbation_amplitude_Pa/scp.dx)*np.random.randn(*du_da_shortened_first_iniguess.shape)
             if itercnt==10: # up to 10 tries
