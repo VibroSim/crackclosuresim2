@@ -45,13 +45,13 @@ class ModeI_Beta_COD_Formula(ModeI_crack_model):
 
 """
 
-    u=None
+    u_per_unit_stress=None
     beta=None
 
     
     
     def __init__(self,**kwargs):
-        if "u" not in kwargs:
+        if "u_per_unit_stress" not in kwargs:
             raise ValueError("Must provide COD function u(object,sigma_applied,surface_position,surface_length)")
 
         if "beta" not in kwargs:
@@ -80,8 +80,8 @@ class ModeI_Beta_COD_Formula(ModeI_crack_model):
                 
         return sigmaI_theta0_times_rootr_over_sqrt_a_over_sigmaext
 
-    def eval_ModeI_COD_vectorized(self,sigma_applied,x,xt):
-        return self.u(self,sigma_applied,x,xt)
+    def eval_ModeI_COD_per_unit_stress_vectorized(self,x,xt):
+        return self.u_per_unit_stress(self,x,xt)
         
     
     pass
@@ -190,7 +190,7 @@ class ModeI_Beta_WeightFunction(ModeI_crack_model):
                 
         return sigmaI_theta0_times_rootr_over_sqrt_a_over_sigmaext
 
-    def eval_ModeI_COD_vectorized(self,sigma_applied,x,xt):
+    def eval_ModeI_COD_per_unit_stress_vectorized(self,x,xt):
         # we are using weightfunctions
 
         # New implementation with weight functions:
@@ -213,9 +213,9 @@ class ModeI_Beta_WeightFunction(ModeI_crack_model):
         
         right_integral_vect = np.vectorize(right_integral)
         
-        u = (2.0*sigma_applied/self.Eeff) * ( self.K_I_ov_sigma_ext_use(x)*self.weightfun_times_sqrt_aminx(self,x,x)*2.0*np.sqrt(self.epsx) + right_integral_vect(x))
+        u_per_unit_stress = (2.0/self.Eeff) * ( self.K_I_ov_sigma_ext_use(x)*self.weightfun_times_sqrt_aminx(self,x,x)*2.0*np.sqrt(self.epsx) + right_integral_vect(x))
         
-        return u
+        return u_per_unit_stress
     
     pass
 
@@ -984,7 +984,7 @@ def solve_incremental_compressivestress(x,x_bnd,sigma,sigma_closure,tensile_disp
 def tensile_displacement(sigma_applied,x,xt,crack_model):
     ##plane stress is considered
 
-    u = crack_model.eval_ModeI_COD_vectorized(sigma_applied,x,xt)
+    u = crack_model.eval_ModeI_COD_per_unit_stress_vectorized(x,xt)*sigma_applied
     #if (xt > 1e-3):
     #    sys.modules["__main__"].__dict__.update(globals())
     #    sys.modules["__main__"].__dict__.update(locals())
@@ -1323,6 +1323,118 @@ def initialize_normalstress_compressive(x,x_bnd,sigma_closure,dx,sigmaext_max,a,
 
 
     return (sigmaext,sigma,tensile_displ,xt_idx,use_xt2,use_xt1)
+
+
+def tensile_closure_from_crackopening(x,x_bnd,sigma_closure,crackopening,dx,a,sigma_yield,crack_model):
+    """ Interpret a (possibly partly or fully) tensile closure field from 
+    a compressive closure field and a crack (half) opening displacement field. 
+
+    Note that the closure field with opening displacement field 
+    representation limits us to effective tips that lie on grid boundaries
+    whereas the tensile closure field can place the effective tip 
+    (opening point) anywhere. 
+
+    Note: first point of returned tensile closure will always be zero 
+"""
+    
+    assert(not(((crackopening > 0.0) & (sigma_closure > 0.0)).any())) # no closure stress where crack is open
+    assert((sigma_closure >= 0.0).all()) # no tensile closure stress
+
+    positive_closure_indexes = np.where(sigma_closure > 0.0)[0]
+
+    if positive_closure_indexes[0]==0:
+        assert((crackopening == 0.0).all()) 
+        return sigma_closure # crack is entirely closed, so tensile_closure is just sigma_closure
+    
+    if positive_closure_indexes.shape[0]==0:
+        # crack is entirely open
+        xt_idx = x_bnd.shape[0]-2
+        pass
+    else:
+        xt_idx = positive_closure_indexes[0]-1
+        pass
+
+    # xt_idx is index into x_bnd indicating start of last element that is open
+    # also equiavlently index into x for last element that is open
+    # also equivalently index into sigma_closure for that element or crackopening for that element (should be zero)
+    assert((sigma_closure[xt_idx:] >= 0.0).all())
+    assert((crackopening[xt_idx:]==0.0).all())
+
+    sigma = np.zeros(x.shape[0],dtype='d') # stress field we are accumulating (positive tensile) that superimposes with the positive compressive sigma_closure
+
+    tensile_displ = copy.deepcopy(crackopening)
+
+    sigmaext = 0.0
+    sigmaext_max = -np.inf
+    
+    # Now try closing the crack one step at a time
+    tensile_closure = copy.deepcopy(sigma_closure)
+    while xt_idx >= 1:
+        use_xt2 = x_bnd[xt_idx+1]   # use_xt2 is the starting tip position for this compressive step
+        use_xt1 = x_bnd[xt_idx]  # use_xt1 is the ending tip position for this compressive step
+        # use_xt2 and use_xt2 bound the element at x[xt_idx]
+        # There is no substantial COD (just infinitesimal) of this element as the crack closes from use_xt2 to use_xt1
+        # So we calculate the "tensile closure" on this region to close the element to its left, centered at x[xt_idx-1]
+        
+        #(use_xt1,sigmaext, sigma, tensile_displ, dsigmaext_dxt) = solve_incremental_compressivestress(x,x_bnd,sigma,sigma_closure,tensile_displ,use_xt2,xt_idx,dx,sigmaext,sigmaext_max,a,sigma_yield,crack_model,calculate_displacements=True)
+
+        # calculate as in tensile_displacement() to get an incremental displacement that zeros the displacement in this region...
+        # Determine sigmaext2-sigmaext on this basis...
+
+        # # Solving objective function... our given sigma_closure at xt_idx must be zero
+        # # but the sigma_closure in the objective function should be the tensile closure.
+        # # whereas sigmaext2 is now given
+
+        # Since sigmaext2 = sigmaext1 - (xt2-xt1)*F
+        # then F = -(sigmaext2-sigmaext1)/(xt2-xt1)
+
+        # ... So we don't need to solve with the objective function.
+        # ... We can call integral_compressivestress_shrinking_effective_crack_length_byxt(x,sigmaext1,sigmaext_max,F,xt1,xt2,crack_model)
+        # to obtain sigma_increment
+        # at position xt_idx,  per the objective function, sigma+sigma_increment-sigma_closure == 0
+        # where sigma_closure is our tensile closure field.
+        # So we can now calculate the tensile closure field value at this position.
+        # Then accumulate sigma into sigma_increment, add in calculated displacement field
+        # (which should almost exactly zero out displacement at this position),
+        # and repeat.
+
+
+        du_dsigma = crack_model.u_per_unit_stress(crack_model,x[xt_idx-1],x[xt_idx])  # Displacement of x[xt_idx-1] with effective tip at x[xt_idx]
+
+        # delta_sigma_ext is negative... external loading increment required to close crack at x[xt_idx-1]
+        delta_sigma_ext = - tensile_displ[xt_idx-1]/du_dsigma 
+        
+        # sigmaext is starting load (negative for compression)
+        # sigmaext2 is the ending load (negative for compression,
+        # more negative than sigmaext1
+        sigmaext2 = sigmaext + delta_sigma_ext
+
+        
+        F = -delta_sigma_ext/(use_xt2-use_xt1)  # F is positive... measures closure gradient
+        # integral_compressivestress_shrinking_effective_crack_length_byxt recalculates
+        # sigmaext2 internally, but result will match our value to machine precision
+        (icseclb_use_xt1,icseclb_sigmaext2,sigma_increment) = integral_compressivestress_shrinking_effective_crack_length_byxt(x,sigmaext,sigmaext_max,F,use_xt1,use_xt2,crack_model)
+
+        incremental_displacement = np.zeros(x.shape[0],dtype='d')
+        xt = x[xt_idx] # (use_xt1+use_xt2)/2.0
+        left_of_effective_tip = (x < xt)
+        incremental_displacement[left_of_effective_tip] = tensile_displacement(sigmaext2-sigmaext,x[left_of_effective_tip],xt,crack_model)
+
+        tensile_closure[xt_idx] = sigma_increment[xt_idx] # extract tensile_closure value for this point
+        
+        # Add in effects of this step
+        sigma+=sigma_increment
+        tensile_displ += incremental_displacement
+
+        assert(abs(tensile_displ[xt_idx-1]) < 1e-12) # Verify that ultimate displacement of our point-to-the-left is what it was supposed to be
+
+        # increment to next step
+        sigmaext = sigmaext2
+        xt_idx-=1
+        pass
+
+    # in the final state, sigma + tensile_closure superimpose 
+    return tensile_closure
 
 
 def crackopening_from_tensile_closure(x,x_bnd,sigma_closure,dx,a,sigma_yield,crack_model):
@@ -1939,7 +2051,7 @@ class ModeI_throughcrack_CODformula(ModeI_Beta_COD_Formula):
     
         
     def __init__(self,Eeff):
-        def u(Eeff,sigma_applied,x,xt):
+        def u_per_unit_stress(Eeff,x,xt):  # half-opening displacement over sigma_applied
             # Non weightfunction method:
 
             # Old method: Based on Suresh eq. 9.45.
@@ -1957,12 +2069,12 @@ class ModeI_throughcrack_CODformula(ModeI_Beta_COD_Formula):
             # uy = 2(sigma/Eeff)*sqrt((a+x)(a-x))
             
             #Eeff = E
-            u = (2*sigma_applied/Eeff)*np.sqrt((xt+x)*(xt-x))
-            return u
+            u_per_unit_stress = (2/Eeff)*np.sqrt((xt+x)*(xt-x))
+            return u_per_unit_stress
     
         super(ModeI_throughcrack_CODformula, self).__init__(Eeff=Eeff,
                                                             beta=lambda obj: 1.0,
-                                                            u = lambda obj,sigma_applied,x,xt: u(obj.Eeff,sigma_applied,x,xt))
+                                                            u_per_unit_stress = lambda obj,x,xt: u_per_unit_stress(obj.Eeff,x,xt))
         pass
     pass
 
@@ -1975,19 +2087,19 @@ class Tada_ModeI_CircularCrack_along_midline(ModeI_Beta_COD_Formula):
         return (2.0**(1.0/3.0))/((np.pi**(2.0/3.0))*(self.beta(self)**(1.0/3.0)))
     
     def __init__(self,E,nu):
-        def u(E,nu,sigma_applied,x,xt):
+        def u_per_unit_stress(E,nu,x,xt): # half opening displacement
             # For a circular crack in an infinite space,
             # loaded in mode I.
             # We will be evaluating along a line through the crack center
             # Based on Tada, H., Paris, P., & Irwin, G. (2000). The stress analysis of cracks handbook / Hiroshi Tada, Paul C. Paris, George R. Irwin. (3rd ed.). New York: ASME Press.
         
-            u = (4.0*(1-nu**2.0)/(np.pi*E)) * sigma_applied * np.sqrt(xt**2.0 - x**2.0)
-            return u
+            u_per_unit_stress = (4.0*(1-nu**2.0)/(np.pi*E))  * np.sqrt(xt**2.0 - x**2.0)
+            return u_per_unit_stress
     
         super(Tada_ModeI_CircularCrack_along_midline, self).__init__(E=E,
                                                                      nu=nu,
                                                                      beta=lambda obj: 4.0/(np.pi**2.0),
-                                                                     u = lambda obj,sigma_applied,x,xt: u(obj.E,obj.nu,sigma_applied,x,xt))
+                                                                     u_per_unit_stress = lambda obj,x,xt: u(obj.E,obj.nu,x,xt))
         pass
     pass
 

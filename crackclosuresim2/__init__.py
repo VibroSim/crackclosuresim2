@@ -42,6 +42,7 @@ from .crackclosure import ModeI_Beta_WeightFunction
 from .crackclosure import solve_normalstress
 from .crackclosure import inverse_closure
 from .crackclosure import crackopening_from_tensile_closure
+from .crackclosure import tensile_closure_from_crackopening
 from .crackclosure import Glinka_ModeI_ThroughCrack
 from .crackclosure import ModeI_throughcrack_weightfun
 from .crackclosure import ModeI_throughcrack_CODformula
