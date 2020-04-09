@@ -237,14 +237,14 @@ u_surrogate = {
 def array_repr(array):
     return "np.array(%s,dtype=np.%s)" % (np.array2string(array,separator=',',suppress_small=False,threshold=np.inf,floatmode='unique'),repr(array.dtype))
 
-def u(rho,phi,a,tauext,E,nu,use_surrogate=True):
+def u_per_unit_stress(rho,phi,a,E,nu,use_surrogate=True):
     # NOTE: returns shear displacement of each crack flank
     # relative displacement between both flanks is double this
 
     
     if use_surrogate and (phi,nu) in u_surrogate:
         (t,c,k) = u_surrogate[(phi,nu)]
-        return splev(rho/a,(t,c,k))*a*tauext/E
+        return splev(rho/a,(t,c,k))*a/E
 
     if use_surrogate:
         raise ValueError("crackclosuresim2.fabrikant: WARNING: Surrogate not available for u(phi=%.20e,nu=%.20e); computation will be extremely slow. Pass use_surrogate=False if you really want this!\n" % (phi,nu))
@@ -353,12 +353,12 @@ def Fabrikant_ModeII_CircularCrack_along_midline(E,nu):
         pass
     
     # u(x,0.0,xt,tau_applied,obj.E,obj.nu)
-    uvec = np.vectorize(u,otypes=[np.double])
+    u_per_unit_stress_vec = np.vectorize(u_per_unit_stress,otypes=[np.double])
     
     return ModeII_Beta_CSD_Formula(E=E,
                                    nu=nu,
                                    beta = lambda obj: (K_nd_val**2.0)/np.pi,
-                                   ut = lambda obj,tau_applied,x,xt: uvec(x,0.0,xt,tau_applied,obj.E,obj.nu))
+                                   ut_per_unit_stress = lambda obj,x,xt: u_per_unit_stress_vec(x,0.0,xt,obj.E,obj.nu))
 
 pass
 

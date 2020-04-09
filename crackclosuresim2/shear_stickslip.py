@@ -12,7 +12,7 @@ class ModeII_crack_model(object):
     # Implementations should define:
     #  * methods: 
     #    * eval_tauII_theta0_times_rootr_over_sqrt_a_over_tauext(self,a)
-    #    * evaluate_ModeII_CSD_vectorized(self,tau_applied,x,xt)  # should be vectorized over x (not necessarily xt)
+    #    * evaluate_ModeII_CSD_per_unit_stress_vectorized(self,x,xt)  # should be vectorized over x (not necessarily xt)
     pass
 
 
@@ -36,11 +36,11 @@ class ModeII_Beta_CSD_Formula(ModeII_crack_model):
 
 """
 
-    ut=None
+    ut_per_unit_stress=None
     beta=None
     
     def __init__(self,**kwargs):
-        if "ut" not in kwargs:
+        if "ut_per_unit_stress" not in kwargs:
             raise ValueError("Must provide COD function u(object,sigma_applied,surface_position,surface_length)")
 
         if "beta" not in kwargs:
@@ -69,8 +69,8 @@ class ModeII_Beta_CSD_Formula(ModeII_crack_model):
                 
         return tauII_theta0_times_rootr_over_sqrt_a_over_tauext
 
-    def eval_ModeII_CSD_vectorized(self,sigma_applied,x,xt):
-        return self.ut(self,sigma_applied,x,xt)
+    def eval_ModeII_CSD_per_unit_stress_vectorized(self,x,xt):
+        return self.ut_per_unit_stress(self,x,xt)
     
     
     pass
@@ -412,7 +412,7 @@ def shear_displacement(tau_applied,x,xt,crack_model):
     #theta = np.pi
     #return (KII/(2.0*E))*(np.sqrt((xt-x)/(2.0*np.pi)))*((1.0+nu)* \
     # (((2.0*Kappa+3.0)*(np.sin(theta/2.0)))+(np.sin(3.0*theta/2.0))))
-    ut = crack_model.eval_ModeII_CSD_vectorized(tau_applied,x,xt)
+    ut = crack_model.eval_ModeII_CSD_per_unit_stress_vectorized(x,xt)*tau_applied
     return ut
 
 
@@ -586,7 +586,7 @@ def solve_shearstress(x,x_bnd,sigma_closure,dx,tauext_max,a,mu,tau_yield,crack_m
 
 
 def ModeII_throughcrack_CSDformula(E,nu):
-    def ut(E,nu,tau_applied,x,xt):
+    def ut_per_unit_stress(E,nu,x,xt):
         # Non weightfunction method:
 
         # ***!!! This could probably be improved by using
@@ -599,23 +599,23 @@ def ModeII_throughcrack_CSDformula(E,nu):
 
         #plane stress is considered
         Kappa = (3.0-nu)/(1.0+nu)
-        KII = tau_applied*np.sqrt(np.pi*(xt))
+        KII_per_unit_stress = np.sqrt(np.pi*(xt))
         theta = np.pi
-        ut = (KII/(2.0*E))*(np.sqrt((xt-x)/(2.0*np.pi)))*((1.0+nu)* (((2.0*Kappa+3.0)*(np.sin(theta/2.0)))+(np.sin(3.0*theta/2.0))))
+        ut_per_unit_stress = (KII_per_unit_stress/(2.0*E))*(np.sqrt((xt-x)/(2.0*np.pi)))*((1.0+nu)* (((2.0*Kappa+3.0)*(np.sin(theta/2.0)))+(np.sin(3.0*theta/2.0))))
         
-        return ut
+        return ut_per_unit_stress
     
     
     return ModeII_Beta_CSD_Formula(E=E,
                                    nu=nu,
                                    beta=lambda obj: 1.0,
-                                   ut = lambda obj,tau_applied,x,xt: ut(obj.E,obj.nu,tau_applied,x,xt))
+                                   ut_per_unit_stress = lambda obj,x,xt: ut_per_unit_stress(obj.E,obj.nu,x,xt))
 
     
     
 
 def ModeIII_throughcrack_CSDformula(E,nu):
-    def ut(E,nu,tau_applied,x,xt):
+    def ut_per_unit_stress(E,nu,x,xt):
         #For a 1D problem based on the Westergaard stress functions, since the
         #models are only valid in the region near the crack tip, This can be 
         #taken as the same for both an edge and an center crack. This is 
@@ -625,14 +625,14 @@ def ModeIII_throughcrack_CSDformula(E,nu):
         
         #plane stress is considered however, the Kappa value is not used.
         #Kappa = (3.0-nu)/(1.0+nu)
-        KIII = tau_applied*np.sqrt(np.pi*(xt))
+        KIII_per_unit_stress = np.sqrt(np.pi*(xt))
         theta = np.pi
-        ut = (KIII/(2.0*E))*(np.sqrt((xt-x)/(2.0*np.pi)))*((1.0+nu)*(np.sin(3.0*theta/2.0)))
+        ut_per_unit_stress = (KIII_per_unit_stress/(2.0*E))*(np.sqrt((xt-x)/(2.0*np.pi)))*((1.0+nu)*(np.sin(3.0*theta/2.0)))
         
-        return ut
+        return ut_per_unit_stress
     
     return ModeII_Beta_CSD_Formula(E=E,
                                    nu=nu,
                                    beta=lambda obj: 1.0,
-                                   ut = lambda obj,tau_applied,x,xt: ut(obj.E,obj.nu,tau_applied,x,xt))
+                                   ut_per_unit_stress = lambda obj,x,xt: ut_per_unit_stress(obj.E,obj.nu,x,xt))
 

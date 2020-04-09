@@ -2,7 +2,7 @@ import numpy as np
 from scipy.integrate import quad
 from scipy.interpolate import splrep,splev
 
-from crackclosuresim2.fabrikant import K_nondim,u_nondim,u,K,array_repr
+from crackclosuresim2.fabrikant import K_nondim,u_nondim,u_per_unit_stress,K,array_repr
 
 #Penny-shaped crack revisited: Closed-form solutions; V. I. Fabrikant
 #https://www.tandfonline.com/loi/tpha20
@@ -47,7 +47,7 @@ if create_surrogate_entries:
 
 
 x=np.linspace(0,a,30)
-u_eval = np.array([ u(xval,0.0,a,tauext,E,nu,use_surrogate=use_surrogate) for xval in x])
+u_eval = np.array([ u_per_unit_stress(xval,0.0,a,E,nu,use_surrogate=use_surrogate)*tauext for xval in x])
 
 
 K_eval = K(np.pi,a,tauext,nu,use_surrogate=use_surrogate) # NOTE: K comes out negative if we use 0 for phi (!)
