@@ -52,7 +52,7 @@ class ModeI_Beta_COD_Formula(ModeI_crack_model):
     
     def __init__(self,**kwargs):
         if "u_per_unit_stress" not in kwargs:
-            raise ValueError("Must provide COD function u(object,sigma_applied,surface_position,surface_length)")
+            raise ValueError("Must provide COD function u_per_unit_stress(object,surface_position,surface_length)")
 
         if "beta" not in kwargs:
             raise ValueError("Must provide K coefficient beta(object)")
@@ -267,7 +267,7 @@ def indef_integral_of_crack_tip_singularity_times_1_over_r2_pos_crossterm_decay(
      | --===- * |--------|  dx_t
      / \/ r     \(r + r0)/
      
-    where r is implicitly defined as x - x_t. 
+    where r is implicitly defined as x - x_t and r0 as b*x_t.
 
     The first factor represents the standard sqrt(a) divided by the square 
     root of the radius away from the crack decay that is found in standard 
@@ -387,7 +387,8 @@ def integral_tensilestress_growing_effective_crack_length_byxt(x,sigmaext1,sigma
       sigma_yy_crack = (K_I / sqrt(2*pi*r))  (Suresh, Eq. 9.44a at theta=0)
 
     ... we choose to add in the external field not being held by the crack
-      sigma_yy_total = (K_I / sqrt(2*pi*r)) + sigma_ext
+       and a decay factor from load balancing (see below)
+      sigma_yy_total = (K_I / sqrt(2*pi*r))*(r0^2/(r+r0)^2) + sigma_ext
 
      
     In the region where the stress accumulates, to the right of the tip, 
@@ -2099,7 +2100,7 @@ class Tada_ModeI_CircularCrack_along_midline(ModeI_Beta_COD_Formula):
         super(Tada_ModeI_CircularCrack_along_midline, self).__init__(E=E,
                                                                      nu=nu,
                                                                      beta=lambda obj: 4.0/(np.pi**2.0),
-                                                                     u_per_unit_stress = lambda obj,x,xt: u(obj.E,obj.nu,x,xt))
+                                                                     u_per_unit_stress = lambda obj,x,xt: u_per_unit_stress(obj.E,obj.nu,x,xt))
         pass
     pass
 
