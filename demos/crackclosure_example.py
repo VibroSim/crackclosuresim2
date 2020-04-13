@@ -144,7 +144,7 @@ ax2axis=ax2.axis()
 ax2.axis([ax2axis[0],ax2axis[1],ax2axis[2]*10,ax2axis[3]*10])
 pl.legend(legax,legstr)
 #fig.tight_layout()
-pl.title('Closed crack')
+pl.title('Closed crack being opened')
 pl.savefig(os.path.join(tempfile.gettempdir(),'tensile_peel_closedcrack.png'),dpi=300)
 
 
@@ -199,7 +199,7 @@ align_yaxis(ax21,0,ax22,0)
 ax22.set_ylabel('Tensile displacement (nm)')
 pl.legend(legax,legstr)
 #fig.tight_layout()
-pl.title('Tight crack')
+pl.title('Tight crack; applied tensile stress does not open the crack')
 pl.savefig(os.path.join(tempfile.gettempdir(),'tensile_peel_tightcrack.png'),dpi=300)
 
 
@@ -254,7 +254,7 @@ align_yaxis(ax31,0,ax32,0)
 ax32.set_ylabel('Tensile displacement (nm)')
 pl.legend(legax,legstr)
 #fig.tight_layout()
-pl.title('Partially open crack')
+pl.title('Almost-open crack being opened')
 pl.savefig(os.path.join(tempfile.gettempdir(),'tensile_peel_opencrack.png'),dpi=300)
 
 

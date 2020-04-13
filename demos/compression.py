@@ -63,8 +63,8 @@ crack_model = Tada_ModeI_CircularCrack_along_midline(E,nu)
 
 # Closure state (function of position; positive compression)
 
-observed_reff = np.array([ 0.0,  1e-3, 1.5e-3, 2e-3  ],dtype='d')
-observed_seff = np.array([ 10e6, 15e6, 30e6, 150e6  ],dtype='d')
+observed_reff = np.array([ 0.5e-3,  1e-3, 1.5e-3, 2e-3  ],dtype='d')
+observed_seff = np.array([ .00e6, 15e6, 30e6, 150e6  ],dtype='d')
 
 sigma_closure = inverse_closure(observed_reff,
                                 observed_seff,

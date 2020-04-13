@@ -126,7 +126,7 @@ if __name__=="__main__":
     # !!!*** NOTE: This technique is relied on in the angledfrictionmodel !!!***
     scp.setcrackstate(contact_stress_bias,displacement_bias + (contact_stress_bias/scp.Lm)**(2.0/3.0))
 
-    du_da_bias_applied=np.zeros(scp.x.shape[0],dtype='d')
+    du_da_bias_applied=np.zeros(scp.x.shape[0]+1,dtype='d')
 
     soft_closure_plots(scp,du_da_bias_applied,titleprefix="Bias applied: ")
 
