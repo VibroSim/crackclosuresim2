@@ -41,7 +41,7 @@ class ModeII_Beta_CSD_Formula(ModeII_crack_model):
     
     def __init__(self,**kwargs):
         if "ut_per_unit_stress" not in kwargs:
-            raise ValueError("Must provide COD function u(object,sigma_applied,surface_position,surface_length)")
+            raise ValueError("Must provide COD function ut_per_unit_stress(object,surface_position,surface_length)")
 
         if "beta" not in kwargs:
             raise ValueError("Must provide K coefficient beta(object)")
@@ -78,7 +78,18 @@ class ModeII_Beta_CSD_Formula(ModeII_crack_model):
 
 
 
+
+
+
+
+
 def indef_integral_of_simple_squareroot_quotients(a,u):
+    """ This routine is no longer used because integrated out 
+    to infinity the form of solution kernel that goes with this
+    fails load balancing... See 
+    indef_integral_of_crack_tip_singularity_times_1_over_r2_pos_crossterm_decay(crack_model,x,xt) 
+    for the replacement"""
+
     (a,u) = np.broadcast_arrays(a,u) # make sure a and u are the same shape
     # From Wolfram Alpha: integral of (sqrt(u)/sqrt(a-u)) du
     #  = a*arctan(sqrt(u)/sqrt(a-u)) - sqrt(u)*sqrt(a-u)
@@ -102,6 +113,108 @@ def indef_integral_of_simple_squareroot_quotients(a,u):
     integral[divzero] = np.pi*a[divzero]/2.0
     return integral
 
+
+def indef_integral_of_crack_tip_singularity_times_1_over_r2_pos_crossterm_decay(crack_model,x,xt):
+    """
+    This is the indefinite integral of the crack tip stress solution for an 
+    open linear elastic crack.
+         ___
+     / \/x_t    /   r0   \2
+     | --===- * |--------|  dx_t
+     / \/ r     \(r + r0)/
+     
+    where r is implicitly defined as x - x_t and r0 as b*x_t.
+
+    The first factor represents the standard sqrt(a) divided by the square 
+    root of the radius away from the crack decay that is found in standard 
+    crack tip stress solutions e.g. Anderson (2004), and Tada (2000). 
+    However, this alone does not accurate account for the load balance in 
+    of the load that would have been carried by half of the crack surface 
+    and the load that would be added ahead of the crack tip. There is 
+    presumed to be another constant term outside this integral matching
+    the load at infinity. 
+    
+    The second factor in the integral represents additional decay of the 
+    1/sqrt(r) singularity which, combined with the outside constant term)
+    enforces the load balance of the stress state as r is integrated to 
+    infinity. 
+    
+    This function of r0 complicates the integral because not only is 
+    r = x - x_t a function of x_t (the variable of integration), r0 is also a 
+    function of x_t (r0 is presumed to have the form constant*x_t, where 
+     this constant will 
+    be refered to as b=r0_over_a). 
+         
+    The resulting integral is:
+            ___
+     /    \/x_t      /       b*x_t       \2
+     | --=======- *  |-------------------|  dx_t
+     / \/x - x_t     \((x - x_t) + b*x_t)/
+    
+    The function inputs are:
+    
+        crack_model - contains the values describing the particular 1/sqrt(r)
+              LEFM tip model desired, including a function returning 
+              the r0_over_a value needed for the integral. The assumption
+              is that r0_over_a, even though it is given parameters including
+              x_t, is not actually dependent on x_t. If there is dependence on
+              x_t then this solution is not correct (but may be close enough
+              for practical purposes). 
+
+        x  -  the x value or range along the crack that the evaluated 
+              integral is being 
+              calculated over, not the variable of integration
+        
+        xt -  the value or range of half crack length that the indefinite
+              integral is being evaluated at
+        
+    
+    This function then returns the indefinite integral evaluated at
+    (x,x_t)
+        
+    """
+    (x,xt) = np.broadcast_arrays(x,xt) # make sure x and xt are the same shape
+    #From Wolfram Alpha: 
+    #   integrate ((sqrt(u))/(sqrt(a-u)))*((b*u)/((a-u)+b*u))^2 du =
+    #Plain-Text Wolfram Alpha output
+    #   (b^2 (-(((-1 + b) Sqrt[a - u] Sqrt[u] (a (1 + b) + (-1 + b) b u))/(b 
+    #   (a + (-1 + b) u))) + a (-5 + b) ArcTan[Sqrt[u]/Sqrt[a - u]] + (a (-1 + 
+    #   5 b) ArcTan[(Sqrt[b] Sqrt[u])/Sqrt[a - u]])/b^(3/2)))/(-1 + b)^3
+    
+    #where b*u = r0 --> b = r0_over_a, u = xt, and a = x
+
+    # Calculate division-by-zero and
+    # non division-by-zero regimes separately
+    
+    # Limiting case as x-xt -> 0:
+    # Let r = x-xt -> xt = x-r
+    #
+    # The limit approaches ((b**2)/(b-1)**3)*(pi/2.0)*((x*(5*b-1)/(b**(3./2.)))
+    #                               +(x*(b-5))) as r->0
+    
+    divzero = (x==xt) | ((np.abs(x-xt) < 1e-10*x) & (np.abs(x-xt) < 1e-10*xt))
+    
+    #if np.count_nonzero(x < xt) > 0:
+    #    import pdb
+    #    pdb.set_trace()
+    #    pass
+    
+    b = crack_model.r0_over_a(xt)
+    
+    f1=sqrt(xt[~divzero])
+    f2=sqrt(x[~divzero]-xt[~divzero])
+
+    A=((b**2)/(b-1)**3)
+    B=((x[~divzero]*(5*b-1)*arctan((sqrt(b)*f1)/(f2)))/(b**(3./2.)))
+    C=((b-1)*(f1)*(f2)*(x[~divzero]*(b+1)+(b-1)*b*xt[~divzero]))
+    D=(b*(x[~divzero]+(b-1)*xt[~divzero]))
+    E=(x[~divzero]*(b-5)*arctan(f1/f2))
+
+    integral = np.zeros(x.shape,dtype='d')
+    integral[~divzero] =A*(B-(C/D)+E)
+    
+    integral[divzero] = ((b**2)/(b-1)**3)*(pi/2.0)*x[divzero]*(((5*b-1)/(b**(3./2.)))+(b-5))
+    return integral
 
 
 
@@ -132,8 +245,10 @@ def integral_shearstress_growing_effective_crack_length_byxt(x,tauext1,tauext_ma
      The mode II normal stress formula is:
       sigma_xy_crack = (K_II / sqrt(2*pi*r))  (Suresh, Eq. 9.47a at theta=0)
 
-    ... we choose to add in the external field not being held by the crack
-      sigma_xy_total = (K_II / sqrt(2*pi*r)) + sigma_ext
+    ... we choose to multiply by a decay factor from load balancing and 
+      add in the external field not being held by the crack
+      
+      sigma_xy_total = (K_II / sqrt(2*pi*r))*(r0^2/(r+r0)^2) + tau_ext
 
     The variable tauII_theta0_times_rootr_over_sqrt_a_over_sigmaext
     represents the value of sigmaxy_crack(x,K) with the above formula 
@@ -151,7 +266,7 @@ def integral_shearstress_growing_effective_crack_length_byxt(x,tauext1,tauext_ma
     tauext
 
     The incremental shear stress field would be
-    integral_tauext1^tauext2 of 1.0 + tauII(x-xt,K_over_tauext) dtauext
+    integral_tauext1^tauext2 of (tauII(x-xt,K_over_tauext) (r0^2/(r+r0)^2) + 1.0) dtauext
     (note that K and xt are dependent on tauext)
    
 
@@ -163,27 +278,27 @@ def integral_shearstress_growing_effective_crack_length_byxt(x,tauext1,tauext_ma
     tauext. 
 
     Then we can rewrite the incremental shear stress as: 
-    integral_tauext1^tauext2 of 1.0 + tauII_theta0_times_rootr_over_sqrt_a_over_tauext*sqrt(xt)/sqrt(x-xt) dtauext
+    integral_tauext1^tauext2 of ( tauII_theta0_times_rootr_over_sqrt_a_over_tauext*sqrt(xt)/sqrt(x-xt) (r0^2/(r+r0)^2)  + 1.0 ) dtauext
     Here, xt is still dependent on tauext... this will give shear stress
     as a function of position (x). 
 
-    We assume xt is linearly dependent on shear stress:
+    We assume xt is linearly dependent on external shear stress:
     xt = xtp + (1/F)*(tauext-tauext1)
     where xtp is the final xt from the previous step. 
 
     tauII_theta0_times_rootr_over_sqrt_a_over_tauext is a constant 
 
     So our incremental shear is
-    integral_tauext1^tauext2 (1.0 + tauII_theta0_times_rootr_over_sqrt_a_over_tauext sqrt(xt)/sqrt(x-xt) dtauext
+    integral_tauext1^tauext2 (tauII_theta0_times_rootr_over_sqrt_a_over_tauext sqrt(xt)/sqrt(x-xt) (r0^2/(r+r0)^2) + 1.0 )dtauext
     where we ignore any contributions corresponding to (x-xt) <= 0
 
-    (the new 1.0 term represents that beyond the effective tip the external 
+    (the new (r0^2/(r+r0)^2) factor represents extra decay of the 1/sqrt(r)
+    solution away from the effective tip. The 1.0 term represents that beyond the effective tip the external 
     load directly increments the stress state, in addition to the stress 
     concentration caused by the presence of the open region)    
 
-    pull out constant term
 
-    (tauext2-tauext1) + integral_tauext1^tauext2 tauII_theta0_times_rootr_over_sqrt_a_over_tauext sqrt(xt)/sqrt(x-xt) dtauext
+    integral_tauext1^tauext2 tauII_theta0_times_rootr_over_sqrt_a_over_tauext sqrt(xt)/sqrt(x-xt) (r0^2/(r+r0)^2) + 1  dtauext
 
     Perform change of integration variable tauext -> xt: 
        Derivative of xt:
@@ -192,19 +307,27 @@ def integral_shearstress_growing_effective_crack_length_byxt(x,tauext1,tauext_ma
 
 
     So the  incremental shear stress we are solving for is
-    (tauext2-tauext1) + integral_xt1^xt2 tauII_theta0_times_rootr_over_sqrt_a_over_tauext sqrt(xt)*F/sqrt(x-xt)  dxt
+    integral_xt1^xt2 (tauII_theta0_times_rootr_over_sqrt_a_over_tauext sqrt(xt)*F/sqrt(x-xt) (r0^2/(r+r0)^2) + F)  dxt
     where we ignore any contributions corresponding to (x-xt) <= 0
 
     and tauext2 = tauext1 + (xt2-xt1)*F 
  
     F is a constant so have 
-    F*(xt2-xt1) +  F * tauII_theta0_times_rootr_over_sqrt_a_over_tauext * integral_xt1^xt2 sqrt(xt)/(sqrt(x-xt))  dxt
+      F  * integral_xt1^xt2 tauII_theta0_times_rootr_over_sqrt_a_over_tauext * (sqrt(xt)/(sqrt(x-xt)) (r0^2/(r+r0)^2) + 1)  dxt
 
+    representing r0 as r0_over_xt*xt, and r by x-xt, the r0^2/(r+r0)^2 factor
+    becomes r0_over_xt^2*xt^2/(x-xt+r0_over_xt*xt)^2
 
-    This is then the integral of (sqrt(u)/sqrt(a-bu)) du
-       where u = xt, 
-    with solution given by
-       indef_integral_of_simple_squareroot_quotients(x,xt2) - indef_integral_of_simple_squareroot_quotients(x,xt1)
+      F * integral_xt1^xt2 (tauII_theta0_times_rootr_over_sqrt_a_over_tauext sqrt(xt)/(sqrt(x-xt)) r0_over_xt^2*xt^2/(x-xt+r0_over_xt*xt)^2  + 1)  dxt
+
+    pulling out the trivial term and treating tauII_theta0_times_rootr_over_sqrt_a_over_tauext as a constant
+
+     = F ( tauII_theta0_times_rootr_over_sqrt_a_over_tauext * integral_xt1^xt2 sqrt(xt)/(sqrt(x-xt)) r0_over_xt^2*xt^2/(x-xt+r0_over_xt*xt)^2  dxt + (xt2-xt1)  )
+    The indefinite integral of the above is evaluated by 
+    indef_integral_of_crack_tip_singularity_times_1_over_r2_pos_crossterm_decay(crack_model,x,xt)
+
+    so the above integral can be solved as 
+     = F * [ tauII_theta0_times_rootr_over_sqrt_a_over_tauext *( indef_integral_of_crack_tip_singularity_times_1_over_r2_pos_crossterm_decay(crack_model,x,xt2) - indef_integral_of_crack_tip_singularity_times_1_over_r2_pos_crossterm_decay(crack_model,x,xt1) )   + (xt2-xt1)  ]
 
     Well almost. We only consider the region of this integral where 
     x-xt > 0. This can be accomplished by shifting the bounds when 
@@ -218,13 +341,14 @@ def integral_shearstress_growing_effective_crack_length_byxt(x,tauext1,tauext_ma
     Integral upper bound =  x where xt1 < x < xt2
     Integral upper bound = xt2 where x > xt2
 
-       indef_integral_of_simple_squareroot_quotients(x,upper_bound) - indef_integral_of_simple_squareroot_quotients(x,xt1)
-    
+    So we get 
+     = F * [ tauII_theta0_times_rootr_over_sqrt_a_over_tauext *( indef_integral_of_crack_tip_singularity_times_1_over_r2_pos_crossterm_decay(crack_model,x,upper_bound) - indef_integral_of_crack_tip_singularity_times_1_over_r2_pos_crossterm_decay(crack_model,x,xt1) )   + (upper_bound-xt1)  ]
+
     So our actual solution putting everything together is:
     0 where x < xt1 
     otherwise: 
     upper_bound = min(x, xt2) 
-    F*(upper_bound-xt1) + (tauII_theta0_times_rootr_over_sqrt_a_over_tauext*F)*(indef_integral_of_simple_squareroot_quotients(x,upper_bound) - indef_integral_of_simple_squareroot_quotients(x,xt1))
+    = F * [ tauII_theta0_times_rootr_over_sqrt_a_over_tauext *( indef_integral_of_crack_tip_singularity_times_1_over_r2_pos_crossterm_decay(crack_model,x,upper_bound) - indef_integral_of_crack_tip_singularity_times_1_over_r2_pos_crossterm_decay(crack_model,x,xt1) )   + (upper_bound-xt1)  ]
 
     """
     
@@ -267,7 +391,7 @@ def integral_shearstress_growing_effective_crack_length_byxt(x,tauext1,tauext_ma
     
     tauII_theta0_times_rootr_over_sqrt_a_over_tauext = crack_model.eval_tauII_theta0_times_rootr_over_sqrt_a_over_tauext(xtavg) 
     
-    res[nonzero] = F*(upper_bound[nonzero]-xt1) + (tauII_theta0_times_rootr_over_sqrt_a_over_tauext*F) * (indef_integral_of_simple_squareroot_quotients(x[nonzero],upper_bound[nonzero]) - indef_integral_of_simple_squareroot_quotients(x[nonzero],xt1))
+    res[nonzero] = F*(upper_bound[nonzero]-xt1) + F*tauII_theta0_times_rootr_over_sqrt_a_over_tauext*(indef_integral_of_crack_tip_singularity_times_1_over_r2_pos_crossterm_decay(crack_model,x[nonzero],upper_bound[nonzero]) - indef_integral_of_crack_tip_singularity_times_1_over_r2_pos_crossterm_decay(crack_model,x[nonzero],xt1))
 
     
     
@@ -585,54 +709,95 @@ def solve_shearstress(x,x_bnd,sigma_closure,dx,tauext_max,a,mu,tau_yield,crack_m
 
 
 
-def ModeII_throughcrack_CSDformula(E,nu):
-    def ut_per_unit_stress(E,nu,x,xt):
-        # Non weightfunction method:
+class ModeII_throughcrack_CSDformula(ModeII_Beta_CSD_Formula):
+    def r0_over_a(self,xt):
+        """
+        The baseline approximation of the stress field beyond the crack
+        tip is K/sqrt(2*pi*r), but this is only valid within perhaps a/10
+        of the tip. 
 
-        # ***!!! This could probably be improved by using
-        # the formula for crack surface displacement along
-        # the entire crack, not the near-tip formula
-        # used below
+        Initially we approximated the stress field as 
+        K/sqrt(2*pi*r) + tau_infty so that the stress would approach
+        the correct value as r -> infty. Unfortunately this doesn't 
+        satisfy force balance (in fact if you integrate it, it fails
+        to converge!). 
+
+        So our fix is to approximate the stress field as 
+        (K/sqrt(2*pi*r))*(r0^2/(r+r0)^2) + tau_infty, where 
+        r0 is selected to satisfy force balance between the load 
+        not held over the cracked region and the stress concentration
+        beyond the tip. 
+
+
+        r0 is the characteristic radius for the 1/r^2 decay 
+        of the 1/sqrt(r) term
+
+        Assuming K has the form tau*sqrt(pi*a*beta) for a through
+        crack in a thin plate, then per 
+            total_load_matching_crossterm_r2_work.pdf
+
+        r0 = 8a/(pi^2*beta) 
+        """
+        return 8.0/((np.pi**2.0)*self.beta(self))
+
+    def __init__(self,E,nu):
+        def ut_per_unit_stress(E,nu,x,xt):
+            # Non weightfunction method:
+
+            # ***!!! This could probably be improved by using
+            # the formula for crack surface displacement along
+            # the entire crack, not the near-tip formula
+            # used below
+            
+            # NOTE: returns shear displacement of each crack flank
+            # relative displacement between both flanks is double this
+            
+            #plane stress is considered
+            Kappa = (3.0-nu)/(1.0+nu)
+            KII_per_unit_stress = np.sqrt(np.pi*(xt))
+            theta = np.pi
+            ut_per_unit_stress = (KII_per_unit_stress/(2.0*E))*(np.sqrt((xt-x)/(2.0*np.pi)))*((1.0+nu)* (((2.0*Kappa+3.0)*(np.sin(theta/2.0)))+(np.sin(3.0*theta/2.0))))
+            
+            return ut_per_unit_stress
+    
+        super(ModeII_throughcrack_CSDformula,self).__init__(E=E,
+                                                            nu=nu,
+                                                            beta=lambda obj: 1.0,
+                                                            ut_per_unit_stress = lambda obj,x,xt: ut_per_unit_stress(obj.E,obj.nu,x,xt))
+        pass
+    pass
+    
+
+class ModeIII_throughcrack_CSDformula(ModeII_Beta_CSD_Formula):
+    # Note that there should really be a ModeIII_Beta_CSD_Formula plus adequate
+    # investigation to verify that formulas are applicable 
+    def r0_over_a(self,xt):
+        """
+        This is correct for Mode I and Mode II.... we are assuming it is correct or roughly correct for mode III
+        """
+        return 8.0/((np.pi**2.0)*self.beta(self))
+
+    def __init__(self,E,nu):
+        def ut_per_unit_stress(E,nu,x,xt):
+            #For a 1D problem based on the Westergaard stress functions, since the
+            #models are only valid in the region near the crack tip, This can be 
+            #taken as the same for both an edge and an center crack. This is 
+            #unique to mode III as the KIII is identical for the edge and center 
+            #case (i.e. beta = 1.0)[Tada 2000, Section 8.1]. (Unlike the Mode I and
+            #II case where, beta=~1.12
+            
+            #plane stress is considered however, the Kappa value is not used.
+            #Kappa = (3.0-nu)/(1.0+nu)
+            KIII_per_unit_stress = np.sqrt(np.pi*(xt))
+            theta = np.pi
+            ut_per_unit_stress = (KIII_per_unit_stress/(2.0*E))*(np.sqrt((xt-x)/(2.0*np.pi)))*((1.0+nu)*(np.sin(3.0*theta/2.0)))
+            
+            return ut_per_unit_stress
         
-        # NOTE: returns shear displacement of each crack flank
-        # relative displacement between both flanks is double this
-
-        #plane stress is considered
-        Kappa = (3.0-nu)/(1.0+nu)
-        KII_per_unit_stress = np.sqrt(np.pi*(xt))
-        theta = np.pi
-        ut_per_unit_stress = (KII_per_unit_stress/(2.0*E))*(np.sqrt((xt-x)/(2.0*np.pi)))*((1.0+nu)* (((2.0*Kappa+3.0)*(np.sin(theta/2.0)))+(np.sin(3.0*theta/2.0))))
+        super(ModeIII_throughcrack_CSDformula,self).__init__(E=E,
+                                                             nu=nu,
+                                                             beta=lambda obj: 1.0,
+                                                             ut_per_unit_stress = lambda obj,x,xt: ut_per_unit_stress(obj.E,obj.nu,x,xt))
         
-        return ut_per_unit_stress
-    
-    
-    return ModeII_Beta_CSD_Formula(E=E,
-                                   nu=nu,
-                                   beta=lambda obj: 1.0,
-                                   ut_per_unit_stress = lambda obj,x,xt: ut_per_unit_stress(obj.E,obj.nu,x,xt))
-
-    
-    
-
-def ModeIII_throughcrack_CSDformula(E,nu):
-    def ut_per_unit_stress(E,nu,x,xt):
-        #For a 1D problem based on the Westergaard stress functions, since the
-        #models are only valid in the region near the crack tip, This can be 
-        #taken as the same for both an edge and an center crack. This is 
-        #unique to mode III as the KIII is identical for the edge and center 
-        #case (i.e. beta = 1.0)[Tada 2000, Section 8.1]. (Unlike the Mode I and
-        #II case where, beta=~1.12
-        
-        #plane stress is considered however, the Kappa value is not used.
-        #Kappa = (3.0-nu)/(1.0+nu)
-        KIII_per_unit_stress = np.sqrt(np.pi*(xt))
-        theta = np.pi
-        ut_per_unit_stress = (KIII_per_unit_stress/(2.0*E))*(np.sqrt((xt-x)/(2.0*np.pi)))*((1.0+nu)*(np.sin(3.0*theta/2.0)))
-        
-        return ut_per_unit_stress
-    
-    return ModeII_Beta_CSD_Formula(E=E,
-                                   nu=nu,
-                                   beta=lambda obj: 1.0,
-                                   ut_per_unit_stress = lambda obj,x,xt: ut_per_unit_stress(obj.E,obj.nu,x,xt))
-
+        pass
+    pass

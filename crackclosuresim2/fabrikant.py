@@ -333,34 +333,45 @@ def K(phi,a,tauext,nu,use_surrogate=True):
 
 
 
-def Fabrikant_ModeII_CircularCrack_along_midline(E,nu):
-    
-    # For beta,
-    # K = tau*sqrt(pi*a*beta)
-    #   = K_nondim*tau*sqrt(a)
-    # Therefore K_nondim*tau*sqrt(a) = tau*sqrt(pi*a*beta)
-    # Therefore K_nondim = sqrt(pi*beta)
-    # Therefore K_nondim/sqrt(pi) = sqrt(beta)
-    # Therefore K_nondim^2/pi = beta
-    
-    # use pi instead of 0 as phi for K because
-    # otherwise we (undesirably) get the negative of what we want
-    if (np.pi,nu) in K_surrogate:
-        K_nd_val = K_surrogate[(np.pi,nu)]
-        pass
-    else:
-        K_nd_val = K_nondim(np.pi,nu)
-        pass
-    
-    # u(x,0.0,xt,tau_applied,obj.E,obj.nu)
-    u_per_unit_stress_vec = np.vectorize(u_per_unit_stress,otypes=[np.double])
-    
-    return ModeII_Beta_CSD_Formula(E=E,
-                                   nu=nu,
-                                   beta = lambda obj: (K_nd_val**2.0)/np.pi,
-                                   ut_per_unit_stress = lambda obj,x,xt: u_per_unit_stress_vec(x,0.0,xt,obj.E,obj.nu))
+class Fabrikant_ModeII_CircularCrack_along_midline(ModeII_Beta_CSD_Formula):
+    def r0_over_a(self,xt):
+        """Based on calculation given in total_load_matching_crossterm_r2_work.pdf
+        This neglects the fact that in this crack model the stress intensity factor is a 
+        function of angle because it is based on doing the load balance by integrating
+        beyond the crack area. That load balance assumes that KII is uniform -- i.e.
+        that the KII on the surface plane is representative, which it probably really isn't.
+        ... But this shouldn't be too far off.
+"""
+        return (2.0**(1.0/3.0))/((np.pi**(2.0/3.0))*(self.beta(self)**(1.0/3.0)))
 
-pass
+    def __init__(self,E,nu):
+        # For beta,
+        # K = tau*sqrt(pi*a*beta)
+        #   = K_nondim*tau*sqrt(a)
+        # Therefore K_nondim*tau*sqrt(a) = tau*sqrt(pi*a*beta)
+        # Therefore K_nondim = sqrt(pi*beta)
+        # Therefore K_nondim/sqrt(pi) = sqrt(beta)
+        # Therefore K_nondim^2/pi = beta
+        
+        # use pi instead of 0 as phi for K because
+        # otherwise we (undesirably) get the negative of what we want
+        if (np.pi,nu) in K_surrogate:
+            K_nd_val = K_surrogate[(np.pi,nu)]
+            pass
+        else:
+            K_nd_val = K_nondim(np.pi,nu)
+            pass
+        
+        # u(x,0.0,xt,tau_applied,obj.E,obj.nu)
+        u_per_unit_stress_vec = np.vectorize(u_per_unit_stress,otypes=[np.double])
+        
+        super(Fabrikant_ModeII_CircularCrack_along_midline,self).__init__(E=E,
+                                                                          nu=nu,
+                                                                          beta = lambda obj: (K_nd_val**2.0)/np.pi,
+                                                                          ut_per_unit_stress = lambda obj,x,xt: u_per_unit_stress_vec(x,0.0,xt,obj.E,obj.nu))
+        
+        pass
+    pass
 
 
 
