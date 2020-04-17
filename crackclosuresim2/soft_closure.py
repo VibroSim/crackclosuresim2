@@ -354,8 +354,8 @@ class sc_params(object):
         if niter >= total_maxiter and res_fun_denormalized > goal_residual:
             print("soft_closure/initialize_contact: WARNING Maximum number of iterations (%d) reached and residual (%g) exceeds goal (%g)" % (total_maxiter,res_fun_denormalized,goal_residual))
             sys.stdout.flush()
-            self.save_debug_pickle(sigma_ext,duda__from_duda_shortened(self,res.x*du_da_normalization,closure_index),closure_index,du_da_normalization,goal_function_normalization,sigma_closure=sigma_closure)
             pass
+        self.save_debug_pickle(0.0,duda__from_duda_shortened(self,res.x*du_da_normalization,closure_index),closure_index,du_da_normalization,goal_function_normalization,sigma_closure=sigma_closure)
 
         
         if res_fun_denormalized > goal_residual and not res.success: #  and res.status != 4:
@@ -762,19 +762,25 @@ def soft_closure_goal_function_with_gradient(du_da_shortened,scp,closure_index):
 
     #du_da = np.concatenate((np.zeros(closure_index+1,dtype='d'),du_da_shortened,np.zeros(scp.xsteps*scp.fine_refinement - scp.afull_idx_fine - 2 ,dtype='d')))
     du_da_short = duda_short__from_duda_shortened(du_da_shortened,closure_index)
-
     
-
+    
+    
     
     #last_closureidx = np.where(x_bnd >= a)[0][0]
-
+    
     #  constraint that integral of du/da must equal sigma_ext
     # means that last value of u should match sigma_ext
     
     # sigmacontact is positive compression
     
-    (from_displacement,displacement,from_displacement_gradient,displacement_gradient) = sigmacontact_from_displacement(scp,du_da_short,closure_index_for_gradient=closure_index)
+    (from_displacement,
+     displacement,
+     from_displacement_gradient,
+     displacement_gradient) = sigmacontact_from_displacement(scp,du_da_short,closure_index_for_gradient=closure_index)
     #dfrom_displacement = 0 when displacement < 0; (-3/2)displacement**(1/2)*Lm*ddisplacement otherwise
+
+    displacement_derivative = (displacement[1:]-displacement[:-1])/scp.dx #spatial derivative of displacement... (unitless)
+    displacement_derivative_gradient = (displacement_gradient[1:,:]-displacement_gradient[:-1,:])/scp.dx #spatial derivative of displacement... (unitless)
 
     #u = np.cumsum(du_da)*scp.dx_fine
     # u nominally on position basis x_fine+dx_fine/2.0
@@ -782,12 +788,12 @@ def soft_closure_goal_function_with_gradient(du_da_shortened,scp,closure_index):
     (from_stress,from_stress_gradient) = sigmacontact_from_stress(scp,du_da_short,closure_index_for_gradient=closure_index)
     
     # elements of residual have units of stress^2
-    residual = (from_displacement-from_stress)
+    residual = (from_displacement-from_stress) # in Pascals
     dresidual = from_displacement_gradient - from_stress_gradient
-
+    
     average = (from_displacement+from_stress)/2.0
     daverage = (from_displacement_gradient + from_stress_gradient)/2.0
-
+    
     # We only worry about residual, negative, and displaced
     # up to the point before the last... why?
     # well the last point corresponds to the crack tip, which
@@ -798,22 +804,34 @@ def soft_closure_goal_function_with_gradient(du_da_shortened,scp,closure_index):
     #negative = average[:-1][average[:-1] < 0]  # negative sigmacontact means tension on the surfaces, which is not allowed (except at the actual tip)!
     negative_except_at_tip = average < 0
     negative_except_at_tip[-1] = False
-
+    
     negative = average[negative_except_at_tip]
     
     dnegative = daverage[negative_except_at_tip,:]
-
+    
     #displaced = average[:-1][displacement[:-1] > 0.0] # should not have stresses with positive displacement
     displaced_except_at_tip = displacement > 0.0
     displaced_except_at_tip[-1] = False
-
+    
     displaced = average[displaced_except_at_tip]
     
     ddisplaced = daverage[displaced_except_at_tip,:]
     
-    goal_function =  1.0*np.sum(residual[:-1]**2.0) + 1.0*np.sum(negative**2.0) + 1.0*np.sum(displaced**2.0) 
-    gradient = 1.0*np.sum(2.0*residual[:-1,np.newaxis]*dresidual[:-1,:],axis=0) + 1.0*np.sum(2.0*negative[:,np.newaxis]*dnegative,axis=0) + 1.0*np.sum(2.0*displaced[:,np.newaxis]*ddisplaced,axis=0)
+    if hasattr(scp.crack_model,"E"):
+        reference_modulus=scp.crack_model.E
+        pass
+    elif hasattr(scp.crack_model,"Eeff"):
+        reference_modulus=scp.crack_model.Eeff
+        pass
 
+    # displacement derivative term discourages very large transients in displacement (except at physical tip)
+    displacement_derivative_scaled = displacement_derivative*reference_modulus*1e-9
+    displacement_derivative_gradient_scaled = displacement_derivative_gradient*reference_modulus*1e-9
+
+    # Primary residual term in Pascals**2
+    goal_function =  1.0*np.sum(residual[:-1]**2.0) + 1.0*np.sum(negative**2.0) + 1.0*np.sum(displaced**2.0) + 1.0*np.sum(displacement_derivative_scaled[:-1]**2.0)
+    gradient = 1.0*np.sum(2.0*residual[:-1,np.newaxis]*dresidual[:-1,:],axis=0) + 1.0*np.sum(2.0*negative[:,np.newaxis]*dnegative,axis=0) + 1.0*np.sum(2.0*displaced[:,np.newaxis]*ddisplaced,axis=0) + 1.0*np.sum(2.0*displacement_derivative_scaled[:-1,np.newaxis]*displacement_derivative_gradient_scaled[:-1,:],axis=0)
+    
     #print("grad_residual=%s" % (str(np.sum(2.0*residual[:-1,np.newaxis]*dresidual[:-1,:],axis=0))))
     
     #print("from_displacement_grad_residual_component=%s" % (str(np.sum(2.0*residual[:-1,np.newaxis]*from_displacement_gradient[:-1,:],axis=0))))
@@ -1048,9 +1066,10 @@ def calc_contact_kernel(scp,sigma_ext,closure_index,du_da_shortened_iniguess):
         if niter >= total_maxiter and res_fun_denormalized > goal_residual:
             print("soft_closure/calc_contact (tensile): WARNING Maximum number of iterations (%d) reached and residual (%g) exceeds goal (%g); res.status=%d" % (total_maxiter,res_fun_denormalized,goal_residual,res.status))
             sys.stdout.flush()
-            scp.save_debug_pickle(sigma_ext,duda__from_duda_shortened(scp,res.x*du_da_normalization,closure_index),closure_index,du_da_normalization,goal_function_normalization,load_constraint_fun_normalization=load_constraint_fun_normalization)
+        #
+        scp.save_debug_pickle(sigma_ext,duda__from_duda_shortened(scp,res.x*du_da_normalization,closure_index),closure_index,du_da_normalization,goal_function_normalization,load_constraint_fun_normalization=load_constraint_fun_normalization)
 
-            pass
+        pass
 
         if (res.status==6 and res_fun_denormalized > goal_residual) or abs(res.fun) > 1e25: 
             # Characteristic of a divergence failure 

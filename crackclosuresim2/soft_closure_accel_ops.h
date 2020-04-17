@@ -420,6 +420,20 @@ static double soft_closure_goal_function_with_gradient_c(double *du_da_shortened
   double displaced=0.0;
   double *ddisplaced;
   double *displacement,*from_displacement,*displacement_gradient,*from_displacement_gradient,*from_stress,*from_stress_gradient;
+  double displaced_deriv=0.0;
+  double displacement_derivative_scaled;
+  double *displacement_derivative_gradient_scaled; 
+
+  double reference_modulus; 
+
+
+  if (crack_model.modeltype==CMT_THROUGH) {
+    reference_modulus = crack_model.modeldat.through.Eeff;
+  } else if (crack_model.modeltype == CMT_TADA) {
+    reference_modulus = crack_model.modeldat.tada.E;
+  } else {
+    assert(0);
+  }
 
   du_da_short_len=(closure_index+1+du_da_shortened_len);
   
@@ -441,6 +455,7 @@ static double soft_closure_goal_function_with_gradient_c(double *du_da_shortened
   from_displacement = malloc(sizeof(double)*(du_da_short_len-1));
   from_displacement_gradient = malloc(sizeof(double)*(du_da_short_len-1)*du_da_shortened_len); // axis zero (changes more slowly) is position along crack; axis one (changes more quickly) is du_da_shortened element
   displacement_gradient = malloc(sizeof(double)*(du_da_short_len-1)*du_da_shortened_len); // axis zero (changes more slowly) is position along crack; axis one (changes more quickly) is du_da_shortened element
+
   
   from_stress = malloc(sizeof(double)*(du_da_short_len-1));
   from_stress_gradient = malloc(sizeof(double)*(du_da_short_len-1)*du_da_shortened_len); // axis zero (changes more slowly) is position along crack; axis one (changes more quickly) is du_da_shortened element
@@ -448,14 +463,15 @@ static double soft_closure_goal_function_with_gradient_c(double *du_da_shortened
   dresidual = malloc(sizeof(double)*du_da_shortened_len); // axis zero is du_da_shortened element
   daverage = malloc(sizeof(double)*du_da_shortened_len); // axis zero is du_da_shortened element
   dnegative = malloc(sizeof(double)*du_da_shortened_len); // axis zero is du_da_shortened element
-  ddisplaced = malloc(sizeof(double)*du_da_shortened_len); // axis zero is du_da_shortened element
+  ddisplaced = malloc(sizeof(double)*du_da_shortened_len); 
+  displacement_derivative_gradient_scaled = malloc(sizeof(double)*du_da_shortened_len); // axis zero is du_da_shortened element
 
   for (du_da_pos=0;du_da_pos < du_da_shortened_len;du_da_pos++) {
     dresidual[du_da_pos]=0;
     //daverage[du_da_pos]=0;
     dnegative[du_da_pos]=0;
     ddisplaced[du_da_pos]=0;
-    
+    displacement_derivative_gradient_scaled[du_da_pos]=0;    
   }
   
   // dirty little trick to run sigmacontact_from_displacement()
@@ -531,11 +547,22 @@ static double soft_closure_goal_function_with_gradient_c(double *du_da_shortened
       }
     }
 
+
+    if (cnt > 0) {
+      displacement_derivative_scaled=(displacement[cnt]-displacement[cnt-1])/dx * reference_modulus * 1e-9;
+
+      displaced_deriv += pow(displacement_derivative_scaled,2.0); 
+      
+      for (du_da_pos=0;du_da_pos < du_da_shortened_len;du_da_pos++) {
+	displacement_derivative_gradient_scaled[du_da_pos] += (displacement_gradient[cnt*du_da_shortened_len + du_da_pos]-displacement_gradient[(cnt-1)*du_da_shortened_len + du_da_pos])/dx * reference_modulus * 1e-9;
+      }
+    }
+
   }
 
   
   for (du_da_pos=0;du_da_pos < du_da_shortened_len;du_da_pos++) {
-    du_da_shortened_gradient_out[du_da_pos] = dresidual[du_da_pos] + dnegative[du_da_pos] + ddisplaced[du_da_pos];
+    du_da_shortened_gradient_out[du_da_pos] = dresidual[du_da_pos] + dnegative[du_da_pos] + ddisplaced[du_da_pos] + displacement_derivative_gradient_scaled[du_da_pos];
   }
 
   //print_array("from_stress",from_stress,du_da_short_len-1);
@@ -556,5 +583,5 @@ static double soft_closure_goal_function_with_gradient_c(double *du_da_shortened
 
   //printf("residual=%g; negative=%g; displaced=%g\n",residual,negative,displaced);
 
-  return residual + negative + displaced;
+  return residual + negative + displaced + displaced_deriv;
 }

@@ -23,7 +23,8 @@ from crackclosuresim2.soft_closure import duda_short__from_duda_shortened
 # is run.
 
 
-pickle_filename = "/tmp/scdebug74457_line_1015.pickle"
+#pickle_filename = "/tmp/scdebug74457_line_1015.pickle"
+pickle_filename="/tmp/scdebug22822_line_1052.pickle"
 pickle_fh=open(pickle_filename,"rb")
 vars = pickle.load(pickle_fh)
 #scp = vars["scp"]
@@ -43,7 +44,7 @@ pl.plot(scp.x,contact_stress_from_stress,'-',
         scp.x,contact_stress_from_displacement,'-')
 
 
-epsval=1e-2
+epsval=1e-5
 epsvalscaled = epsval
 
 du_da_shortened=duda_shortened__from_duda(du_da,scp.afull_idx,closure_index)
@@ -54,6 +55,11 @@ du_da_shortened_iniguess=np.ones(scp.afull_idx+2-(closure_index+1),dtype='d')*(1
 
 
 (initial_residual,initial_gradient)=soft_closure_goal_function_with_gradient_normalized_accel(du_da_shortened/du_da_normalization,scp,closure_index,du_da_normalization,goal_function_normalization)
+
+(initial_residual_denorm,initial_gradient_denorm) = soft_closure_goal_function_with_gradient(du_da_shortened,scp,closure_index)
+# divide initial_residual_denorm by goal_function_normalization to get normalized result
+# multiply initial_gradient_denorm by du_da_normalization and divide by by goal_function_normalization to get normalized result
+
 
 res = scipy.optimize.minimize(soft_closure_goal_function_with_gradient_normalized_accel,du_da_shortened/du_da_normalization,args=(scp,closure_index,du_da_normalization,goal_function_normalization),   # was soft_closure_goal_function_accel
                               constraints = {"type":"eq","fun": lambda du_da_shortened_normalized: ((np.sum(duda_short__from_duda_shortened(du_da_shortened_normalized*du_da_normalization,closure_index))*scp.dx)-sigma_ext)/load_constraint_fun_normalization },
