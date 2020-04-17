@@ -113,8 +113,6 @@ class sc_params(object):
         scp_copy.crack_model = None
         to_pickle = {
             "scp": scp_copy,
-            "E": self.crack_model.E,
-            "nu": self.crack_model.nu,
             "crack_model_class": self.crack_model.__class__.__name__,
             "sigma_ext": sigma_ext,
 
@@ -131,6 +129,16 @@ class sc_params(object):
             "goal_function_normalization": goal_function_normalization,
         }
 
+        if hasattr(self.crack_model,"E"):
+            to_pickle["E"]= self.crack_model.E,
+            pass
+        if hasattr(self.crack_model,"Eeff"):
+            to_pickle["Eeff"]= self.crack_model.Eeff
+            pass
+        if hasattr(self.crack_model,"nu"):
+            to_pickle["nu"]= self.crack_model.nu
+            pass
+        
         if sigma_closure is not None:
             to_pickle["sigma_closure"]=sigma_closure
             pass
