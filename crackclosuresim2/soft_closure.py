@@ -980,7 +980,7 @@ def calc_contact_kernel(scp,sigma_ext,closure_index,du_da_shortened_iniguess):
         pass
 
 
-    goal_stress_fit_error_pascals = 300e3 # was 150e3 # Amount of stress error to allow in fitting process. If we have more than this we keep trying to minimize
+    goal_stress_fit_error_pascals = 2e6 # was 150e3 # Amount of stress error to allow in fitting process. If we have more than this we keep trying to minimize
     goal_residual = (goal_stress_fit_error_pascals**2.0)*scp.afull_idx
     goal_residual_str = str(goal_residual) # for gdb
     
