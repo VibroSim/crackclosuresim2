@@ -423,7 +423,7 @@ static double soft_closure_goal_function_with_gradient_c(double *du_da_shortened
   double duda_deriv=0.0;
   double duda_derivative_scaled;
   double *duda_derivative_gradient_scaled; 
-  double duda_derivative_scalefactor=5e-5;
+  double duda_derivative_scalefactor=5e-7;
   double duda_derivative_multiplier;
   double duda_derivative_gradient_multiplier;
   //double reference_modulus; 

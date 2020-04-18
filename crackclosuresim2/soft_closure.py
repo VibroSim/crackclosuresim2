@@ -767,7 +767,7 @@ def soft_closure_goal_function_with_gradient(du_da_shortened,scp,closure_index):
     # closure_index is used in tension to shorten du_da, disallowing any stresses or concentration to left of initial opening distance
     
 
-    duda_derivative_scalefactor=5e-5
+    duda_derivative_scalefactor=5e-7
 
     #du_da = np.concatenate((np.zeros(closure_index+1,dtype='d'),du_da_shortened,np.zeros(scp.xsteps*scp.fine_refinement - scp.afull_idx_fine - 2 ,dtype='d')))
     du_da_short = duda_short__from_duda_shortened(du_da_shortened,closure_index)
@@ -874,7 +874,7 @@ def soft_closure_goal_function_with_gradient_normalized(du_da_shortened_normaliz
 class CalcContactFailure(Exception):
     message = None
 
-    def __init__(self,message):
+    def __init__(self,message=""):
         self.message=message
         pass
 
