@@ -410,7 +410,7 @@ static double soft_closure_goal_function_with_gradient_c(double *du_da_shortened
 {
   double *du_da_short;
   int du_da_short_len,cnt;
-  int du_da_pos;
+  int du_da_pos;//,du_da_pos2;
   double residual=0.0;
   double *dresidual;
   double average=0.0;
@@ -420,20 +420,22 @@ static double soft_closure_goal_function_with_gradient_c(double *du_da_shortened
   double displaced=0.0;
   double *ddisplaced;
   double *displacement,*from_displacement,*displacement_gradient,*from_displacement_gradient,*from_stress,*from_stress_gradient;
-  double displaced_deriv=0.0;
-  double displacement_derivative_scaled;
-  double *displacement_derivative_gradient_scaled; 
+  double duda_deriv=0.0;
+  double duda_derivative_scaled;
+  double *duda_derivative_gradient_scaled; 
+  double duda_derivative_scalefactor=5e-5;
+  double duda_derivative_multiplier;
+  double duda_derivative_gradient_multiplier;
+  //double reference_modulus; 
+  
 
-  double reference_modulus; 
-
-
-  if (crack_model.modeltype==CMT_THROUGH) {
-    reference_modulus = crack_model.modeldat.through.Eeff;
-  } else if (crack_model.modeltype == CMT_TADA) {
-    reference_modulus = crack_model.modeldat.tada.E;
-  } else {
-    assert(0);
-  }
+  //if (crack_model.modeltype==CMT_THROUGH) {
+  //  reference_modulus = crack_model.modeldat.through.Eeff;
+  //} else if (crack_model.modeltype == CMT_TADA) {
+  //  reference_modulus = crack_model.modeldat.tada.E;
+  //} else {
+  //  assert(0);
+  //}
 
   du_da_short_len=(closure_index+1+du_da_shortened_len);
   
@@ -464,14 +466,14 @@ static double soft_closure_goal_function_with_gradient_c(double *du_da_shortened
   daverage = malloc(sizeof(double)*du_da_shortened_len); // axis zero is du_da_shortened element
   dnegative = malloc(sizeof(double)*du_da_shortened_len); // axis zero is du_da_shortened element
   ddisplaced = malloc(sizeof(double)*du_da_shortened_len); 
-  displacement_derivative_gradient_scaled = malloc(sizeof(double)*du_da_shortened_len); // axis zero is du_da_shortened element
+  duda_derivative_gradient_scaled = malloc(sizeof(double)*du_da_shortened_len); // axis zero is du_da_shortened element
 
   for (du_da_pos=0;du_da_pos < du_da_shortened_len;du_da_pos++) {
     dresidual[du_da_pos]=0;
     //daverage[du_da_pos]=0;
     dnegative[du_da_pos]=0;
     ddisplaced[du_da_pos]=0;
-    displacement_derivative_gradient_scaled[du_da_pos]=0;    
+    duda_derivative_gradient_scaled[du_da_pos]=0;    
   }
   
   // dirty little trick to run sigmacontact_from_displacement()
@@ -546,29 +548,53 @@ static double soft_closure_goal_function_with_gradient_c(double *du_da_shortened
 	ddisplaced[du_da_pos] += 2.0*average*daverage[du_da_pos];
       }
     }
-
-
-    if (cnt > 0) {
-      displacement_derivative_scaled=(displacement[cnt]-displacement[cnt-1])/dx * reference_modulus * 1e-9;
-
-      displaced_deriv += pow(displacement_derivative_scaled,2.0); 
-      
-      for (du_da_pos=0;du_da_pos < du_da_shortened_len;du_da_pos++) {
-	displacement_derivative_gradient_scaled[du_da_pos] += (displacement_gradient[cnt*du_da_shortened_len + du_da_pos]-displacement_gradient[(cnt-1)*du_da_shortened_len + du_da_pos])/dx * reference_modulus * 1e-9;
-      }
-    }
-
   }
+
+  duda_derivative_multiplier = (1.0/dx)*pow(afull_idx*dx,2)*duda_derivative_scalefactor;
+  duda_derivative_gradient_multiplier = 2.0*pow(duda_derivative_multiplier,2.0);
+  
+  for (du_da_pos=0;du_da_pos < du_da_shortened_len;du_da_pos++) {
+    // iterate solely over the modifiable elements of du_da_shortened
+    
+    if (du_da_pos > 0 && du_da_pos < du_da_shortened_len-1) {
+
+      if (du_da_pos != 1) {
+	duda_derivative_scaled=(du_da_shortened[du_da_pos]-du_da_shortened[du_da_pos-1])*duda_derivative_multiplier;
+	// d/da (c(a-b))^2
+	// = c^2 2(a-b)da
+	// d/db (c(a-b))^2
+	// = -c^2 2(a-b)db
+	
+	duda_derivative_gradient_scaled[du_da_pos] += duda_derivative_gradient_multiplier*(du_da_shortened[du_da_pos]-du_da_shortened[du_da_pos-1]);
+	duda_derivative_gradient_scaled[du_da_pos-1] += -duda_derivative_gradient_multiplier*(du_da_shortened[du_da_pos]-du_da_shortened[du_da_pos-1]);
+	
+      } else {
+	// element 0 can have any kind of transient... brings crack to open state. always treated as 0 from the perspective of next element over
+	duda_derivative_scaled=(du_da_shortened[du_da_pos])*duda_derivative_multiplier;
+
+	duda_derivative_gradient_scaled[du_da_pos] += duda_derivative_gradient_multiplier*du_da_shortened[du_da_pos];
+	
+      }
+      //printf("duda_deriv term: %g\n",duda_derivative_scaled);
+      duda_deriv += pow(duda_derivative_scaled,2.0); 
+
+    } 
+    
+  }
+  
+  
 
   
   for (du_da_pos=0;du_da_pos < du_da_shortened_len;du_da_pos++) {
-    du_da_shortened_gradient_out[du_da_pos] = dresidual[du_da_pos] + dnegative[du_da_pos] + ddisplaced[du_da_pos] + displacement_derivative_gradient_scaled[du_da_pos];
+    du_da_shortened_gradient_out[du_da_pos] = dresidual[du_da_pos] + dnegative[du_da_pos] + ddisplaced[du_da_pos] + duda_derivative_gradient_scaled[du_da_pos];
   }
 
   //print_array("from_stress",from_stress,du_da_short_len-1);
   //print_array("from_displacement",from_displacement,du_da_short_len-1);
   //print_array("du_da_short",du_da_short,du_da_short_len);
-
+  //print_array("duda_derivative_gradient_scaled",duda_derivative_gradient_scaled,du_da_short_len);
+  
+  free(duda_derivative_gradient_scaled);
   free(ddisplaced);
   free(dnegative);
   free(daverage);
@@ -583,5 +609,5 @@ static double soft_closure_goal_function_with_gradient_c(double *du_da_shortened
 
   //printf("residual=%g; negative=%g; displaced=%g\n",residual,negative,displaced);
 
-  return residual + negative + displaced + displaced_deriv;
+  return residual + negative + displaced + duda_deriv;
 }

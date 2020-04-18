@@ -767,6 +767,7 @@ def soft_closure_goal_function_with_gradient(du_da_shortened,scp,closure_index):
     # closure_index is used in tension to shorten du_da, disallowing any stresses or concentration to left of initial opening distance
     
 
+    duda_derivative_scalefactor=5e-5
 
     #du_da = np.concatenate((np.zeros(closure_index+1,dtype='d'),du_da_shortened,np.zeros(scp.xsteps*scp.fine_refinement - scp.afull_idx_fine - 2 ,dtype='d')))
     du_da_short = duda_short__from_duda_shortened(du_da_shortened,closure_index)
@@ -787,9 +788,16 @@ def soft_closure_goal_function_with_gradient(du_da_shortened,scp,closure_index):
      displacement_gradient) = sigmacontact_from_displacement(scp,du_da_short,closure_index_for_gradient=closure_index)
     #dfrom_displacement = 0 when displacement < 0; (-3/2)displacement**(1/2)*Lm*ddisplacement otherwise
 
-    displacement_derivative = (displacement[1:]-displacement[:-1])/scp.dx #spatial derivative of displacement... (unitless)
-    displacement_derivative_gradient = (displacement_gradient[1:,:]-displacement_gradient[:-1,:])/scp.dx #spatial derivative of displacement... (unitless)
+    duda_prederivative = np.concatenate(((0,),du_da_shortened[1:-1]))
 
+    # duda_prederivative_gradient is an 81x82 identity matrix with the upper left entry zeroed out (also last column is zeros) 
+    duda_prederivative_gradient = np.concatenate((np.zeros((1,du_da_shortened.shape[0]),dtype='d'),np.concatenate((np.zeros((du_da_shortened.shape[0]-2,1),dtype='d'),np.eye(du_da_shortened.shape[0]-2),np.zeros((du_da_shortened.shape[0]-2,1),dtype='d')),axis=1)),axis=0)
+    duda_derivative = (duda_prederivative[1:]-duda_prederivative[:-1])/scp.dx #spatial derivative of duda...  units of stress over displacement^2
+    # duda_derviative_gradient's first index is index into spatial derivative of duda; second index is which element of duda the partial derivative is with respect to
+    duda_derivative_gradient = (duda_prederivative_gradient[1:,:]-duda_prederivative_gradient[:-1,:])/scp.dx #gradient for spatial derivative of displacement...
+    
+    
+    
     #u = np.cumsum(du_da)*scp.dx_fine
     # u nominally on position basis x_fine+dx_fine/2.0
     
@@ -825,20 +833,23 @@ def soft_closure_goal_function_with_gradient(du_da_shortened,scp,closure_index):
     
     ddisplaced = daverage[displaced_except_at_tip,:]
     
-    if hasattr(scp.crack_model,"E"):
-        reference_modulus=scp.crack_model.E
-        pass
-    elif hasattr(scp.crack_model,"Eeff"):
-        reference_modulus=scp.crack_model.Eeff
-        pass
+    #if hasattr(scp.crack_model,"E"):
+    #    reference_modulus=scp.crack_model.E
+    #    pass
+    #elif hasattr(scp.crack_model,"Eeff"):
+    #    reference_modulus=scp.crack_model.Eeff
+    #    pass
 
-    # displacement derivative term discourages very large transients in displacement (except at physical tip)
-    displacement_derivative_scaled = displacement_derivative*reference_modulus*1e-9
-    displacement_derivative_gradient_scaled = displacement_derivative_gradient*reference_modulus*1e-9
+    # du derivative term discourages very large transients in duda
+    # duda...  units of stress over displacement^2 # for comparison
+    # residual is in Pascals... so to get equivalent units
+    # we need to multiply by meters^2... say cracklength^2
+    duda_derivative_scaled = duda_derivative * (scp.afull_idx*scp.dx)**2.0 * duda_derivative_scalefactor
+    duda_derivative_gradient_scaled = duda_derivative_gradient * (scp.afull_idx*scp.dx)**2.0 * duda_derivative_scalefactor
 
     # Primary residual term in Pascals**2
-    goal_function =  1.0*np.sum(residual[:-1]**2.0) + 1.0*np.sum(negative**2.0) + 1.0*np.sum(displaced**2.0) + 1.0*np.sum(displacement_derivative_scaled[:-1]**2.0)
-    gradient = 1.0*np.sum(2.0*residual[:-1,np.newaxis]*dresidual[:-1,:],axis=0) + 1.0*np.sum(2.0*negative[:,np.newaxis]*dnegative,axis=0) + 1.0*np.sum(2.0*displaced[:,np.newaxis]*ddisplaced,axis=0) + 1.0*np.sum(2.0*displacement_derivative_scaled[:-1,np.newaxis]*displacement_derivative_gradient_scaled[:-1,:],axis=0)
+    goal_function =  1.0*np.sum(residual[:-1]**2.0) + 1.0*np.sum(negative**2.0) + 1.0*np.sum(displaced**2.0) + 1.0*np.sum(duda_derivative_scaled[:]**2.0)
+    gradient = 1.0*np.sum(2.0*residual[:-1,np.newaxis]*dresidual[:-1,:],axis=0) + 1.0*np.sum(2.0*negative[:,np.newaxis]*dnegative,axis=0) + 1.0*np.sum(2.0*displaced[:,np.newaxis]*ddisplaced,axis=0) + 1.0*np.sum(2.0*duda_derivative_scaled[:,np.newaxis]*duda_derivative_gradient_scaled[:,:],axis=0)
     
     #print("grad_residual=%s" % (str(np.sum(2.0*residual[:-1,np.newaxis]*dresidual[:-1,:],axis=0))))
     
@@ -914,7 +925,9 @@ def calc_contact(scp,sigma_ext):
     # Attempt calc_contact_kernel with different initial guesses until we get convergence
     itercnt=0
     while True:
-        try: 
+        try:
+            #from VibroSim_Simulator.function_as_script import scriptify
+
             (du_da,contact_stress_from_displacement,displacement,contact_stress_from_stress,residual) = calc_contact_kernel(scp,sigma_ext,closure_index,du_da_shortened_iniguess)
             return (du_da,contact_stress_from_displacement,displacement,contact_stress_from_stress,residual)
         except CalcContactFailure as Failure:
@@ -967,7 +980,7 @@ def calc_contact_kernel(scp,sigma_ext,closure_index,du_da_shortened_iniguess):
         pass
 
 
-    goal_stress_fit_error_pascals = 150e3 # Amount of stress error to allow in fitting process. If we have more than this we keep trying to minimize
+    goal_stress_fit_error_pascals = 300e3 # was 150e3 # Amount of stress error to allow in fitting process. If we have more than this we keep trying to minimize
     goal_residual = (goal_stress_fit_error_pascals**2.0)*scp.afull_idx
     goal_residual_str = str(goal_residual) # for gdb
     
@@ -1100,7 +1113,7 @@ def calc_contact_kernel(scp,sigma_ext,closure_index,du_da_shortened_iniguess):
             pass
 
         # Verify proper operation of accelerated code
-        (slowcalc,slowcalc_gradient) = soft_closure_goal_function_with_gradient(res.x*du_da_normalization,scp,closure_index)
+        (slowcalc,slowcalc_gradient) = soft_closure_goal_function_with_gradient(res.x*du_da_normalization,scp,closure_index)   
         (fastcalc,fastcalc_gradient) = soft_closure_goal_function_with_gradient_accel(res.x*du_da_normalization,scp,closure_index)
         if abs((slowcalc-fastcalc)/slowcalc) >= 1e-4 and (slowcalc > goal_residual/100.0 or fastcalc > goal_residual/100.0):
             scp.save_debug_pickle(sigma_ext,duda__from_duda_shortened(scp,res.x*du_da_normalization,closure_index),closure_index,du_da_normalization,goal_function_normalization,load_constraint_fun_normalization=load_constraint_fun_normalization)
@@ -1160,6 +1173,7 @@ def calc_contact_kernel(scp,sigma_ext,closure_index,du_da_shortened_iniguess):
         starting_value=du_da_shortened_iniguess
         while niter < total_maxiter and not terminate: 
             this_niter=10000
+            
             res = scipy.optimize.minimize(soft_closure_goal_function_with_gradient_normalized_accel,starting_value/du_da_normalization,args=(scp,closure_index,du_da_normalization,goal_function_normalization),   # was soft_closure_goal_function_accel
                                           constraints = constraints,
                                           method="SLSQP",
@@ -1237,6 +1251,7 @@ def calc_contact_kernel(scp,sigma_ext,closure_index,du_da_shortened_iniguess):
 
         # Verify proper operation of accelerated code
         (slowcalc,slowcalc_gradient) = soft_closure_goal_function_with_gradient(res.x*du_da_normalization,scp,closure_index)
+
         (fastcalc,fastcalc_gradient) = soft_closure_goal_function_with_gradient_accel(res.x*du_da_normalization,scp,closure_index)
 
         if abs((slowcalc-fastcalc)/slowcalc) >= 1e-4 and (slowcalc > goal_residual/100.0 or fastcalc > goal_residual/100.0):
