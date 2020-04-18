@@ -362,8 +362,8 @@ class sc_params(object):
         if niter >= total_maxiter and res_fun_denormalized > goal_residual:
             print("soft_closure/initialize_contact: WARNING Maximum number of iterations (%d) reached and residual (%g) exceeds goal (%g)" % (total_maxiter,res_fun_denormalized,goal_residual))
             sys.stdout.flush()
+            self.save_debug_pickle(0.0,duda__from_duda_shortened(self,res.x*du_da_normalization,closure_index),closure_index,du_da_normalization,goal_function_normalization,sigma_closure=sigma_closure)
             pass
-        self.save_debug_pickle(0.0,duda__from_duda_shortened(self,res.x*du_da_normalization,closure_index),closure_index,du_da_normalization,goal_function_normalization,sigma_closure=sigma_closure)
 
         
         if res_fun_denormalized > goal_residual and not res.success: #  and res.status != 4:
@@ -1087,10 +1087,10 @@ def calc_contact_kernel(scp,sigma_ext,closure_index,du_da_shortened_iniguess):
         if niter >= total_maxiter and res_fun_denormalized > goal_residual:
             print("soft_closure/calc_contact (tensile): WARNING Maximum number of iterations (%d) reached and residual (%g) exceeds goal (%g); res.status=%d" % (total_maxiter,res_fun_denormalized,goal_residual,res.status))
             sys.stdout.flush()
-        #
-        scp.save_debug_pickle(sigma_ext,duda__from_duda_shortened(scp,res.x*du_da_normalization,closure_index),closure_index,du_da_normalization,goal_function_normalization,load_constraint_fun_normalization=load_constraint_fun_normalization)
-
-        pass
+            scp.save_debug_pickle(sigma_ext,duda__from_duda_shortened(scp,res.x*du_da_normalization,closure_index),closure_index,du_da_normalization,goal_function_normalization,load_constraint_fun_normalization=load_constraint_fun_normalization)
+            #
+        
+            pass
 
         if (res.status==6 and res_fun_denormalized > goal_residual) or abs(res.fun) > 1e25: 
             # Characteristic of a divergence failure 
