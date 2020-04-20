@@ -81,8 +81,8 @@ def initialize_contact_goal_function_with_gradient_accel(np.ndarray[np.float64_t
     return (goal_function_value,gradient)
 
 
-def initialize_contact_goal_function_with_gradient_normalized_accel(du_da_shortened_normalized,scp,closure_index,du_da_normalization,goal_function_normalization):
-    (goal_function,gradient)=initialize_contact_goal_function_with_gradient_accel(du_da_shortened_normalized*du_da_normalization,scp,closure_index)
+def initialize_contact_goal_function_with_gradient_normalized_accel(du_da_shortened_normalized,scp,sigma_closure,closure_index,du_da_normalization,goal_function_normalization):
+    (goal_function,gradient)=initialize_contact_goal_function_with_gradient_accel(du_da_shortened_normalized*du_da_normalization,scp,sigma_closure,closure_index)
     goal_function_normalized = goal_function / goal_function_normalization
     
     
