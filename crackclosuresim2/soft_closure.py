@@ -130,7 +130,7 @@ class sc_params(object):
         }
 
         if hasattr(self.crack_model,"E"):
-            to_pickle["E"]= self.crack_model.E,
+            to_pickle["E"]= self.crack_model.E
             pass
         if hasattr(self.crack_model,"Eeff"):
             to_pickle["Eeff"]= self.crack_model.Eeff
@@ -1089,7 +1089,6 @@ def calc_contact_kernel(scp,sigma_ext,closure_index,du_da_shortened_iniguess):
             sys.stdout.flush()
             scp.save_debug_pickle(sigma_ext,duda__from_duda_shortened(scp,res.x*du_da_normalization,closure_index),closure_index,du_da_normalization,goal_function_normalization,load_constraint_fun_normalization=load_constraint_fun_normalization)
             #
-        
             pass
 
         if (res.status==6 and res_fun_denormalized > goal_residual) or abs(res.fun) > 1e25: 
