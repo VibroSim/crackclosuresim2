@@ -2246,6 +2246,7 @@ def perform_inverse_closure(inputfilename,E,nu,sigma_yield,CrackCenterX,dx,speci
     return (x,x_bnd,a_side1,a_side2,sigma_closure_side1,sigma_closure_side2,side1fig,side2fig)
 
 def save_closurestress(filename,x,sigma_closure,a,crackopening=None):
+    """ NOTE: crackopening should be the half-crackopening!!!"""
     import pandas as pd
 
     nrows = np.count_nonzero(x <= a)+1
@@ -2283,6 +2284,7 @@ def save_closurestress(filename,x,sigma_closure,a,crackopening=None):
 
 
 def load_closurestress(filename):
+    """ returns (x,x_bnd,xstep,a,sigma_closure,crack_opening)... crack_opening returned (if present) is half_crackopening"""
     import pandas as pd
     
     closurestress_dataframe = pd.read_csv(filename,index_col=0)
