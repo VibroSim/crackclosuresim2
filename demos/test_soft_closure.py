@@ -82,7 +82,7 @@ if __name__=="__main__":
     
 
 
-    scp.initialize_contact(sigma_closure,crack_initial_opening)
+    scp.initialize_contact(sigma_closure,2.0*crack_initial_opening) # 2.0 because scp.initialize_contact wants full opening, not half opening
     
 
     du_da=np.zeros(scp.x.shape[0]+1,dtype='d')

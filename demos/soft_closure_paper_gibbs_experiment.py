@@ -81,7 +81,7 @@ if __name__=="__main__":
     
     sigma_closure_softmodel = sigma_closure.copy()
     sigma_closure_softmodel[sigma_closure_softmodel < 0.0]=0.0
-    scp.initialize_contact(sigma_closure_softmodel,crack_initial_opening)
+    scp.initialize_contact(sigma_closure_softmodel,2.0*crack_initial_opening) # 2.0 because scp.initialize_contact wants full opening, not half opening
     
     
 
