@@ -72,8 +72,8 @@ class sc_params(object):
     #afull_idx_fine = None
     sigma_closure = None
     #sigma_closure_interp = None
-    crack_initial_opening = None
-    #crack_initial_opening_interp = None
+    crack_initial_full_opening = None
+    #crack_initial_full_opening_interp = None
 
     def __init__(self,**kwargs):
         for argname in kwargs:
@@ -153,24 +153,24 @@ class sc_params(object):
         pass
 
 
-    def setcrackstate(self,sigma_closure,crack_initial_opening):
+    def setcrackstate(self,sigma_closure,crack_initial_full_opening):
         self.sigma_closure=sigma_closure
         #self.sigma_closure_interp=scipy.interpolate.interp1d(self.x,self.sigma_closure,kind="linear",fill_value="extrapolate")(self.x_fine)
 
         
-        self.crack_initial_opening=crack_initial_opening
-        #self.crack_initial_opening_interp=scipy.interpolate.interp1d(self.x,self.crack_initial_opening,kind="linear",fill_value="extrapolate")(self.x_fine)
+        self.crack_initial_full_opening=crack_initial_full_opening
+        #self.crack_initial_full_opening_interp=scipy.interpolate.interp1d(self.x,self.crack_initial_full_opening,kind="linear",fill_value="extrapolate")(self.x_fine)
         pass
 
-    def initialize_contact(self,sigma_closure,crack_initial_opening):
-        """ ***NOTE: crack_initial_opening here is the FULL displacement, 
+    def initialize_contact(self,sigma_closure,crack_initial_full_opening):
+        """ ***NOTE: crack_initial_full_opening here is the FULL displacement, 
         not the half displacement usually used in crackclosure.py ***"""
         
         assert(np.all(sigma_closure >= 0.0)) # given sigma_closure should not have any tensile component
         
-        #self.crack_initial_opening=copy.copy(crack_initial_opening)
-        self.crack_initial_opening=np.zeros(self.x.shape[0],dtype='d')
-        #self.crack_initial_opening_interp=np.zeros(self.x_fine.shape[0],dtype='d')
+        #self.crack_initial_full_opening=copy.copy(crack_initial_full_opening)
+        self.crack_initial_full_opening=np.zeros(self.x.shape[0],dtype='d')
+        #self.crack_initial_full_opening_interp=np.zeros(self.x_fine.shape[0],dtype='d')
         self.sigma_closure=np.zeros(self.x.shape[0],dtype='d')
         #self.sigma_closure_interp=np.zeros(self.x_fine.shape[0],dtype='d')
 
@@ -398,7 +398,7 @@ class sc_params(object):
 
         from_stress = sigmacontact_from_stress(self,du_da)
 
-        # displacement = crack_initial_opening - (sigma_closure_stored/Lm)^(2/3) + displacement_due_to_distributed_stress_concentrations
+        # displacement = crack_initial_full_opening - (sigma_closure_stored/Lm)^(2/3) + displacement_due_to_distributed_stress_concentrations
         # sigmacontact_from_displacement = 0 when displacement > 0
         # sigmacontact_from_displacement = (-displacement)^(3/2)*Lm when displacement < 0
         
@@ -408,14 +408,14 @@ class sc_params(object):
         # sigma_closure = (-displacement)^(3/2)*Lm
         # (-displacement)^(3/2) = sigma_closure/Lm = 
         # displacement = -(sigma_closure/Lm)^(2/3)
-        # crack_initial_opening + displacement_due_to_distributed_stress_concentrations = -(sigma_closure/Lm)^(2/3)
-        # crack_initial_opening = -displacement_due_to_distributed_stress_concentrations -(sigma_closure/Lm)^(2/3)
+        # crack_initial_full_opening + displacement_due_to_distributed_stress_concentrations = -(sigma_closure/Lm)^(2/3)
+        # crack_initial_full_opening = -displacement_due_to_distributed_stress_concentrations -(sigma_closure/Lm)^(2/3)
 
         # To evaluate modeled residual stressing operation starting
         # at zero initial opening and zero closure, 
         # stop here, and run soft_closure_plots()
-        self.crack_initial_opening = crack_initial_opening -displacement - (sigma_closure/self.Lm)**(2.0/3.0)  # Through this line we have evaluated an initial opening displacement
-        #self.crack_initial_opening_interp=scipy.interpolate.interp1d(self.x,self.crack_initial_opening,kind="linear",fill_value="extrapolate")(self.x_fine)
+        self.crack_initial_full_opening = crack_initial_full_opening -displacement - (sigma_closure/self.Lm)**(2.0/3.0)  # Through this line we have evaluated an initial opening displacement
+        #self.crack_initial_full_opening_interp=scipy.interpolate.interp1d(self.x,self.crack_initial_full_opening,kind="linear",fill_value="extrapolate")(self.x_fine)
 
         
         #sys.modules["__main__"].__dict__.update(globals())
@@ -428,8 +428,8 @@ class sc_params(object):
         from_stress = sigmacontact_from_stress(self,du_da)
 
         # This becomes our new initial state
-        self.crack_initial_opening = displacement + (sigma_closure/self.Lm)**(2.0/3.0) # we add sigma_closure displacement back in because sigmacontact_from_displacement() will subtract it out
-        #self.crack_initial_opening_interp=scipy.interpolate.interp1d(self.x,self.crack_initial_opening,kind="linear",fill_value="extrapolate")(self.x_fine)
+        self.crack_initial_full_opening = displacement + (sigma_closure/self.Lm)**(2.0/3.0) # we add sigma_closure displacement back in because sigmacontact_from_displacement() will subtract it out
+        #self.crack_initial_full_opening_interp=scipy.interpolate.interp1d(self.x,self.crack_initial_full_opening,kind="linear",fill_value="extrapolate")(self.x_fine)
 
         self.sigma_closure = sigma_closure
         #self.sigma_closure_interp=scipy.interpolate.interp1d(self.x,self.sigma_closure,kind="linear",fill_value="extrapolate")(self.x_fine)
@@ -532,7 +532,7 @@ def sigmacontact_from_displacement(scp,du_da,closure_index_for_gradient=None):
     
 
     
-    displacement = scp.crack_initial_opening[:(du_da.shape[0]-1)] - (scp.sigma_closure[:(du_da.shape[0]-1)]/scp.Lm)**(2.0/3.0)
+    displacement = scp.crack_initial_full_opening[:(du_da.shape[0]-1)] - (scp.sigma_closure[:(du_da.shape[0]-1)]/scp.Lm)**(2.0/3.0)
 
     #displacement=scipy.interpolate.interp1d(scp.x,displacement_coarse,kind="linear",fill_value="extrapolate")(x)
 
@@ -1347,7 +1347,7 @@ def soft_closure_plots(scp,du_da,titleprefix=""):
 
     displacement_plot=pl.figure()
     pl.clf()
-    pl.plot(scp.x*1e3,(scp.crack_initial_opening-(scp.sigma_closure/scp.Lm)**(2.0/3.0))*1e6,'-')
+    pl.plot(scp.x*1e3,(scp.crack_initial_full_opening-(scp.sigma_closure/scp.Lm)**(2.0/3.0))*1e6,'-')
     pl.plot(scp.x*1e3,displacement*1e6,'-')
     pl.grid()
     pl.legend(('Initial displacement','Final displacement'))

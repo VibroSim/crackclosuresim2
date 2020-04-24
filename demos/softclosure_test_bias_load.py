@@ -118,7 +118,7 @@ if __name__=="__main__":
 
     soft_closure_plots(scp,du_da_bias,titleprefix="Bias: ")
 
-    # Step #2: Assign the new crack state. The applied 'crack_initial_opening'
+    # Step #2: Assign the new crack state. The applied 'crack_initial_full_opening'
     # should have (contact_stress_bias/scp.Lm)**(2.0/3.0) added in because
     # the sigmacontact_from_displacement() calculation routine starts
     # by subtracting out (sigma_closure/scp.Lm)**(2.0/3.0) where
