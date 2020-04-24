@@ -1329,6 +1329,8 @@ def initialize_normalstress_compressive(x,x_bnd,sigma_closure,dx,sigmaext_max,a,
 def tensile_closure_from_crackopening(x,x_bnd,sigma_closure,crackopening,dx,a,sigma_yield,crack_model):
     """ Interpret a (possibly partly or fully) tensile closure field from 
     a compressive closure field and a crack (half) opening displacement field. 
+    Note that this uses the half-opening not the full-opening used 
+    in softclosure.py
 
     Note that the closure field with opening displacement field 
     representation limits us to effective tips that lie on grid boundaries
@@ -1443,7 +1445,8 @@ def crackopening_from_tensile_closure(x,x_bnd,sigma_closure,dx,a,sigma_yield,cra
 meaning to "tensile" closure stresses -- based on the compressive 
 loading required to close the crack to that point -- we can determine
 an opening profile for the unloaded crack. This function calculates
-that crack opening"""
+that crack opening... Note that this gives the half-opening
+as opposed to the full-opening used in softclosure.py"""
 
 
     sigmaext_max=-np.inf # as much external compression as we need

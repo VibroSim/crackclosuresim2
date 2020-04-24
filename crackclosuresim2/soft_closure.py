@@ -163,7 +163,9 @@ class sc_params(object):
         pass
 
     def initialize_contact(self,sigma_closure,crack_initial_opening):
-
+        """ ***NOTE: crack_initial_opening here is the FULL displacement, 
+        not the half displacement usually used in crackclosure.py ***"""
+        
         assert(np.all(sigma_closure >= 0.0)) # given sigma_closure should not have any tensile component
         
         #self.crack_initial_opening=copy.copy(crack_initial_opening)
