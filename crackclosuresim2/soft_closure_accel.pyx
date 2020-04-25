@@ -33,7 +33,7 @@ cdef extern from "soft_closure_accel_ops.h":
     pass
 
     cdef double initialize_contact_goal_function_with_gradient_c(double *du_da_shortened,int du_da_shortened_len,int closure_index,unsigned xsteps,int afull_idx,double *scp_sigma_closure,double *sigma_closure,double x0,double dx,double Lm,crack_model_t crack_model,double *du_da_shortened_gradient_out)
-    cdef double soft_closure_goal_function_with_gradient_c(double *du_da_shortened,int du_da_shortened_len,int closure_index,unsigned xsteps,int afull_idx,double *crack_initial_opening,double *sigma_closure,double x0,double dx,double Lm,crack_model_t crack_model,double *du_da_shortened_gradient_out)
+    cdef double soft_closure_goal_function_with_gradient_c(double *du_da_shortened,int du_da_shortened_len,int closure_index,unsigned xsteps,int afull_idx,double *crack_initial_full_opening,double *sigma_closure,double x0,double dx,double Lm,crack_model_t crack_model,double *du_da_shortened_gradient_out)
 
 def initialize_contact_goal_function_with_gradient_accel(np.ndarray[np.float64_t,ndim=1] du_da_shortened,scp,np.ndarray[np.float64_t,ndim=1] sigma_closure,int closure_index):
     """ NOTE: This should be kept identical functionally to initialize_contact_goal_function in soft_closure.py"""
@@ -101,7 +101,7 @@ def soft_closure_goal_function_with_gradient_accel(np.ndarray[np.float64_t,ndim=
 
     cdef unsigned xsteps
     cdef int afull_idx
-    cdef np.ndarray[np.float64_t,ndim=1] crack_initial_opening
+    cdef np.ndarray[np.float64_t,ndim=1] crack_initial_full_opening
     cdef np.ndarray[np.float64_t,ndim=1] sigma_closure
     cdef np.ndarray[np.float64_t,ndim=1] gradient
     cdef double x0  # first refined x position
@@ -112,7 +112,7 @@ def soft_closure_goal_function_with_gradient_accel(np.ndarray[np.float64_t,ndim=
     
     xsteps = scp.xsteps
     afull_idx = scp.afull_idx
-    crack_initial_opening = scp.crack_initial_opening
+    crack_initial_full_opening = scp.crack_initial_full_opening
     sigma_closure = scp.sigma_closure
     x0 = scp.x[0]
     dx = scp.dx
@@ -143,7 +143,7 @@ def soft_closure_goal_function_with_gradient_accel(np.ndarray[np.float64_t,ndim=
     gradient = np.empty(du_da_shortened.shape[0],dtype='d')
     
     
-    goal_function_value = soft_closure_goal_function_with_gradient_c(<double *>du_da_shortened.data,du_da_shortened.shape[0],closure_index,xsteps,afull_idx,<double *>crack_initial_opening.data,<double *>sigma_closure.data,x0,dx,Lm,crack_model,<double *>gradient.data)
+    goal_function_value = soft_closure_goal_function_with_gradient_c(<double *>du_da_shortened.data,du_da_shortened.shape[0],closure_index,xsteps,afull_idx,<double *>crack_initial_full_opening.data,<double *>sigma_closure.data,x0,dx,Lm,crack_model,<double *>gradient.data)
 
     return (goal_function_value,gradient)
 

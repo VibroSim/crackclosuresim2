@@ -142,7 +142,7 @@ static void sigmacontact_from_displacement(double *du_da_short,
 					   int du_da_short_len,
 					   int du_da_shortened_len,
 					   int afull_idx,
-					   double *crack_initial_opening_interp,
+					   double *crack_initial_full_opening_interp,
 					   double *sigma_closure_interp,
 					   double x0,
 					   double dx,
@@ -162,7 +162,7 @@ static void sigmacontact_from_displacement(double *du_da_short,
   int aidx;
   
   for (cnt=0;cnt < du_da_short_len-1;cnt++) {
-    displacement[cnt] = crack_initial_opening_interp[cnt] - pow(sigma_closure_interp[cnt]/Lm,2.0/3.0);
+    displacement[cnt] = crack_initial_full_opening_interp[cnt] - pow(sigma_closure_interp[cnt]/Lm,2.0/3.0);
 
     for (du_da_pos=0;du_da_pos < du_da_shortened_len;du_da_pos++) {
       displacement_gradient[cnt*du_da_shortened_len + du_da_pos] = 0.0;
@@ -405,7 +405,7 @@ static double initialize_contact_goal_function_with_gradient_c(double *du_da_sho
 
 
 
-static double soft_closure_goal_function_with_gradient_c(double *du_da_shortened,int du_da_shortened_len,int closure_index,unsigned xsteps,int afull_idx,double *crack_initial_opening_interp,double *sigma_closure_interp,double x0,double dx,double Lm,struct crack_model_t crack_model,double *du_da_shortened_gradient_out)
+static double soft_closure_goal_function_with_gradient_c(double *du_da_shortened,int du_da_shortened_len,int closure_index,unsigned xsteps,int afull_idx,double *crack_initial_full_opening_interp,double *sigma_closure_interp,double x0,double dx,double Lm,struct crack_model_t crack_model,double *du_da_shortened_gradient_out)
 // NOTE: This should be kept identical functionally to soft_closure_goal_function in soft_closure_accel.py
 {
   double *du_da_short;
@@ -488,7 +488,7 @@ static double soft_closure_goal_function_with_gradient_c(double *du_da_shortened
 	sigmacontact_from_displacement(du_da_short,du_da_short_len,
 				       du_da_shortened_len,
 				       afull_idx,
-				       crack_initial_opening_interp,
+				       crack_initial_full_opening_interp,
 				       sigma_closure_interp,
 				       x0,
 				       dx,
