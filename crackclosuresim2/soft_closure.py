@@ -27,12 +27,12 @@ from .soft_closure_accel import soft_closure_goal_function_with_gradient_normali
 # followed by distributed stress concentration starting at x center offset by dx/2 from
 # crack center, may extend well beyond crack tip. Only meaningful up through crack tip.
 #
-# du_da_short: Same as full length but does not extend significantly beyond crack tip. Goes up to afull_idx+1 as last element (afull_idx+2 elements total)
+# du_da_short: Same as full length but does not extend significantly beyond crack tip. Goes up to afull_idx as last element (afull_idx+1 elements total)
 #
 # du_da_shortened: representation of du_da_short consisting of first element,
-#  closure_index+1 implicit zeros, followed by afull_idx-closure_index
+#  closure_index+1 implicit zeros, followed by afull_idx-closure_index-1
 # remaining elements from du_da_short. Total number of (non-implicit)
-#  elements: afull_idx-closure_index+1
+#  elements: afull_idx-closure_index
 #
 # scp.a :  fully open crack length rounded to an x_bnd boundary. 
 # scp.afull_idx ... x_bnd index of scp.a
@@ -41,14 +41,12 @@ from .soft_closure_accel import soft_closure_goal_function_with_gradient_normali
 # On that basis du_da_short: element #0 corresponds to uniform loading
 # du_da_short element #1: corresponds to position range 0..dx, affects
 # displacement[0] interpreted as x=dx/2.0
-# element #afull_idx+1 corresponds to position range afull_idx*dx...(afull_idx+1)*dx
-# affects displacements up through x = (afull_idx + 1/2)*dx ... This is wrong!
-# ... should only go up to afull_idx
+# element #afull_idx corresponds to position range (afull_idx-1)*dx...(afull_idx)*dx
+# affects displacements up through x = (afull_idx - 1/2)*dx 
 #
-# NOTE: That means can get displacments 
 
 def duda_short__from_duda_shortened(du_da_shortened,closure_index):
-    du_da_short = np.concatenate(((du_da_shortened[0],),np.zeros(closure_index+1,dtype='d'),du_da_shortened[1:]))  # short version goes only up to afull_idx_fine+1 as last element (afull_idx_fine+2 elements total)
+    du_da_short = np.concatenate(((du_da_shortened[0],),np.zeros(closure_index+1,dtype='d'),du_da_shortened[1:]))  # short version goes only up to afull_idx_fine as last element (afull_idx_fine+1 elements total)
     return du_da_short
 
 def duda_shortened__from_duda(du_da,afull_idx,closure_index):
@@ -56,12 +54,12 @@ def duda_shortened__from_duda(du_da,afull_idx,closure_index):
 
     assert((du_da[1:(closure_index+2)]==0).all())
     du_da_shortened_ext = np.concatenate(((du_da[0],),du_da[(closure_index+2):]))
-    du_da_shortened = du_da_shortened_ext[:(afull_idx+2)]
+    du_da_shortened = du_da_shortened_ext[:(afull_idx+1)]
     return du_da_shortened
     
     
 def duda__from_duda_shortened(scp,du_da_shortened,closure_index):
-    du_da = np.concatenate(((du_da_shortened[0],),np.zeros(closure_index+1,dtype='d'),du_da_shortened[1:],np.zeros(scp.xsteps - scp.afull_idx - 2, dtype='d')))  # full version goes all the way up to and including scp.xsteps. 
+    du_da = np.concatenate(((du_da_shortened[0],),np.zeros(closure_index+1,dtype='d'),du_da_shortened[1:],np.zeros(scp.xsteps - scp.afull_idx - 1, dtype='d')))  # full version goes all the way up to and including scp.xsteps. 
     return du_da
 
 
@@ -201,7 +199,7 @@ class sc_params(object):
         #sigma_closure_avg_stress = np.sum(sigma_closure[sigma_closure > 0.0])*self.dx*thickness/(self.a*thickness)
         
         # now we use du_da_shortened
-        # which is  afull_idx_fine+2 numbers representing
+        # which is  afull_idx_fine+1 numbers representing
         # a uniform load followed by the distributed stress concentration
         # ... Note that the distributed stress concentration indices
         # have no effect to the left of the closure point 
@@ -212,12 +210,12 @@ class sc_params(object):
         # du_da_shortened has the initial open region removed, as we
         # disallow any concentration in this open region --
         # crack should not close. 
-        du_da_shortened_iniguess=np.zeros(self.afull_idx+2-(closure_index+1),dtype='d')*(1.0/(self.afull_idx+1)) # * (-sigma_closure_avg_stress)/self.dx_fine  #
+        du_da_shortened_iniguess=np.zeros(self.afull_idx+1-(closure_index+1),dtype='d')*(1.0/(self.afull_idx+1)) # * (-sigma_closure_avg_stress)/self.dx_fine  #
         if closure_index==-1:
             du_da_shortened_iniguess[0] = -sigma_closure[0]/self.dx
             pass
         
-        du_da_shortened_iniguess[1:(self.afull_idx+2-(closure_index+1))] = -sigma_closure[(closure_index+1):(self.afull_idx+1)]/self.dx
+        du_da_shortened_iniguess[1:(self.afull_idx+1-(closure_index+1))] = -sigma_closure[(closure_index+1):(self.afull_idx)]/self.dx
 
         
         
@@ -233,7 +231,7 @@ class sc_params(object):
         #    uniform_load=uniform_du_da_shortened[0]*self.dx_fine  # Uniform stress in Pa across crack
         #    uniform_load = 0.0
         #    
-        #    du_da = np.concatenate((uniform_du_da_shortened[1:],np.zeros(self.xsteps*self.fine_refinement - self.afull_idx_fine - 2 ,dtype='d')))        
+        #    du_da = np.concatenate((uniform_du_da_shortened[1:],np.zeros(self.xsteps*self.fine_refinement - self.afull_idx_fine - 1 ,dtype='d')))        
         
         #    (sigma_contact,displacement,closure_index,du_da_corrected) = sigmacontact_from_displacement(self,uniform_load,du_da,dsigmaext_dxt_hardcontact_interp)
             
@@ -255,7 +253,7 @@ class sc_params(object):
         #    uniform_load=uniform_du_da_shortened[0]*self.dx_fine  # Uniform stress in Pa across crack
         #    uniform_load = 0.0
             
-        #    du_da = np.concatenate((uniform_du_da_shortened[1:],np.zeros(self.xsteps*self.fine_refinement - self.afull_idx_fine - 2 ,dtype='d')))        
+        #    du_da = np.concatenate((uniform_du_da_shortened[1:],np.zeros(self.xsteps*self.fine_refinement - self.afull_idx_fine - 1 ,dtype='d')))        
             
         #    (sigma_contact,displacement,closure_index_junk,du_da_corrected) = sigmacontact_from_displacement(self,uniform_load,du_da,dsigmaext_dxt_hardcontact_interp)
         #    
@@ -403,7 +401,7 @@ class sc_params(object):
         #assert(abs((slowcalc-fastcalc)/slowcalc) < 1e-4)
         
         du_da_shortened=res.x*du_da_normalization
-        #du_da = np.concatenate(((du_da_shortened[0],),np.zeros(closure_index+1,dtype='d'),du_da_shortened[1:],np.zeros(self.xsteps - self.afull_idx - 2 ,dtype='d')))
+        #du_da = np.concatenate(((du_da_shortened[0],),np.zeros(closure_index+1,dtype='d'),du_da_shortened[1:],np.zeros(self.xsteps - self.afull_idx - 1 ,dtype='d')))
         du_da = duda__from_duda_shortened(self,res.x*du_da_normalization,closure_index)
         
         (contact_stress,displacement) = sigmacontact_from_displacement(self,du_da)
@@ -488,7 +486,7 @@ class sc_params(object):
 def initialize_contact_goal_function_with_gradient(du_da_shortened,scp,sigma_closure,closure_index):
     """ NOTE: This should be kept identical functionally to initialize_contact_goal_function_accel in soft_closure_accel.pyx"""
 
-    #du_da = np.concatenate((np.zeros(closure_index+1,dtype='d'),du_da_shortened,np.zeros(scp.xsteps*scp.fine_refinement - scp.afull_idx_fine - 2 ,dtype='d')))
+    #du_da = np.concatenate((np.zeros(closure_index+1,dtype='d'),du_da_shortened,np.zeros(scp.xsteps*scp.fine_refinement - scp.afull_idx_fine - 1 ,dtype='d')))
     du_da_short = duda_short__from_duda_shortened(du_da_shortened,closure_index)
 
     #last_closureidx = np.where(x_bnd >= a)[0][0]
@@ -504,7 +502,7 @@ def initialize_contact_goal_function_with_gradient(du_da_shortened,scp,sigma_clo
     (from_stress,from_stress_gradient) = sigmacontact_from_stress(scp,du_da_short,closure_index_for_gradient=closure_index)
     
     # elements of residual have units of stress^2
-    residual = (sigma_closure[:(scp.afull_idx+1)]-from_stress)
+    residual = (sigma_closure[:(scp.afull_idx)]-from_stress)
     dresidual = - from_stress_gradient
 
 
@@ -550,7 +548,7 @@ def sigmacontact_from_displacement(scp,du_da,closure_index_for_gradient=None):
 
     if closure_index_for_gradient is not None:
         # displacement gradient axis zero is position along crack, axis one is du_da_shortened element 
-        displacement_gradient = np.zeros((du_da.shape[0]-1,scp.afull_idx-closure_index_for_gradient+1),dtype='d')
+        displacement_gradient = np.zeros((du_da.shape[0]-1,scp.afull_idx-closure_index_for_gradient),dtype='d')
         pass
 
     # !!!*** Possibly calculation should start at scp.afull_idx_fine instead of
@@ -562,7 +560,7 @@ def sigmacontact_from_displacement(scp,du_da,closure_index_for_gradient=None):
 
     if isinstance(scp.crack_model,ModeI_throughcrack_CODformula):
     
-        for aidx in range(scp.afull_idx,-1,-1):
+        for aidx in range(scp.afull_idx-1,-1,-1):
             
             #assert(sigma_closure[aidx] > 0)
             #   in next line: sqrt( (a+x) * (a-x) where x >= 0 and
@@ -592,7 +590,7 @@ def sigmacontact_from_displacement(scp,du_da,closure_index_for_gradient=None):
             pass
         pass
     elif isinstance(scp.crack_model,Tada_ModeI_CircularCrack_along_midline):
-        for aidx in range(scp.afull_idx,-1,-1): 
+        for aidx in range(scp.afull_idx-1,-1,-1): 
             #assert(sigma_closure[aidx] > 0)
             #   in next line: sqrt( (a+x) * (a-x) where x >= 0 and
             #   throw out where x >= a
@@ -640,7 +638,7 @@ def sigmacontact_from_displacement(scp,du_da,closure_index_for_gradient=None):
 
     if closure_index_for_gradient is not None:
         # sigma_contact gradient axis zero is position along crack, axis one is du_da_shortened element 
-        sigma_contact_gradient = np.zeros((du_da.shape[0]-1,scp.afull_idx-closure_index_for_gradient+1),dtype='d')
+        sigma_contact_gradient = np.zeros((du_da.shape[0]-1,scp.afull_idx-closure_index_for_gradient),dtype='d')
         sigma_contact_gradient[displacement < 0.0,:] = -(3.0/2.0)*((-displacement[displacement < 0.0,np.newaxis])**(1.0/2.0))*scp.Lm*displacement_gradient[displacement < 0.0,:]
         pass
     
@@ -663,7 +661,7 @@ def sigmacontact_from_stress(scp,du_da,closure_index_for_gradient=None):
 
     if closure_index_for_gradient is not None:
         # sigma_contact gradient axis zero is position along crack, axis one is du_da_shortened element 
-        sigma_contact_gradient = np.zeros((du_da.shape[0]-1,scp.afull_idx-closure_index_for_gradient+1),dtype='d')
+        sigma_contact_gradient = np.zeros((du_da.shape[0]-1,scp.afull_idx-closure_index_for_gradient),dtype='d')
         pass
     
     da = scp.dx # same step size
@@ -686,7 +684,7 @@ def sigmacontact_from_stress(scp,du_da,closure_index_for_gradient=None):
         sigma_contact_gradient[:,0] -= da
         pass
     
-    for aidx in range(scp.afull_idx+1):
+    for aidx in range(scp.afull_idx):
         #assert(sigma_closure[aidx] > 0)
 
         #sigmacontact[(aidx+1):] -= du_da[aidx+1]*((betaval/sqrt(2.0))*sqrt(x_fine[aidx]/(x_fine[(aidx+1):]-x_fine[aidx])) + 1.0)*da # + 1.0 represents stress when a large distance away from effective tip
@@ -783,7 +781,7 @@ def soft_closure_goal_function_with_gradient(du_da_shortened,scp,closure_index):
 
     duda_derivative_scalefactor=5e-7
 
-    #du_da = np.concatenate((np.zeros(closure_index+1,dtype='d'),du_da_shortened,np.zeros(scp.xsteps*scp.fine_refinement - scp.afull_idx_fine - 2 ,dtype='d')))
+    #du_da = np.concatenate((np.zeros(closure_index+1,dtype='d'),du_da_shortened,np.zeros(scp.xsteps*scp.fine_refinement - scp.afull_idx_fine - 1 ,dtype='d')))
     du_da_short = duda_short__from_duda_shortened(du_da_shortened,closure_index)
     
     
@@ -911,10 +909,10 @@ def calc_contact(scp,sigma_ext):
          gives you the dissplacement between the two sides! 
     """
     
-    #iniguess=np.arange(scp.afull_idx+1,dtype='d')/(scp.afull_idx+1) * sigma_ext  # This iniguess was for u
+    #iniguess=np.arange(scp.afull_idx,dtype='d')/(scp.afull_idx) * sigma_ext  # This iniguess was for u
     
     # now we use du_da_shortened
-    # which is an initial load value, followed by afull_idx_fine+1 numbers representing
+    # which is an initial load value, followed by afull_idx_fine numbers representing
     # the distributed stress concentration
     # ... Note that the distributed stress concentration indices
     # have no effect to the left of the closure point
@@ -931,7 +929,7 @@ def calc_contact(scp,sigma_ext):
         pass
 
     #du_da_shortened_iniguess=np.ones(scp.afull_idx_fine+1,dtype='d')*(1.0/(scp.afull_idx+1)) * sigma_ext/scp.dx_fine  #
-    du_da_shortened_first_iniguess=np.ones(scp.afull_idx+2-(closure_index+1),dtype='d')*(1.0/(scp.afull_idx+1))* sigma_ext/scp.dx  #
+    du_da_shortened_first_iniguess=np.ones(scp.afull_idx+1-(closure_index+1),dtype='d')*(1.0/(scp.afull_idx+1))* sigma_ext/scp.dx  #
     du_da_shortened_iniguess = du_da_shortened_first_iniguess
     
     perturbation_amplitude_Pa=100000.0
@@ -1138,7 +1136,7 @@ def calc_contact_kernel(scp,sigma_ext,closure_index,du_da_shortened_iniguess):
         
         
         du_da_shortened=res.x*du_da_normalization
-        #du_da = np.concatenate(((du_da_shortened[0],),np.zeros(closure_index+1,dtype='d'),du_da_shortened[1:],np.zeros(scp.xsteps - scp.afull_idx - 2 ,dtype='d')))        
+        #du_da = np.concatenate(((du_da_shortened[0],),np.zeros(closure_index+1,dtype='d'),du_da_shortened[1:],np.zeros(scp.xsteps - scp.afull_idx - 1 ,dtype='d')))        
         du_da = duda__from_duda_shortened(scp,du_da_shortened,closure_index)
 
         pass
@@ -1156,7 +1154,7 @@ def calc_contact_kernel(scp,sigma_ext,closure_index,du_da_shortened_iniguess):
         #    uniform_load=uniform_du_da_shortened[0]*self.dx_fine  # Uniform stress in Pa across crack
         #    uniform_load = 0.0
             
-        #    du_da = np.concatenate((uniform_du_da_shortened[1:],np.zeros(self.xsteps*self.fine_refinement - self.afull_idx_fine - 2 ,dtype='d')))        
+        #    du_da = np.concatenate((uniform_du_da_shortened[1:],np.zeros(self.xsteps*self.fine_refinement - self.afull_idx_fine - 1 ,dtype='d')))        
             
         #    (sigma_contact,displacement,closure_index_generated,du_da_corrected) = sigmacontact_from_displacement(self,uniform_load,du_da,dsigmaext_dxt_hardcontact_interp)
             
@@ -1273,9 +1271,9 @@ def calc_contact_kernel(scp,sigma_ext,closure_index,du_da_shortened_iniguess):
             raise ValueError("Accelerated goal calculation mismatch: %g vs %g" % (slowcalc,fastcalc))
 
 
-        #du_da = np.concatenate((du_da_shortened,np.zeros(scp.xsteps*scp.fine_refinement - scp.afull_idx_fine - 2 ,dtype='d')))
+        #du_da = np.concatenate((du_da_shortened,np.zeros(scp.xsteps*scp.fine_refinement - scp.afull_idx_fine - 1 ,dtype='d')))
         assert(closure_index==-1)
-        #du_da = np.concatenate(((du_da_shortened[0],),np.zeros(closure_index+1,dtype='d'),du_da_shortened[1:],np.zeros(scp.xsteps - scp.afull_idx - 2 ,dtype='d')))        
+        #du_da = np.concatenate(((du_da_shortened[0],),np.zeros(closure_index+1,dtype='d'),du_da_shortened[1:],np.zeros(scp.xsteps - scp.afull_idx - 1 ,dtype='d')))        
         du_da = duda__from_duda_shortened(scp,du_da_shortened,closure_index)
 
         #(contact_stress,displacement) = sigmacontact_from_displacement(scp,du_da)
