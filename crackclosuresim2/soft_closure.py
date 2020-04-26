@@ -860,6 +860,8 @@ def soft_closure_goal_function_with_gradient(du_da_shortened,scp,closure_index):
     duda_derivative_gradient_scaled = duda_derivative_gradient * (scp.afull_idx*scp.dx)**2.0 * duda_derivative_scalefactor
 
     # Primary residual term in Pascals**2
+    #print("residual.shape[0]=%d; afull_idx=%d" % (residual.shape[0],scp.afull_idx))
+    
     goal_function =  1.0*np.sum(residual[:-1]**2.0) + 1.0*np.sum(negative**2.0) + 1.0*np.sum(displaced**2.0) + 1.0*np.sum(duda_derivative_scaled[:]**2.0)
     gradient = 1.0*np.sum(2.0*residual[:-1,np.newaxis]*dresidual[:-1,:],axis=0) + 1.0*np.sum(2.0*negative[:,np.newaxis]*dnegative,axis=0) + 1.0*np.sum(2.0*displaced[:,np.newaxis]*ddisplaced,axis=0) + 1.0*np.sum(2.0*duda_derivative_scaled[:,np.newaxis]*duda_derivative_gradient_scaled[:,:],axis=0)
     

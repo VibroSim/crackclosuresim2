@@ -171,7 +171,7 @@ static void sigmacontact_from_displacement(double *du_da_short,
 
   
   if (crack_model.modeltype==CMT_THROUGH) {
-    for (aidx=afull_idx;aidx >= 0;aidx--) {
+    for (aidx=(afull_idx-1);aidx >= 0;aidx--) {
       du_da_shortened_index = aidx - closure_index_for_gradient;
 
       for (cnt=0;cnt < aidx;cnt++) {
@@ -194,7 +194,7 @@ static void sigmacontact_from_displacement(double *du_da_short,
       
     }
   } else if (crack_model.modeltype==CMT_TADA) {
-    for (aidx=afull_idx;aidx >= 0;aidx--) {
+    for (aidx=(afull_idx-1);aidx >= 0;aidx--) {
       du_da_shortened_index = aidx - closure_index_for_gradient;
       
       for (cnt=0;cnt < aidx;cnt++) {
@@ -278,7 +278,7 @@ static void sigmacontact_from_stress(double *du_da_short,
     assert(0);    
   }
   
-  for (aidx=0;aidx <= afull_idx;aidx++) {
+  for (aidx=0;aidx < afull_idx;aidx++) {
     du_da_shortened_index = aidx - closure_index_for_gradient;
 
     
@@ -286,7 +286,7 @@ static void sigmacontact_from_stress(double *du_da_short,
     
     r0 = r0_over_a*a;
 
-    for (cnt=aidx+1;cnt <= afull_idx;cnt++) {
+    for (cnt=aidx+1;cnt < afull_idx;cnt++) {
       r = x0+cnt*dx - a;
       //from_stress[cnt] -= du_da_short[aidx+1]*((sqrt_betaval/M_SQRT2)*sqrt((x0+aidx*dx)/(x0+cnt*dx - x0-aidx*dx)) + 1.0)*dx;
       //from_stress[cnt] -= du_da_short[aidx+1]*((sqrt_betaval/M_SQRT2)*sqrt(a/r) + 1.0)*dx;
@@ -301,7 +301,7 @@ static void sigmacontact_from_stress(double *du_da_short,
     from_stress[aidx] -= (du_da_short[aidx+1]*(sqrt_betaval/M_SQRT2))*(indef_integral_of_crack_tip_singularity_times_1_over_r2_pos_crossterm_decay(r0_over_a,a,a)-indef_integral_of_crack_tip_singularity_times_1_over_r2_pos_crossterm_decay(r0_over_a,a,a-dx/2.0)) + du_da_short[aidx+1]*dx/2.0;
     
     if (aidx+1 >= closure_index_for_gradient+2) {
-      for (cnt=aidx+1;cnt <= afull_idx;cnt++) {
+      for (cnt=aidx+1;cnt < afull_idx;cnt++) {
 	r = x0+cnt*dx - a;
 	//from_stress_gradient[cnt*du_da_shortened_len + du_da_shortened_index] -= ((sqrt_betaval/M_SQRT2)*sqrt(a/r)*exp(-r/(r0_over_a*a)) + 1.0)*dx;
 	//from_stress_gradient[cnt*du_da_shortened_len + du_da_shortened_index] -= ((sqrt_betaval/M_SQRT2)*sqrt(a/r)*pow(r0,2.0)/(pow(r,2.0)+pow(r0,2.0)) + 1.0)*dx;
