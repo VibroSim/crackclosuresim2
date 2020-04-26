@@ -27,13 +27,25 @@ from .soft_closure_accel import soft_closure_goal_function_with_gradient_normali
 # followed by distributed stress concentration starting at x center offset by dx/2 from
 # crack center, may extend well beyond crack tip. Only meaningful up through crack tip.
 #
-# du_da_short: Same as full length but does not extend significantly beyond crack tip. Goes up to afull_idx_fine+1 as last element (afull_idx_fine+2 elements total)
+# du_da_short: Same as full length but does not extend significantly beyond crack tip. Goes up to afull_idx+1 as last element (afull_idx+2 elements total)
 #
 # du_da_shortened: representation of du_da_short consisting of first element,
-#  closure_index+1 implicit zeros, followed by afull_idx_fine-closure_index
+#  closure_index+1 implicit zeros, followed by afull_idx-closure_index
 # remaining elements from du_da_short. Total number of (non-implicit)
-#  elements: afull_idx_fine-closure_index+1
-
+#  elements: afull_idx-closure_index+1
+#
+# scp.a :  fully open crack length rounded to an x_bnd boundary. 
+# scp.afull_idx ... x_bnd index of scp.a
+# so scp.x[afull_idx] is one half step beyond crack tip.
+#
+# On that basis du_da_short: element #0 corresponds to uniform loading
+# du_da_short element #1: corresponds to position range 0..dx, affects
+# displacement[0] interpreted as x=dx/2.0
+# element #afull_idx+1 corresponds to position range afull_idx*dx...(afull_idx+1)*dx
+# affects displacements up through x = (afull_idx + 1/2)*dx ... This is wrong!
+# ... should only go up to afull_idx
+#
+# NOTE: That means can get displacments 
 
 def duda_short__from_duda_shortened(du_da_shortened,closure_index):
     du_da_short = np.concatenate(((du_da_shortened[0],),np.zeros(closure_index+1,dtype='d'),du_da_shortened[1:]))  # short version goes only up to afull_idx_fine+1 as last element (afull_idx_fine+2 elements total)
