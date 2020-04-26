@@ -1338,7 +1338,7 @@ def soft_closure_plots(scp,du_da,titleprefix=""):
     
     sigmacontact_plot=pl.figure()
     pl.clf()
-    pl.plot(scp.x*1e3,from_displacement/1e6,'-',
+    pl.plot(scp.x[:scp.afull_idx]*1e3,from_displacement/1e6,'-',
             scp.x*1e3,from_stress/1e6,'-'),
     pl.grid()
     pl.legend(("from displacement","from stress"))
@@ -1359,8 +1359,8 @@ def soft_closure_plots(scp,du_da,titleprefix=""):
 
     displacement_plot=pl.figure()
     pl.clf()
-    pl.plot(scp.x*1e3,(scp.crack_initial_full_opening-(scp.sigma_closure/scp.Lm)**(2.0/3.0))*1e6,'-')
-    pl.plot(scp.x*1e3,displacement*1e6,'-')
+    pl.plot(scp.x[:scp.afull_idx]*1e3,(scp.crack_initial_full_opening[:scp.afull_idx]-(scp.sigma_closure[:scp.afull_idx]/scp.Lm)**(2.0/3.0))*1e6,'-')
+    pl.plot(scp.x[:scp.afull_idx]*1e3,displacement*1e6,'-')
     pl.grid()
     pl.legend(('Initial displacement','Final displacement'))
     pl.xlabel('Position (mm)')
