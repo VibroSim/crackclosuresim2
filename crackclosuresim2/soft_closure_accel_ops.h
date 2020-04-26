@@ -573,7 +573,7 @@ static double soft_closure_goal_function_with_gradient_c(double *du_da_shortened
   // law... so we only iterate up to du_da_short_len-2,
   // representing that a stress concentration
   //  at the crack tip is OK for our goal 
-  for (cnt=0;cnt < afull_idx-1;cnt++) {
+  for (cnt=0;cnt < afull_idx;cnt++) {
     residual += pow(from_displacement[cnt]-from_stress[cnt],2.0);
     
     for (du_da_pos=0;du_da_pos < du_da_shortened_len;du_da_pos++) {

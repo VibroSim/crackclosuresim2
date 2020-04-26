@@ -865,28 +865,26 @@ def soft_closure_goal_function_with_gradient(du_da_shortened,scp,closure_index):
     average = (from_displacement+from_stress[:scp.afull_idx])/2.0
     daverage = (from_displacement_gradient + from_stress_gradient[:scp.afull_idx,:])/2.0
     
-    # We only worry about residual, negative, and displaced
-    # up to the point before the last... why?
-    # well the last point corresponds to the crack tip, which
-    # CAN hold tension and doesn't have to follow the contact stress
-    # law... so all these [:-1]'s represent that a stress concentration
-    # at the crack tip is OK for our goal
 
     #negative = average[:-1][average[:-1] < 0]  # negative sigmacontact means tension on the surfaces, which is not allowed (except at the actual tip)!
-    negative_except_at_tip = average < 0
-    negative_except_at_tip[-1] = False
+    #negative_except_at_tip = average < 0
+    #negative_except_at_tip[-1] = False
     
-    negative = average[negative_except_at_tip]
+    #negative = average[negative_except_at_tip]
+    negative = average[average < 0.0]
     
-    dnegative = daverage[negative_except_at_tip,:]
+    #dnegative = daverage[negative_except_at_tip,:]
+    dnegative = daverage[average < 0.0,:]
     
     #displaced = average[:-1][displacement[:-1] > 0.0] # should not have stresses with positive displacement
-    displaced_except_at_tip = displacement > 0.0
-    displaced_except_at_tip[-1] = False
+    #displaced_except_at_tip = displacement > 0.0
+    #displaced_except_at_tip[-1] = False
     
-    displaced = average[displaced_except_at_tip]
+    #displaced = average[displaced_except_at_tip]
+    displaced = average[displacement > 0.0]
     
-    ddisplaced = daverage[displaced_except_at_tip,:]
+    #ddisplaced = daverage[displaced_except_at_tip,:]
+    ddisplaced = daverage[displacement > 0.0,:]
     
     #if hasattr(scp.crack_model,"E"):
     #    reference_modulus=scp.crack_model.E
@@ -905,8 +903,8 @@ def soft_closure_goal_function_with_gradient(du_da_shortened,scp,closure_index):
     # Primary residual term in Pascals**2
     #print("residual.shape[0]=%d; afull_idx=%d" % (residual.shape[0],scp.afull_idx))
     
-    goal_function =  1.0*np.sum(residual[:-1]**2.0) + 1.0*np.sum(negative**2.0) + 1.0*np.sum(displaced**2.0) + 1.0*np.sum(duda_derivative_scaled[:]**2.0)
-    gradient = 1.0*np.sum(2.0*residual[:-1,np.newaxis]*dresidual[:-1,:],axis=0) + 1.0*np.sum(2.0*negative[:,np.newaxis]*dnegative,axis=0) + 1.0*np.sum(2.0*displaced[:,np.newaxis]*ddisplaced,axis=0) + 1.0*np.sum(2.0*duda_derivative_scaled[:,np.newaxis]*duda_derivative_gradient_scaled[:,:],axis=0)
+    goal_function =  1.0*np.sum(residual**2.0) + 1.0*np.sum(negative**2.0) + 1.0*np.sum(displaced**2.0) + 1.0*np.sum(duda_derivative_scaled[:]**2.0)
+    gradient = 1.0*np.sum(2.0*residual[:,np.newaxis]*dresidual[:,:],axis=0) + 1.0*np.sum(2.0*negative[:,np.newaxis]*dnegative,axis=0) + 1.0*np.sum(2.0*displaced[:,np.newaxis]*ddisplaced,axis=0) + 1.0*np.sum(2.0*duda_derivative_scaled[:,np.newaxis]*duda_derivative_gradient_scaled[:,:],axis=0)
     
     #print("grad_residual=%s" % (str(np.sum(2.0*residual[:-1,np.newaxis]*dresidual[:-1,:],axis=0))))
     
