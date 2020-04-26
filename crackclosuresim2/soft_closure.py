@@ -176,7 +176,7 @@ class sc_params(object):
         """ ***NOTE: crack_initial_full_opening here is the FULL displacement, 
         not the half displacement usually used in crackclosure.py ***"""
         
-        assert(np.all(sigma_closure >= 0.0)) # given sigma_closure should not have any tensile component
+        assert(np.all((sigma_closure >= 0.0) | (self.x > self.a))) # given sigma_closure should not have any tensile component prior to the crack tip
         
         #self.crack_initial_full_opening=copy.copy(crack_initial_full_opening)
         self.crack_initial_full_opening=np.zeros(self.x.shape[0],dtype='d')
@@ -424,7 +424,7 @@ class sc_params(object):
         # To evaluate modeled residual stressing operation starting
         # at zero initial opening and zero closure, 
         # stop here, and run soft_closure_plots()
-        self.crack_initial_full_opening = crack_initial_full_opening -displacement - (sigma_closure/self.Lm)**(2.0/3.0)  # Through this line we have evaluated an initial opening displacement
+        self.crack_initial_full_opening = crack_initial_full_opening[:self.afull_idx] -displacement - (sigma_closure[:self.afull_idx]/self.Lm)**(2.0/3.0)  # Through this line we have evaluated an initial opening displacement
         #self.crack_initial_full_opening_interp=scipy.interpolate.interp1d(self.x,self.crack_initial_full_opening,kind="linear",fill_value="extrapolate")(self.x_fine)
 
         
@@ -438,7 +438,7 @@ class sc_params(object):
         from_stress = sigmacontact_from_stress(self,du_da)
 
         # This becomes our new initial state
-        self.crack_initial_full_opening = displacement + (sigma_closure/self.Lm)**(2.0/3.0) # we add sigma_closure displacement back in because sigmacontact_from_displacement() will subtract it out
+        self.crack_initial_full_opening = displacement + (sigma_closure[:self.afull_idx]/self.Lm)**(2.0/3.0) # we add sigma_closure displacement back in because sigmacontact_from_displacement() will subtract it out
         #self.crack_initial_full_opening_interp=scipy.interpolate.interp1d(self.x,self.crack_initial_full_opening,kind="linear",fill_value="extrapolate")(self.x_fine)
 
         self.sigma_closure = sigma_closure
@@ -533,7 +533,7 @@ def sigmacontact_from_displacement(scp,du_da,closure_index_for_gradient=None):
     # 
     da = scp.dx # same step size
 
-    x = scp.x[:(du_da.shape[0]-1)]
+    x = scp.x[:scp.afull_idx]
 
     # integral starts at a0, where sigma_closure > 0 (compressive)
     #first_closureidx = np.where(sigma_closure >0)[0][0]
@@ -542,13 +542,13 @@ def sigmacontact_from_displacement(scp,du_da,closure_index_for_gradient=None):
     
 
     
-    displacement = scp.crack_initial_full_opening[:(du_da.shape[0]-1)] - (scp.sigma_closure[:(du_da.shape[0]-1)]/scp.Lm)**(2.0/3.0)
+    displacement = scp.crack_initial_full_opening[:scp.afull_idx] - (scp.sigma_closure[:scp.afull_idx]/scp.Lm)**(2.0/3.0)
 
     #displacement=scipy.interpolate.interp1d(scp.x,displacement_coarse,kind="linear",fill_value="extrapolate")(x)
 
     if closure_index_for_gradient is not None:
         # displacement gradient axis zero is position along crack, axis one is du_da_shortened element 
-        displacement_gradient = np.zeros((du_da.shape[0]-1,scp.afull_idx-closure_index_for_gradient),dtype='d')
+        displacement_gradient = np.zeros((scp.afull_idx,scp.afull_idx-closure_index_for_gradient),dtype='d')
         pass
 
     # !!!*** Possibly calculation should start at scp.afull_idx_fine instead of
@@ -633,12 +633,12 @@ def sigmacontact_from_displacement(scp,du_da,closure_index_for_gradient=None):
     # sigmacontact is positive compression
 
     
-    sigma_contact = np.zeros(x.shape[0],dtype='d')
+    sigma_contact = np.zeros(scp.afull_idx,dtype='d')
     sigma_contact[displacement < 0.0] = ((-displacement[displacement < 0.0])**(3.0/2.0)) * scp.Lm
 
     if closure_index_for_gradient is not None:
         # sigma_contact gradient axis zero is position along crack, axis one is du_da_shortened element 
-        sigma_contact_gradient = np.zeros((du_da.shape[0]-1,scp.afull_idx-closure_index_for_gradient),dtype='d')
+        sigma_contact_gradient = np.zeros((scp.afull_idx,scp.afull_idx-closure_index_for_gradient),dtype='d')
         sigma_contact_gradient[displacement < 0.0,:] = -(3.0/2.0)*((-displacement[displacement < 0.0,np.newaxis])**(1.0/2.0))*scp.Lm*displacement_gradient[displacement < 0.0,:]
         pass
     
