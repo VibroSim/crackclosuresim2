@@ -609,12 +609,12 @@ def sigmacontact_from_displacement(scp,du_da,closure_index_for_gradient=None):
         pass
     elif isinstance(scp.crack_model,Tada_ModeI_CircularCrack_along_midline):
         # special case for fully-open singularity du_da[scp.afull_idx+1]
-        displacement[:scp.afull_idx] += (8.0*(1.0-scp.crack_model.nu**2.0)/(np.pi*scp.crack_model.E))*du_da[scp.afull_idx+1]*np.sqrt((scp.x_bnd[scp_afull_idx]+x[:scp.afull_idx])*(scp.x_bnd[scp.afull_idx]-x[:scp.afull_idx]))*da
+        displacement[:scp.afull_idx] += (8.0*(1.0-scp.crack_model.nu**2.0)/(np.pi*scp.crack_model.E))*du_da[scp.afull_idx+1]*np.sqrt((scp.x_bnd[scp.afull_idx]+x[:scp.afull_idx])*(scp.x_bnd[scp.afull_idx]-x[:scp.afull_idx]))*da
         
         if closure_index_for_gradient is not None:
             if scp.afull_idx+1 >= closure_index_for_gradient+2:
-                du_da_shortened_index = aidx - closure_index_for_gradient
-                displacement_gradient[:scp.afull_idx,du_da_shortened_index] += (8.0*(1.0-scp.crack_model.nu**2.0)/(np.pi*scp.crack_model.E))*np.sqrt((scp.x_bnd[afull_idx]+x[:scp.afull_idx])*(scp.x_bnd[scp.afull_idx]-x[:scp.afull_idx]))*da
+                du_da_shortened_index = scp.afull_idx - closure_index_for_gradient
+                displacement_gradient[:scp.afull_idx,du_da_shortened_index] += (8.0*(1.0-scp.crack_model.nu**2.0)/(np.pi*scp.crack_model.E))*np.sqrt((scp.x_bnd[scp.afull_idx]+x[:scp.afull_idx])*(scp.x_bnd[scp.afull_idx]-x[:scp.afull_idx]))*da
                 pass
             pass
         
