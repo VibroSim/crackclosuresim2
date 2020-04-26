@@ -160,8 +160,10 @@ static void sigmacontact_from_displacement(double *du_da_short,
   int du_da_pos;
   int du_da_shortened_index;
   int aidx;
+
+  assert(du_da_short_len == afull_idx + 1);
   
-  for (cnt=0;cnt < du_da_short_len-1;cnt++) {
+  for (cnt=0;cnt < afull_idx;cnt++) {
     displacement[cnt] = crack_initial_full_opening_interp[cnt] - pow(sigma_closure_interp[cnt]/Lm,2.0/3.0);
 
     for (du_da_pos=0;du_da_pos < du_da_shortened_len;du_da_pos++) {
@@ -171,6 +173,21 @@ static void sigmacontact_from_displacement(double *du_da_short,
 
   
   if (crack_model.modeltype==CMT_THROUGH) {
+    // special case for fully-open singularity du_da[scp.afull_idx+1]
+    du_da_shortened_index = afull_idx - closure_index_for_gradient;
+    for (cnt=0;cnt < afull_idx;cnt++) {
+      displacement[cnt] += (4.0/crack_model.modeldat.through.Eeff)*du_da_short[afull_idx+1]*sqrt((x0-(dx/2.0)+afull_idx*dx + x0+cnt*dx)*(x0-(dx/2.0)+afull_idx*dx - x0-cnt*dx))*dx;	
+    }
+    if (afull_idx+1 >= closure_index_for_gradient+2) {
+      for (cnt=0;cnt < afull_idx;cnt++) {
+	displacement_gradient[cnt*du_da_shortened_len + du_da_shortened_index] += (4.0/crack_model.modeldat.through.Eeff)*sqrt((x0-(dx/2.0)+afull_idx*dx + x0+cnt*dx)*(x0-(dx/2.0)+afull_idx*dx - x0-cnt*dx))*dx;
+      }
+      
+      
+    }
+
+
+    // rest of du_da points, except for zeroth point which has no effect on displacement
     for (aidx=(afull_idx-1);aidx >= 0;aidx--) {
       du_da_shortened_index = aidx - closure_index_for_gradient;
 
@@ -194,6 +211,21 @@ static void sigmacontact_from_displacement(double *du_da_short,
       
     }
   } else if (crack_model.modeltype==CMT_TADA) {
+
+    // special case for fully-open singularity du_da[scp.afull_idx+1]
+    du_da_shortened_index = afull_idx - closure_index_for_gradient;
+    for (cnt=0;cnt < afull_idx;cnt++) {
+      displacement[cnt] += (8.0*(1.0-pow(crack_model.modeldat.tada.nu,2.0))/(M_PI*crack_model.modeldat.tada.E))*du_da_short[afull_idx+1]*sqrt((x0-(dx/2.0)+afull_idx*dx + x0+cnt*dx)*(x0-(dx/2.0)+afull_idx*dx - x0-cnt*dx))*dx;
+    }
+    if (afull_idx+1 >= closure_index_for_gradient+2) {
+      for (cnt=0;cnt < afull_idx;cnt++) {
+	displacement_gradient[cnt*du_da_shortened_len + du_da_shortened_index] += (8.0*(1.0-pow(crack_model.modeldat.tada.nu,2.0))/(M_PI*crack_model.modeldat.tada.E))*sqrt((x0-(dx/2.0)+afull_idx*dx + x0+cnt*dx)*(x0-(dx/2.0)+afull_idx*dx - x0-cnt*dx))*dx;
+      }
+      
+      
+    }
+
+    // rest of du_da points, except for zeroth point which has no effect on displacement
     for (aidx=(afull_idx-1);aidx >= 0;aidx--) {
       du_da_shortened_index = aidx - closure_index_for_gradient;
       
@@ -214,7 +246,7 @@ static void sigmacontact_from_displacement(double *du_da_short,
     assert(0);
   }
   
-  for (cnt=0;cnt < du_da_short_len-1;cnt++) {
+  for (cnt=0;cnt < afull_idx;cnt++) {
     if (displacement[cnt] < 0.0) {
       from_displacement[cnt] = pow(-displacement[cnt],3.0/2.0) * Lm;
       for (du_da_pos=0;du_da_pos < du_da_shortened_len;du_da_pos++) {
@@ -256,7 +288,8 @@ static void sigmacontact_from_stress(double *du_da_short,
   double r0_over_a;
   double r0;
 
-  for (cnt=0;cnt < du_da_short_len-1;cnt++) {
+  assert(du_da_short_len == afull_idx + 1);
+  for (cnt=0;cnt < afull_idx;cnt++) {
     from_stress[cnt] = scp_sigma_closure_interp[cnt] - du_da_short[0]*dx;
     
     from_stress_gradient[cnt*du_da_shortened_len + 0] = -dx;
@@ -313,12 +346,26 @@ static void sigmacontact_from_stress(double *du_da_short,
       //from_stress_gradient[aidx*du_da_shortened_len + du_da_shortened_index] -= (sqrt_betaval/M_SQRT2)*sqrt(a)* ( (1.0/(2.0*M_SQRT2))*sqrt(r0)*(-(log(-sqrt(2.0*(r0)*dx/2.0)+r0 + dx/2.0)-log(sqrt(2.0*(r0)*dx/2.0) + r0 + dx/2.0) + 2.0*atan(1-sqrt(2.0*(dx/2.0)/(r0))) -2.0*atan(sqrt(2.0*(dx/2.0)/(r0))+1.0)))) + dx/2.0;
       from_stress_gradient[aidx*du_da_shortened_len + du_da_shortened_index] -= (sqrt_betaval/M_SQRT2)* ( indef_integral_of_crack_tip_singularity_times_1_over_r2_pos_crossterm_decay(r0_over_a,a,a)-indef_integral_of_crack_tip_singularity_times_1_over_r2_pos_crossterm_decay(r0_over_a,a,a-dx/2.0) ) + dx/2.0;
     }
+
     //if (aidx==0) {
     //  printf("fs[0] subtraction=%g\n",(du_da_short[aidx+1]*(sqrt_betaval/M_SQRT2)*sqrt(a)*sqrt(M_PI*r0_over_a*a)*erf(sqrt(dx/(2.0*r0_over_a*a))) + du_da_short[aidx+1]*dx/2.0));
     //  printf("fs[0] subtraction terms/factors=%g, %g, %g, %g, %g, %g\n",du_da_short[aidx+1],(sqrt_betaval/M_SQRT2),sqrt(a),sqrt(M_PI*r0_over_a*a),erf(sqrt(dx/(2.0*r0_over_a*a))),du_da_short[aidx+1]*dx/2.0);
     //  printf("from_stress[0]=%g\n",from_stress[0]);
     //}
   }
+
+  // Special case at crack fully open: du_da[scp.afull_idx+1]
+  // Nothing to do here, because the accelerated routines don't calculate past the tip..
+  //du_da_shortened_index = afull_idx - closure_index_for_gradient;
+  //
+  //  
+  //a = x0-(dx/2.0) + afull_idx*dx;
+  //r0 = r0_over_a*a;
+  
+  //for (cnt=afull_idx+1;cnt < afull_idx;cnt++) {
+  ////loop never executes
+  //r = x0+cnt*dx - a;
+  //}
 }
 
 static void print_array(char *name,double *ptr,int numelem)
@@ -347,7 +394,9 @@ static double initialize_contact_goal_function_with_gradient_c(double *du_da_sho
   //double *dresidual;
   double *from_stress,*from_stress_gradient;
 
+
   du_da_short_len=(closure_index+1+du_da_shortened_len);
+  assert(du_da_short_len == afull_idx + 1);
   
   du_da_short = malloc(sizeof(double)*du_da_short_len);
   
@@ -361,8 +410,8 @@ static double initialize_contact_goal_function_with_gradient_c(double *du_da_sho
     }
   }
   
-  from_stress = malloc(sizeof(double)*(du_da_short_len-1));
-  from_stress_gradient = malloc(sizeof(double)*(du_da_short_len-1)*du_da_shortened_len); // axis zero (changes more slowly) is position along crack; axis one (changes more quickly) is du_da_shortened element
+  from_stress = malloc(sizeof(double)*(afull_idx));
+  from_stress_gradient = malloc(sizeof(double)*(afull_idx)*du_da_shortened_len); // axis zero (changes more slowly) is position along crack; axis one (changes more quickly) is du_da_shortened element
   
   //dresidual = malloc(sizeof(double)*du_da_shortened_len); // axis zero is du_da_shortened element
 
@@ -385,7 +434,7 @@ static double initialize_contact_goal_function_with_gradient_c(double *du_da_sho
 			   from_stress_gradient);
 
 
-  for (cnt=0;cnt < du_da_short_len-1;cnt++) {
+  for (cnt=0;cnt < afull_idx;cnt++) {
     residual += pow(sigma_closure_interp[cnt]-from_stress[cnt],2.0);
     
     for (du_da_pos=0;du_da_pos < du_da_shortened_len;du_da_pos++) {
@@ -438,7 +487,8 @@ static double soft_closure_goal_function_with_gradient_c(double *du_da_shortened
   //}
 
   du_da_short_len=(closure_index+1+du_da_shortened_len);
-  
+  assert(du_da_short_len == afull_idx + 1);
+
   du_da_short = malloc(sizeof(double)*du_da_short_len);
   
   for (cnt=0;cnt < du_da_short_len;cnt++) {
@@ -451,16 +501,16 @@ static double soft_closure_goal_function_with_gradient_c(double *du_da_shortened
     }
   }
   
-  from_displacement = malloc(sizeof(double)*(du_da_short_len-1));
-  displacement = malloc(sizeof(double)*(du_da_short_len-1));
+  from_displacement = malloc(sizeof(double)*(afull_idx));
+  displacement = malloc(sizeof(double)*(afull_idx));
 
-  from_displacement = malloc(sizeof(double)*(du_da_short_len-1));
-  from_displacement_gradient = malloc(sizeof(double)*(du_da_short_len-1)*du_da_shortened_len); // axis zero (changes more slowly) is position along crack; axis one (changes more quickly) is du_da_shortened element
-  displacement_gradient = malloc(sizeof(double)*(du_da_short_len-1)*du_da_shortened_len); // axis zero (changes more slowly) is position along crack; axis one (changes more quickly) is du_da_shortened element
+  from_displacement = malloc(sizeof(double)*(afull_idx));
+  from_displacement_gradient = malloc(sizeof(double)*(afull_idx)*du_da_shortened_len); // axis zero (changes more slowly) is position along crack; axis one (changes more quickly) is du_da_shortened element
+  displacement_gradient = malloc(sizeof(double)*(afull_idx)*du_da_shortened_len); // axis zero (changes more slowly) is position along crack; axis one (changes more quickly) is du_da_shortened element
 
   
-  from_stress = malloc(sizeof(double)*(du_da_short_len-1));
-  from_stress_gradient = malloc(sizeof(double)*(du_da_short_len-1)*du_da_shortened_len); // axis zero (changes more slowly) is position along crack; axis one (changes more quickly) is du_da_shortened element
+  from_stress = malloc(sizeof(double)*(afull_idx));
+  from_stress_gradient = malloc(sizeof(double)*(afull_idx)*du_da_shortened_len); // axis zero (changes more slowly) is position along crack; axis one (changes more quickly) is du_da_shortened element
 
   dresidual = malloc(sizeof(double)*du_da_shortened_len); // axis zero is du_da_shortened element
   daverage = malloc(sizeof(double)*du_da_shortened_len); // axis zero is du_da_shortened element
@@ -523,7 +573,7 @@ static double soft_closure_goal_function_with_gradient_c(double *du_da_shortened
   // law... so we only iterate up to du_da_short_len-2,
   // representing that a stress concentration
   //  at the crack tip is OK for our goal 
-  for (cnt=0;cnt < du_da_short_len-2;cnt++) {
+  for (cnt=0;cnt < afull_idx-1;cnt++) {
     residual += pow(from_displacement[cnt]-from_stress[cnt],2.0);
     
     for (du_da_pos=0;du_da_pos < du_da_shortened_len;du_da_pos++) {
@@ -589,10 +639,10 @@ static double soft_closure_goal_function_with_gradient_c(double *du_da_shortened
     du_da_shortened_gradient_out[du_da_pos] = dresidual[du_da_pos] + dnegative[du_da_pos] + ddisplaced[du_da_pos] + duda_derivative_gradient_scaled[du_da_pos];
   }
 
-  //print_array("from_stress",from_stress,du_da_short_len-1);
-  //print_array("from_displacement",from_displacement,du_da_short_len-1);
-  //print_array("du_da_short",du_da_short,du_da_short_len);
-  //print_array("duda_derivative_gradient_scaled",duda_derivative_gradient_scaled,du_da_short_len);
+  //print_array("from_stress",from_stress,afull_idx);
+  //print_array("from_displacement",from_displacement,afull_idx);
+  //print_array("du_da_short",du_da_short,afull_idx);
+  //print_array("duda_derivative_gradient_scaled",duda_derivative_gradient_scaled,afull_idx);
   
   free(duda_derivative_gradient_scaled);
   free(ddisplaced);
