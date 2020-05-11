@@ -88,13 +88,19 @@ def run(_xmldoc,_element,
         dc_reff_side2_array,
         dc_seff_side2_array,
 
-        dc_symmetric_cod_bool, # Should be True for a surface or tunnel crack, False for an edge crack. 
+        dc_symmetric_cod_bool=None, # Should be True for a surface or tunnel crack, False for an edge crack. 
         dc_crack_model_normal_str="Tada_ModeI_CircularCrack_along_midline",
         dc_crack_model_shear_str="Fabrikant_ModeII_CircularCrack_along_midline",
         
         dx=5e-6):
 
     verbose=False
+
+    if dc_crack_model_normal_str=="ModeI_throughcrack_CODformula" and dc_symmetric_cod_bool is None:
+        raise ValueError("dc:symmetric_cod must be set to 'true' or 'false' when using ModeI_throughcrack_CODformula crack model")
+
+    if dc_crack_model_shear_str=="ModeII_throughcrack_CSDformula" and dc_symmetric_cod_bool is None:
+	raise ValueError("dc:symmetric_cod must be set to 'true' or 'false' when using ModeII_throughcrack_CSDformula crack model")
 
 
 
