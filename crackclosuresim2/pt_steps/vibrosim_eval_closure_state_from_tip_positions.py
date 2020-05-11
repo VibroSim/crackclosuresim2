@@ -88,6 +88,7 @@ def run(_xmldoc,_element,
         dc_reff_side2_array,
         dc_seff_side2_array,
 
+        dc_symmetric_cod_bool, # Should be True for a surface or tunnel crack, False for an edge crack. 
         dc_crack_model_normal_str="Tada_ModeI_CircularCrack_along_midline",
         dc_crack_model_shear_str="Fabrikant_ModeII_CircularCrack_along_midline",
         
@@ -97,8 +98,8 @@ def run(_xmldoc,_element,
 
 
 
-    crack_model_normal = crack_model_normal_by_name(dc_crack_model_normal_str,dc_YoungsModulus_numericunits.value("Pa"),dc_PoissonsRatio_float)
-    crack_model_shear = crack_model_shear_by_name(dc_crack_model_shear_str,dc_YoungsModulus_numericunits.value("Pa"),dc_PoissonsRatio_float)
+    crack_model_normal = crack_model_normal_by_name(dc_crack_model_normal_str,dc_YoungsModulus_numericunits.value("Pa"),dc_PoissonsRatio_float,dc_symmetric_cod_bool)
+    crack_model_shear = crack_model_shear_by_name(dc_crack_model_shear_str,dc_YoungsModulus_numericunits.value("Pa"),dc_PoissonsRatio_float,dc_symmetric_cod_bool)
     
     sigma_yield = dc_YieldStrength_numericunits.value("Pa")
 
