@@ -56,7 +56,7 @@ weightfun_epsx = dx/8.0
 #crack_model = Glinka_ModeI_ThroughCrack(Eeff,x,specimen_width,weightfun_epsx)
 #crack_model = ModeI_throughcrack_weightfun(Eeff,x,weightfun_epsx)
 
-#crack_model = ModeI_throughcrack_CODformula(Eeff)
+#crack_model = ModeI_throughcrack_CODformula(Eeff,Symmetric_COD=True)
 
 crack_model = Tada_ModeI_CircularCrack_along_midline(E,nu)
 

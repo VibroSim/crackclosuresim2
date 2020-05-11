@@ -710,6 +710,7 @@ def solve_shearstress(x,x_bnd,sigma_closure,dx,tauext_max,a,mu,tau_yield,crack_m
 
 
 class ModeII_throughcrack_CSDformula(ModeII_Beta_CSD_Formula):
+    Symmetric_CSD = None
     def r0_over_a(self,xt):
         """
         The baseline approximation of the stress field beyond the crack
@@ -740,7 +741,18 @@ class ModeII_throughcrack_CSDformula(ModeII_Beta_CSD_Formula):
         """
         return 8.0/((np.pi**2.0)*self.beta(self))
 
-    def __init__(self,E,nu):
+    def __init__(self,E,nu,Symmetric_CSD):
+        """E is Young's modulus; nu is Poisson's ration. 
+        Symmetric_CSD should be True or False depending on 
+        whether you want to use the crack-center symmetric
+        (elliptical displacement) form of the crack shear
+        displacement (CSD) expression (suitable for a 2-sided
+        crack) or the asymmetric form (suitable for an 
+        edge crack). 
+
+        Plane stress is assumed. 
+        """
+        
         def ut_per_unit_stress(E,nu,x,xt):
             # Non weightfunction method:
 
@@ -753,10 +765,16 @@ class ModeII_throughcrack_CSDformula(ModeII_Beta_CSD_Formula):
             # relative displacement between both flanks is double this
             
             #plane stress is considered
-            Kappa = (3.0-nu)/(1.0+nu)
-            KII_per_unit_stress = np.sqrt(np.pi*(xt))
-            theta = np.pi
-            ut_per_unit_stress = (KII_per_unit_stress/(2.0*E))*(np.sqrt((xt-x)/(2.0*np.pi)))*((1.0+nu)* (((2.0*Kappa+3.0)*(np.sin(theta/2.0)))+(np.sin(3.0*theta/2.0))))
+            if Symmetric_CSD:
+                # !!! Need to find citation for this formula !!!
+                ut_per_unit_stress = (2/E)*np.sqrt((xt+x)*(xt-x))
+                pass
+            else: 
+                Kappa = (3.0-nu)/(1.0+nu)
+                KII_per_unit_stress = np.sqrt(np.pi*(xt))
+                theta = np.pi
+                ut_per_unit_stress = (KII_per_unit_stress/(2.0*E))*(np.sqrt((xt-x)/(2.0*np.pi)))*((1.0+nu)* (((2.0*Kappa+3.0)*(np.sin(theta/2.0)))+(np.sin(3.0*theta/2.0))))
+                pass
             
             return ut_per_unit_stress
     
@@ -770,14 +788,26 @@ class ModeII_throughcrack_CSDformula(ModeII_Beta_CSD_Formula):
 
 class ModeIII_throughcrack_CSDformula(ModeII_Beta_CSD_Formula):
     # Note that there should really be a ModeIII_Beta_CSD_Formula plus adequate
-    # investigation to verify that formulas are applicable 
+    # investigation to verify that formulas are applicable
+    Symmetric_CSD=None
     def r0_over_a(self,xt):
         """
         This is correct for Mode I and Mode II.... we are assuming it is correct or roughly correct for mode III
         """
         return 8.0/((np.pi**2.0)*self.beta(self))
 
-    def __init__(self,E,nu):
+    def __init__(self,E,nu,Symmetric_CSD):
+        """E is Young's modulus; nu is Poisson's ration. 
+        Symmetric_CSD should be True or False depending on 
+        whether you want to use the crack-center symmetric
+        (elliptical displacement) form of the crack shear
+        displacement (CSD) expression (suitable for a 2-sided
+        crack) or the asymmetric form (suitable for an 
+        edge crack). 
+
+        Plane stress is assumed. 
+        """
+        self.Symmetric_CSD=Symmetric_CSD
         def ut_per_unit_stress(E,nu,x,xt):
             #For a 1D problem based on the Westergaard stress functions, since the
             #models are only valid in the region near the crack tip, This can be 
@@ -788,10 +818,15 @@ class ModeIII_throughcrack_CSDformula(ModeII_Beta_CSD_Formula):
             
             #plane stress is considered however, the Kappa value is not used.
             #Kappa = (3.0-nu)/(1.0+nu)
-            KIII_per_unit_stress = np.sqrt(np.pi*(xt))
-            theta = np.pi
-            ut_per_unit_stress = (KIII_per_unit_stress/(2.0*E))*(np.sqrt((xt-x)/(2.0*np.pi)))*((1.0+nu)*(np.sin(3.0*theta/2.0)))
-            
+            if Symmetric_CSD:
+                # !!! Need to find citation for this formula !!!
+                ut_per_unit_stress = (2/E)*np.sqrt((xt+x)*(xt-x))
+                pass
+            else:
+                KIII_per_unit_stress = np.sqrt(np.pi*(xt))
+                theta = np.pi
+                ut_per_unit_stress = (KIII_per_unit_stress/(2.0*E))*(np.sqrt((xt-x)/(2.0*np.pi)))*((1.0+nu)*(np.sin(3.0*theta/2.0)))
+                pass
             return ut_per_unit_stress
         
         super(ModeIII_throughcrack_CSDformula,self).__init__(E=E,

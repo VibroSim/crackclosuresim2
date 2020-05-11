@@ -177,7 +177,7 @@ class ModeI_Beta_WeightFunction(ModeI_crack_model):
 
         # sigmaI_theta0_times_rootr_over_sqrt_a_over_sigmaext = ([ integral_-a^(a-epsilon) M(x,a)/sqrt(a-x) dx + M(a,a)*2sqrt(epsilon) ] / sqrt(2*pi))
         
-        sigmaI_theta0_times_rootr_over_sqrt_a_over_sigmaext = (scipy.integrate.quad(lambda x: self.weightfun_times_sqrt_aminx(self,x,a)/np.sqrt(a-x),-a,a-self.epsx)[0] + self.weightfun_times_sqrt_aminx(self,a,a)*2.0*np.sqrt(weightfun_epsx)) / (np.sqrt(2*pi*a))
+        sigmaI_theta0_times_rootr_over_sqrt_a_over_sigmaext = (scipy.integrate.quad(lambda x: self.weightfun_times_sqrt_aminx(self,x,a)/np.sqrt(a-x),-a,a-self.epsx)[0] + self.weightfun_times_sqrt_aminx(self,a,a)*2.0*np.sqrt(self.epsx)) / (np.sqrt(2*pi*a))
         # unit check: (should be unitless)
         # Integral of stress*weight function*dx = SIF (i.e. stress*sqrt(meters))
         # units of weight function = 1/sqrt(meters)
@@ -1985,7 +1985,7 @@ class Glinka_ModeI_ThroughCrack(ModeI_Beta_WeightFunction):
             
             return (2.0/np.sqrt(2*np.pi))*(1.0+M1*scipy.sqrt(1.0-x/a)+M2*(1.0-x/a)+M3*(1.0-x/a)**1.5)
         
-        super(Glinka_ModeI_throughcrack, self).__init__(
+        super(Glinka_ModeI_ThroughCrack, self).__init__(
             weightfun_times_sqrt_aminx=lambda obj,x,a: weightfun_through_times_sqrt_aminx(x,a,width),
             epsx=epsx,
             Eeff=Eeff,
@@ -2023,6 +2023,8 @@ def ModeI_throughcrack_weightfun(Eeff,x,epsx):
                                      use_surrogate=True)
 
 class ModeI_throughcrack_CODformula(ModeI_Beta_COD_Formula):
+    Symmetric_COD = None
+    
     def r0_over_a(self,xt):
         """
         The baseline approximation of the stress field beyond the crack
@@ -2054,7 +2056,17 @@ class ModeI_throughcrack_CODformula(ModeI_Beta_COD_Formula):
         return 8.0/((np.pi**2.0)*self.beta(self))
     
         
-    def __init__(self,Eeff):
+    def __init__(self,Eeff,Symmetric_COD):
+        """Eeff is the effective modulus (just E for plane stress,
+        E/(1-nu^2) for plane strain)
+        Symmetric_COD should be True or False depending on whether
+        you want to use the crack-center symmetric (elliptical
+        displacement) form of the COD 
+        expression (suitable for a 2-sided crack) or the 
+        asymmetric form (suitable for an edge crack)"""
+
+        self.Symmetric_COD=Symmetric_COD
+        
         def u_per_unit_stress(Eeff,x,xt):  # half-opening displacement over sigma_applied
             # Non weightfunction method:
 
@@ -2068,12 +2080,40 @@ class ModeI_throughcrack_CODformula(ModeI_Beta_COD_Formula):
             #u = (KI/(2.0*E))*(np.sqrt((xt-x)/(2.0*np.pi)))*((1.0+nu)* 
             #                                                (((2.0*Kappa+1.0)*(np.sin(theta/2.0)))-np.sin(3.0*theta/2.0)))
             
-            # New Method: Based on Anderson, eq. A2.43
+            # New Method: Based on Anderson, eq. A2.43 (Symmetric_COD)
             # uy = 2(sigma/Eeff)*sqrt(a^2-x^2)
             # uy = 2(sigma/Eeff)*sqrt((a+x)(a-x))
             
             #Eeff = E
-            u_per_unit_stress = (2/Eeff)*np.sqrt((xt+x)*(xt-x))
+            if Symmetric_COD:  # Anderson, eq A2.43
+                u_per_unit_stress = (2/Eeff)*np.sqrt((xt+x)*(xt-x))
+                pass
+            else:
+                # Anderson, table 2.2:
+                # uy = (KI/(2mu)) sqrt((xt-x)/(2pi)) (kappa + 1)
+
+                # kappa = (3-nu)/(1+nu)  (plane stress)
+                # kappa = (3-4nu) (plane strain)
+                # so kappa + 1 =
+                # kappa + 1 = (3-nu +1 +nu)/(1+nu)
+                #           = 4/(1+nu) (plane stress)
+                # kappa + 1 = 4(1-nu) plane strain
+                #
+                # and mu = E/(2*(1+nu))
+                # so
+                # uy = (KI/E) (1+nu) sqrt((xt-x)/(2pi)) (4/(1+nu)) (plane stress)
+                # uy = 4 * (KI/E) sqrt((xt-x)/(2pi)) (plane stress)
+
+                # uy = (KI/E) (1+nu) sqrt((xt-x)/(2pi)) 4(1-nu) (plane strain)
+                # uy = 4 * (KI/E) sqrt((xt-x)/(2pi)) * (1+nu)(1-nu) (plane strain)
+                # uy = 4 * (KI/E) sqrt((xt-x)/(2pi)) * (1-nu^2) (plane strain)
+                # letting Eeff = E (plane stress) or Eeff = E/(1-nu^2) (plane strain),
+                # uy = 4 * (KI/Eeff) sqrt((xt-x)/(2pi))
+                # where KI = sigma_inf *sqrt(pi*xt*beta) (beta=1 in this case)
+                # so u_per_unit_stress = (4*sqrt(pi*xt)/Eeff) * sqrt((xt-x)/(2pi))
+                # u_per_unit_stress = (4*sqrt(a)/Eeff) * sqrt((xt-x)/(2))
+                u_per_unit_stress = (4.0*np.sqrt(xt)/Eeff)*np.sqrt((xt-x)/2.0)
+                pass
             return u_per_unit_stress
     
         super(ModeI_throughcrack_CODformula, self).__init__(Eeff=Eeff,
@@ -2173,7 +2213,7 @@ def perform_inverse_closure(inputfilename,E,nu,sigma_yield,CrackCenterX,dx,speci
     x_bnd=np.arange(xsteps,dtype='d')*dx
     x = (x_bnd[1:]+x_bnd[:-1])/2.0
 
-    weightfun_epsx = dx/8.0
+    #weightfun_epsx = dx/8.0
     crack_model = Tada_ModeI_CircularCrack_along_midline(E,nu)
 
 

@@ -49,7 +49,7 @@ x = (x_bnd[1:]+x_bnd[:-1])/2.0  # x represents x coordinates of the centers of e
 #Friction coefficient
 mu = 0.33
 
-crack_model=ModeII_throughcrack_CSDformula(E,nu)
+crack_model=ModeII_throughcrack_CSDformula(E,nu,Symmetric_CSD=True)
 
     
 # Closure state (function of position; positive compression)

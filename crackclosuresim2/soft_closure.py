@@ -564,13 +564,28 @@ def sigmacontact_from_displacement(scp,du_da,closure_index_for_gradient=None):
 
     if isinstance(scp.crack_model,ModeI_throughcrack_CODformula):
     
-        # special case for fully-open singularity du_da[scp.afull_idx+1]
-        displacement[:scp.afull_idx] += (4.0/scp.crack_model.Eeff)*du_da[scp.afull_idx+1]*np.sqrt((scp.x_bnd[scp.afull_idx]+x[:scp.afull_idx])*(scp.x_bnd[scp.afull_idx]-x[:scp.afull_idx]))*da
+        # special case for fully-open singularity du_da[scp.afull_idx+1]... Note that this is full displacement, not half-displacement, so double the u_per_unit_stress of crackclosure.py
+        if scp.crack_model.Symmetric_COD:
+            # symmetric form
+            displacement[:scp.afull_idx] += (4.0/scp.crack_model.Eeff)*du_da[scp.afull_idx+1]*np.sqrt((scp.x_bnd[scp.afull_idx]+x[:scp.afull_idx])*(scp.x_bnd[scp.afull_idx]-x[:scp.afull_idx]))*da
+            pass
+        else:
+            # asymmetric form
+            displacement[:scp.afull_idx] += (8.0/scp.crack_model.Eeff)*du_da[scp.afull_idx+1]*np.sqrt(scp.x_bnd[scp.afull_idx]*(scp.x_bnd[scp.afull_idx]-x[:scp.afull_idx])/2.0)*da
+            pass
 
         if closure_index_for_gradient is not None:
             if scp.afull_idx+1 >= closure_index_for_gradient+2:
                 du_da_shortened_index = scp.afull_idx -  closure_index_for_gradient
-                displacement_gradient[:scp.afull_idx,du_da_shortened_index] += (4.0/scp.crack_model.Eeff)*np.sqrt((scp.x_bnd[scp.afull_idx]+x[:scp.afull_idx])*(scp.x_bnd[scp.afull_idx]-x[:scp.afull_idx]))*da
+                if scp.crack_model.Symmetric_COD:
+                    # symmetric form
+                    displacement_gradient[:scp.afull_idx,du_da_shortened_index] += (4.0/scp.crack_model.Eeff)*np.sqrt((scp.x_bnd[scp.afull_idx]+x[:scp.afull_idx])*(scp.x_bnd[scp.afull_idx]-x[:scp.afull_idx]))*da
+                    pass
+                else:
+                    # asymmetric form
+                    displacement_gradient[:scp.afull_idx,du_da_shortened_index] += (8.0/scp.crack_model.Eeff)*np.sqrt(scp.x_bnd[scp.afull_idx]*(scp.x_bnd[scp.afull_idx]-x[:scp.afull_idx])/2.0)*da
+                    pass
+                
                 pass
                 
             pass
@@ -584,22 +599,47 @@ def sigmacontact_from_displacement(scp,du_da,closure_index_for_gradient=None):
             #   in next line: sqrt( (a+x) * (a-x) where x >= 0 and
             #   throw out where x >= a
             # diplacement defined on x
-            displacement[:aidx] += (4.0/scp.crack_model.Eeff)*du_da[aidx+1]*np.sqrt((x[aidx]+x[:aidx])*(x[aidx]-x[:aidx]))*da
+            if scp.crack_model.Symmetric_COD:
+                # symmetric form
+                displacement[:aidx] += (4.0/scp.crack_model.Eeff)*du_da[aidx+1]*np.sqrt((x[aidx]+x[:aidx])*(x[aidx]-x[:aidx]))*da
+                pass
+            else:
+                # asymmetric form
+                displacement[:aidx] += (8.0/scp.crack_model.Eeff)*du_da[aidx+1]*np.sqrt(x[aidx]*(x[aidx]-x[:aidx])/2.0)*da
+                pass
+
             
             # Add in the x=a position
-            # Here we have the integral of (4/E)*(du/da)*sqrt( (a+x)* (a-x) )da
-            # as a goes from x[aidx] to x[aidx]+da/2
-            # ... treat du/da and sqrt(a+x) as constant:
-            #  (4/E)*(du/da)*sqrt(a+x) * integral of sqrt(a-x) da
-            # = (4/E)*(du/da)*sqrt(a+x) * (2/3) * (  (x[aidx]+da/2-x[aidx])^(3/2) - (x[aidx]-x[aidx])^(3/2) )
-            # = (4/E)*(du/da)*sqrt(a+x) * (2/3) * ( (da/2)^(3/2) )
-            displacement[aidx] += (4.0/scp.crack_model.Eeff)*du_da[aidx+1]*np.sqrt(2.0*x[aidx])*(da/2.0)**(3.0/2.0)
-
+            
+            if scp.crack_model.Symmetric_COD:
+                # Here we have the integral of (4/E)*(du/da)*sqrt( (a+x)* (a-x) )da
+                # as a goes from x[aidx] to x[aidx]+da/2
+                # ... treat du/da and sqrt(a+x) as constant:
+                #  (4/E)*(du/da)*sqrt(a+x) * integral of sqrt(a-x) da
+                # = (4/E)*(du/da)*sqrt(a+x) * (2/3) * (  (x[aidx]+da/2-x[aidx])^(3/2) - (x[aidx]-x[aidx])^(3/2) )
+                # = (4/E)*(du/da)*sqrt(a+x) * (2/3) * ( (da/2)^(3/2) )
+                displacement[aidx] += (4.0/scp.crack_model.Eeff)*du_da[aidx+1]*np.sqrt(2.0*x[aidx])*(2.0/3.0)*(da/2.0)**(3.0/2.0)
+                pass
+            else:
+                # Here we have the integral of (8/E)*(du/da)*sqrt( a*(a-x)/2.0 )da
+                # as a goes from x[aidx] to x[aidx]+da/2
+                # ... treat du/da as constant:
+                #  (8/E)*(du/da)*sqrt(a/2.0) * integral of sqrt(a-x) da                
+                # = (8/E)*(du/da)*sqrt(a/2.0) * (2/3) * (  (x[aidx]+da/2-x[aidx])^(3/2) - (x[aidx]-x[aidx])^(3/2) )
+                # = (8/E)*(du/da)*sqrt(a/2.0) * (2/3) * ( (da/2)^(3/2) )
+                displacement[aidx] += (8.0/scp.crack_model.Eeff)*du_da[aidx+1]*np.sqrt(x[aidx]/2.0)*(2.0/3.0)*(da/2.0)**(3.0/2.0)
+                pass
             if closure_index_for_gradient is not None:
                 if aidx+1 >= closure_index_for_gradient+2:
                     du_da_shortened_index = aidx -  closure_index_for_gradient
-                    displacement_gradient[:aidx,du_da_shortened_index] += (4.0/scp.crack_model.Eeff)*np.sqrt((x[aidx]+x[:aidx])*(x[aidx]-x[:aidx]))*da
-                    displacement_gradient[aidx,du_da_shortened_index] += (4.0/scp.crack_model.Eeff)*np.sqrt(2.0*x[aidx])*(da/2.0)**(3.0/2.0)
+                    if scp.crack_model.Symmetric_COD:
+                        displacement_gradient[:aidx,du_da_shortened_index] += (4.0/scp.crack_model.Eeff)*np.sqrt((x[aidx]+x[:aidx])*(x[aidx]-x[:aidx]))*da
+                        displacement_gradient[aidx,du_da_shortened_index] += (4.0/scp.crack_model.Eeff)*np.sqrt(2.0*x[aidx])*(2.0/3.0)*(da/2.0)**(3.0/2.0)
+                        pass
+                    else:
+                        displacement_gradient[:aidx,du_da_shortened_index] += (8.0/scp.crack_model.Eeff)*np.sqrt(x[aidx]*(x[aidx]-x[:aidx])/2.0)*da
+                        displacement_gradient[aidx,du_da_shortened_index] += (8.0/scp.crack_model.Eeff)*np.sqrt(x[aidx]/2.0)*(2.0/3.0)*(da/2.0)**(3.0/2.0)
+                        pass
                     pass
                 
                 pass

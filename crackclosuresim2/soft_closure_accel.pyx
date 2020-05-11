@@ -11,6 +11,7 @@ cdef extern from "soft_closure_accel_ops.h":
         double Eeff
         double Beta
         double r0_over_a
+        int Symmetric_COD
         pass
     cdef struct crack_model_tada_t:
         double E
@@ -64,7 +65,8 @@ def initialize_contact_goal_function_with_gradient_accel(np.ndarray[np.float64_t
         crack_model.modeltype=CMT_THROUGH
         crack_model.modeldat.through.Eeff = scp.crack_model.Eeff
         crack_model.modeldat.through.Beta = scp.crack_model.beta(scp.crack_model)
-        crack_model.modeldat.through.r0_over_a = scp.crack_model.r0_over_a(np.nan) # Should be independent of crack length, so we provide nan as parameter to be sure. 
+        crack_model.modeldat.through.r0_over_a = scp.crack_model.r0_over_a(np.nan) # Should be independent of crack length, so we provide nan as parameter to be sure.
+        crack_model.modeldat.through.Symmetric_COD = scp.crack_model.Symmetric_COD
         pass
     elif isinstance(scp.crack_model,Tada_ModeI_CircularCrack_along_midline):
         crack_model.modeltype=CMT_TADA
@@ -73,6 +75,13 @@ def initialize_contact_goal_function_with_gradient_accel(np.ndarray[np.float64_t
         crack_model.modeldat.tada.Beta = scp.crack_model.beta(scp.crack_model)
         crack_model.modeldat.tada.r0_over_a = scp.crack_model.r0_over_a(np.nan) # Should be independent of crack length, so we provide nan as parameter to be sure.
         pass
+    else:
+        crack_model.modeltype=CMT_THROUGH
+        crack_model.modeldat.through.Eeff = 0.0
+        crack_model.modeldat.through.Beta = 0.0
+        crack_model.modeldat.through.r0_over_a = 0.0
+        crack_model.modeldat.through.Symmetric_COD=False
+        raise ValueError("Invalid crack model class")
     
     gradient = np.empty(du_da_shortened.shape[0],dtype='d')
 
@@ -124,7 +133,7 @@ def soft_closure_goal_function_with_gradient_accel(np.ndarray[np.float64_t,ndim=
         crack_model.modeldat.through.Eeff = scp.crack_model.Eeff
         crack_model.modeldat.through.Beta = scp.crack_model.beta(scp.crack_model)
         crack_model.modeldat.through.r0_over_a = scp.crack_model.r0_over_a(np.nan) # Should be independent of crack length, so we provide nan as parameter to be sure.
-
+        crack_model.modeldat.through.Symmetric_COD = scp.crack_model.Symmetric_COD
         pass
     elif isinstance(scp.crack_model,Tada_ModeI_CircularCrack_along_midline):
         crack_model.modeltype=CMT_TADA
@@ -138,6 +147,7 @@ def soft_closure_goal_function_with_gradient_accel(np.ndarray[np.float64_t,ndim=
         crack_model.modeldat.through.Eeff = 0.0
         crack_model.modeldat.through.Beta = 0.0
         crack_model.modeldat.through.r0_over_a = 0.0
+        crack_model.modeldat.through.Symmetric_COD=False
         raise ValueError("Invalid crack model class")
 
     gradient = np.empty(du_da_shortened.shape[0],dtype='d')

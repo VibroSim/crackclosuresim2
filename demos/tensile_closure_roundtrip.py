@@ -53,7 +53,7 @@ if __name__=="__main__":
     
     # Closure state (function of position; positive compression)
     # Use hard closure model to solve for closure state
-    crack_model = ModeI_throughcrack_CODformula(Eeff)
+    crack_model = ModeI_throughcrack_CODformula(Eeff,Symmetric_COD=True)
     #crack_model = Tada_ModeI_CircularCrack_along_midline(E,nu)
     
 

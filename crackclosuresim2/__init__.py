@@ -61,11 +61,12 @@ from .shear_stickslip import ModeIII_throughcrack_CSDformula
 
 from .fabrikant import Fabrikant_ModeII_CircularCrack_along_midline
 
-def crack_model_normal_by_name(crack_model_normal_name,YoungsModulus,PoissonsRatio):
+def crack_model_normal_by_name(crack_model_normal_name,YoungsModulus,PoissonsRatio,Symmetric_COD):
     if crack_model_normal_name == "ModeI_throughcrack_CODformula":
-        crack_model_normal = ModeI_throughcrack_CODformula(YoungsModulus)# ,PoissonsRatio)
+        crack_model_normal = ModeI_throughcrack_CODformula(YoungsModulus,Symmetric_COD=Symmetric_COD)# ,PoissonsRatio)
         pass
     elif crack_model_normal_name == "Tada_ModeI_CircularCrack_along_midline":
+        assert(Symmetric_COD) # Tada is a symmetric model
         crack_model_normal = Tada_ModeI_CircularCrack_along_midline(YoungsModulus,PoissonsRatio)
         pass
     else:
@@ -76,15 +77,16 @@ def crack_model_normal_by_name(crack_model_normal_name,YoungsModulus,PoissonsRat
 
 
 
-def crack_model_shear_by_name(crack_model_shear_name,YoungsModulus,PoissonsRatio):
+def crack_model_shear_by_name(crack_model_shear_name,YoungsModulus,PoissonsRatio,Symmetric_CSD):
     if crack_model_shear_name == "ModeII_throughcrack_CSDformula":
-        crack_model_shear = ModeII_throughcrack_CSDformula(YoungsModulus,PoissonsRatio)
+        crack_model_shear = ModeII_throughcrack_CSDformula(YoungsModulus,PoissonsRatio,Symmetric_CSD=Symmetric_CSD)
         pass
     elif crack_model_shear_name == "Fabrikant_ModeII_CircularCrack_along_midline":
+        assert(Symmetric_CSD) # Fabrikant model is a symmetric cmodel
         crack_model_shear = Fabrikant_ModeII_CircularCrack_along_midline(YoungsModulus,PoissonsRatio)
         pass
     elif crack_model_shear_name == "ModeIII_throughcrack_CSDformula":
-        crack_model_shear = ModeIII_throughcrack_CSDformula(YoungsModulus,PoissonsRatio)
+        crack_model_shear = ModeIII_throughcrack_CSDformula(YoungsModulus,PoissonsRatio,Symmetric_CSD=Symmetric_CSD)
         pass
     else:
         raise ValueError("Unknown shear stress crack model %s" % (crack_model_shear_name))

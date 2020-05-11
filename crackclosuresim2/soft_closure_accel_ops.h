@@ -4,6 +4,7 @@ struct crack_model_throughcrack_t {
   double Eeff;
   double Beta;
   double r0_over_a;
+  int Symmetric_COD;
 };
 
 struct crack_model_tada_t {
@@ -162,51 +163,87 @@ static void sigmacontact_from_displacement(double *du_da_short,
   int aidx;
 
   assert(du_da_short_len == afull_idx + 1);
-  
+
   for (cnt=0;cnt < afull_idx;cnt++) {
     displacement[cnt] = crack_initial_full_opening_interp[cnt] - pow(sigma_closure_interp[cnt]/Lm,2.0/3.0);
-
+    
     for (du_da_pos=0;du_da_pos < du_da_shortened_len;du_da_pos++) {
       displacement_gradient[cnt*du_da_shortened_len + du_da_pos] = 0.0;
     }
   }
-
+  
   
   if (crack_model.modeltype==CMT_THROUGH) {
-    // special case for fully-open singularity du_da[scp.afull_idx+1]
-    du_da_shortened_index = afull_idx - closure_index_for_gradient;
-    for (cnt=0;cnt < afull_idx;cnt++) {
-      displacement[cnt] += (4.0/crack_model.modeldat.through.Eeff)*du_da_short[afull_idx+1]*sqrt((x0-(dx/2.0)+afull_idx*dx + x0+cnt*dx)*(x0-(dx/2.0)+afull_idx*dx - x0-cnt*dx))*dx;	
-    }
-    if (afull_idx+1 >= closure_index_for_gradient+2) {
+    if (crack_model.modeldat.through.Symmetric_COD) {
+      
+      // special case for fully-open singularity du_da[scp.afull_idx+1]
+      du_da_shortened_index = afull_idx - closure_index_for_gradient;
       for (cnt=0;cnt < afull_idx;cnt++) {
-	displacement_gradient[cnt*du_da_shortened_len + du_da_shortened_index] += (4.0/crack_model.modeldat.through.Eeff)*sqrt((x0-(dx/2.0)+afull_idx*dx + x0+cnt*dx)*(x0-(dx/2.0)+afull_idx*dx - x0-cnt*dx))*dx;
+	displacement[cnt] += (4.0/crack_model.modeldat.through.Eeff)*du_da_short[afull_idx+1]*sqrt((x0-(dx/2.0)+afull_idx*dx + x0+cnt*dx)*(x0-(dx/2.0)+afull_idx*dx - x0-cnt*dx))*dx;	
+      }
+      if (afull_idx+1 >= closure_index_for_gradient+2) {
+	for (cnt=0;cnt < afull_idx;cnt++) {
+	  displacement_gradient[cnt*du_da_shortened_len + du_da_shortened_index] += (4.0/crack_model.modeldat.through.Eeff)*sqrt((x0-(dx/2.0)+afull_idx*dx + x0+cnt*dx)*(x0-(dx/2.0)+afull_idx*dx - x0-cnt*dx))*dx;
+	}	
       }
       
+    } else {
+      // Asymmetric COD
+      
+      // special case for fully-open singularity du_da[scp.afull_idx+1]
+      du_da_shortened_index = afull_idx - closure_index_for_gradient;
+      for (cnt=0;cnt < afull_idx;cnt++) {
+	displacement[cnt] += (8.0/crack_model.modeldat.through.Eeff)*du_da_short[afull_idx+1]*sqrt((x0-(dx/2.0)+afull_idx*dx)*(x0-(dx/2.0)+afull_idx*dx - x0-cnt*dx)/2.0)*dx;	
+      }
+      if (afull_idx+1 >= closure_index_for_gradient+2) {
+	for (cnt=0;cnt < afull_idx;cnt++) {
+	  displacement_gradient[cnt*du_da_shortened_len + du_da_shortened_index] += (8.0/crack_model.modeldat.through.Eeff)*sqrt((x0-(dx/2.0)+afull_idx*dx)*(x0-(dx/2.0)+afull_idx*dx - x0-cnt*dx)/2.0)*dx;
+	}	
+      }
       
     }
-
+    
 
     // rest of du_da points, except for zeroth point which has no effect on displacement
     for (aidx=(afull_idx-1);aidx >= 0;aidx--) {
       du_da_shortened_index = aidx - closure_index_for_gradient;
 
-      for (cnt=0;cnt < aidx;cnt++) {
-	displacement[cnt] += (4.0/crack_model.modeldat.through.Eeff)*du_da_short[aidx+1]*sqrt((x0+aidx*dx + x0+cnt*dx)*(x0+aidx*dx - x0-cnt*dx))*dx;
-	
-      }
       
-      displacement[aidx] += (4.0/crack_model.modeldat.through.Eeff)*du_da_short[aidx+1]*sqrt(2.0*(x0+aidx*dx))*pow(dx/2.0,3.0/2.0);
-
-      if (aidx+1 >= closure_index_for_gradient+2) {
+      if (crack_model.modeldat.through.Symmetric_COD) {
 	for (cnt=0;cnt < aidx;cnt++) {
-	  displacement_gradient[cnt*du_da_shortened_len + du_da_shortened_index] += (4.0/crack_model.modeldat.through.Eeff)*sqrt((x0+aidx*dx + x0+cnt*dx)*(x0+aidx*dx - x0-cnt*dx))*dx;
+	  displacement[cnt] += (4.0/crack_model.modeldat.through.Eeff)*du_da_short[aidx+1]*sqrt((x0+aidx*dx + x0+cnt*dx)*(x0+aidx*dx - x0-cnt*dx))*dx;
+	  
 	}
+	
+	displacement[aidx] += (4.0/crack_model.modeldat.through.Eeff)*du_da_short[aidx+1]*sqrt(2.0*(x0+aidx*dx))*(2.0/3.0)*pow(dx/2.0,3.0/2.0);
+	
+	if (aidx+1 >= closure_index_for_gradient+2) {
+	  for (cnt=0;cnt < aidx;cnt++) {
+	    displacement_gradient[cnt*du_da_shortened_len + du_da_shortened_index] += (4.0/crack_model.modeldat.through.Eeff)*sqrt((x0+aidx*dx + x0+cnt*dx)*(x0+aidx*dx - x0-cnt*dx))*dx;
+	  }
 
-	displacement_gradient[aidx*du_da_shortened_len + du_da_shortened_index] += (4.0/crack_model.modeldat.through.Eeff)*sqrt(2.0*(x0+aidx*dx))*pow(dx/2.0,3.0/2.0);
+	  displacement_gradient[aidx*du_da_shortened_len + du_da_shortened_index] += (4.0/crack_model.modeldat.through.Eeff)*sqrt(2.0*(x0+aidx*dx))*(2.0/3.0)*pow(dx/2.0,3.0/2.0);
+	
+	}
+      } else {
+	// Asymmetric COD
+	for (cnt=0;cnt < aidx;cnt++) {
+	  displacement[cnt] += (8.0/crack_model.modeldat.through.Eeff)*du_da_short[aidx+1]*sqrt((x0+aidx*dx)*(x0+aidx*dx - x0-cnt*dx)/2.0)*dx;
+	  
+	}
+	
+	displacement[aidx] += (8.0/crack_model.modeldat.through.Eeff)*du_da_short[aidx+1]*sqrt((x0+aidx*dx)/2.0)*(2.0/3.0)*pow(dx/2.0,3.0/2.0);
+	
+	if (aidx+1 >= closure_index_for_gradient+2) {
+	  for (cnt=0;cnt < aidx;cnt++) {
+	    displacement_gradient[cnt*du_da_shortened_len + du_da_shortened_index] += (8.0/crack_model.modeldat.through.Eeff)*sqrt((x0+aidx*dx)*(x0+aidx*dx - x0-cnt*dx)/2.0)*dx;
+	  }
+	  
+	  displacement_gradient[aidx*du_da_shortened_len + du_da_shortened_index] += (8.0/crack_model.modeldat.through.Eeff)*sqrt((x0+aidx*dx)/2.0)*(2.0/3.0)*pow(dx/2.0,3.0/2.0);
+	  
+	}
 	
       }
-      
 
       
     }
