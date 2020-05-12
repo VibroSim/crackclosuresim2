@@ -100,7 +100,7 @@ def run(_xmldoc,_element,
         raise ValueError("dc:symmetric_cod must be set to 'true' or 'false' when using ModeI_throughcrack_CODformula crack model")
 
     if dc_crack_model_shear_str=="ModeII_throughcrack_CSDformula" and dc_symmetric_cod_bool is None:
-	raise ValueError("dc:symmetric_cod must be set to 'true' or 'false' when using ModeII_throughcrack_CSDformula crack model")
+        raise ValueError("dc:symmetric_cod must be set to 'true' or 'false' when using ModeII_throughcrack_CSDformula crack model")
 
 
 
