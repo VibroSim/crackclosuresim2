@@ -819,9 +819,7 @@ class ModeIII_throughcrack_CSDformula(ModeII_Beta_CSD_Formula):
             #plane stress is considered however, the Kappa value is not used.
             #Kappa = (3.0-nu)/(1.0+nu)
             if Symmetric_CSD:
-                # !!! Need to find citation for this formula !!!
-                ut_per_unit_stress = (2/E)*np.sqrt((xt+x)*(xt-x))
-                pass
+                raise ValueError("Symmetric crack shear displacement for mode III does not make any sense")
             else:
                 KIII_per_unit_stress = np.sqrt(np.pi*(xt))
                 theta = np.pi
