@@ -825,7 +825,7 @@ class ModeIII_throughcrack_CSDformula(ModeII_Beta_CSD_Formula):
             else:
                 KIII_per_unit_stress = np.sqrt(np.pi*(xt))
                 theta = np.pi
-                ut_per_unit_stress = (KIII_per_unit_stress/(2.0*E))*(np.sqrt((xt-x)/(2.0*np.pi)))*((1.0+nu)*(np.sin(3.0*theta/2.0)))
+                ut_per_unit_stress = ((2.0*KIII_per_unit_stress)/(E))*(np.sqrt((xt-x)/(2.0*np.pi)))*(2.0*(1.0+nu)*(np.sin(theta/2.0)))
                 pass
             return ut_per_unit_stress
         
