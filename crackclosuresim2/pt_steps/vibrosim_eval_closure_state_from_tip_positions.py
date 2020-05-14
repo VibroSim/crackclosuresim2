@@ -83,16 +83,18 @@ def run(_xmldoc,_element,
         dc_YoungsModulus_numericunits,
         dc_PoissonsRatio_float,
         dc_YieldStrength_numericunits,
-        dc_reff_side1_array, # NOTE: arrayvalue class is not unit-aware!
-        dc_seff_side1_array, 
-        dc_reff_side2_array,
-        dc_seff_side2_array,
-
+        dc_crack_type_side1_str,
+        dc_crack_type_side2_str,
+        dc_reff_side1_array=None, # NOTE: arrayvalue class is not unit-aware!
+        dc_seff_side1_array=None, 
+        dc_reff_side2_array=None,
+        dc_seff_side2_array=None,
         dc_symmetric_cod_bool=None, # Should be True for a surface or tunnel crack, False for an edge crack. 
         dc_crack_model_normal_str="Tada_ModeI_CircularCrack_along_midline",
         dc_crack_model_shear_str="Fabrikant_ModeII_CircularCrack_along_midline",
-        
         dx=5e-6):
+    """ NOTE: Returns closure state of each side (unless crack_type is none).
+    Also sets a_side1 and a_side2 crack length elements """
 
     verbose=False
 
@@ -109,16 +111,29 @@ def run(_xmldoc,_element,
     
     sigma_yield = dc_YieldStrength_numericunits.value("Pa")
 
-    reff_side1 = dc_reff_side1_array.value()
-    seff_side1 = dc_seff_side1_array.value()
+    a_side1=0.0
+    a_side2=0.0
 
-    reff_side2 = dc_reff_side2_array.value()
-    seff_side2 = dc_seff_side2_array.value()
+    if dc_crack_type_side1_str.lower() != "none":
+        if dc_reff_side1_array is None or dc_seff_side1_array is None:
+            raise ValueError("dc:reff_side1 and dc_seff_side1 must be specified since dc:crack_type_side1 is \"%s\" and not \"none\"." % (dc_crack_type_side1_str))
 
 
-    # Fully open crack lengths for left and right side
-    a_side1 = np.max(reff_side1) 
-    a_side2 = np.max(reff_side2)
+        reff_side1 = dc_reff_side1_array.value()
+        seff_side1 = dc_seff_side1_array.value()
+        # Fully open crack length 
+        a_side1 = np.max(reff_side1) 
+        pass
+
+    if dc_crack_type_side2_str.lower() != "none":
+        if dc_reff_side2_array is None or dc_seff_side2_array is None:
+            raise ValueError("dc:reff_side2 and dc:seff_side2 must be specified since dc:crack_type_side2 is \"%s\" and not \"none\"." % (dc_crack_type_side2_str))
+
+        reff_side2 = dc_reff_side2_array.value()
+        seff_side2 = dc_seff_side2_array.value()
+        # Fully open crack length
+        a_side2 = np.max(reff_side2)
+        pass
 
     # Desired approximate step size for calculations
     approximate_xstep=25e-6 # 25um
@@ -133,68 +148,85 @@ def run(_xmldoc,_element,
     x_bnd = xstep*np.arange(num_boundary_steps) # Position of element boundaries
     xrange = (x_bnd[1:] + x_bnd[:-1])/2.0 # Position of element centers
 
-    # Determine closure stress field from observed crack length data
-    closure_stress_side1=inverse_closure(reff_side1,seff_side1,xrange,x_bnd,xstep,a_side1,sigma_yield,crack_model_normal,verbose=verbose)
-    
-    closure_stress_side2=inverse_closure(reff_side2,seff_side2,xrange,x_bnd,xstep,a_side2,sigma_yield,crack_model_normal,verbose=verbose)
-    
-    
-    # Evaluate initial crack opening gaps from extrapolated tensile closure field
-    crack_initial_opening_side1 = crackopening_from_tensile_closure(xrange,x_bnd,closure_stress_side1,xstep,a_side1,sigma_yield,crack_model_normal)
-    
-    crack_initial_opening_side2 = crackopening_from_tensile_closure(xrange,x_bnd,closure_stress_side2,xstep,a_side2,sigma_yield,crack_model_normal)
-    
 
-    # Plot the evaluated closure state (side1)
-    pl.figure()
-    pl.plot(xrange[xrange < a_side1]*1e3,closure_stress_side1[xrange < a_side1]/1e6,'-',
-            reff_side1*1e3,seff_side1/1e6,'x')
-    for observcnt in range(len(reff_side1)):        
-        (effective_length, sigma, tensile_displ, dsigmaext_dxt) = solve_normalstress(xrange,x_bnd,closure_stress_side1,xstep,seff_side1[observcnt],a_side1,sigma_yield,crack_model_normal)
-        pl.plot(effective_length*1e3,seff_side1[observcnt]/1e6,'.')
+    if dc_crack_type_side1_str.lower() != "none":
+        # Determine closure stress field from observed crack length data
+        closure_stress_side1=inverse_closure(reff_side1,seff_side1,xrange,x_bnd,xstep,a_side1,sigma_yield,crack_model_normal,verbose=verbose)
+        # Evaluate initial crack opening gaps from extrapolated tensile closure field
+        crack_initial_opening_side1 = crackopening_from_tensile_closure(xrange,x_bnd,closure_stress_side1,xstep,a_side1,sigma_yield,crack_model_normal)
         pass
-    pl.grid(True)
-    pl.legend(('Closure stress field','Observed crack tip posn','Recon. crack tip posn'),loc="best")
-    pl.xlabel('Radius from crack center (mm)')
-    pl.ylabel('Stress (MPa)')
-    pl.title('Crack closure state (side1)')
 
-    closure_state_side1_href = hrefv(quote(dc_measident_str+"_closurestate_side1.png"),dc_dest_href)
-    pl.savefig(closure_state_side1_href.getpath(),dpi=300)
+    
+    if dc_crack_type_side2_str.lower() != "none":
+        # Determine closure stress field from observed crack length data
+        closure_stress_side2=inverse_closure(reff_side2,seff_side2,xrange,x_bnd,xstep,a_side2,sigma_yield,crack_model_normal,verbose=verbose)
+    
+        # Evaluate initial crack opening gaps from extrapolated tensile closure field
+        crack_initial_opening_side2 = crackopening_from_tensile_closure(xrange,x_bnd,closure_stress_side2,xstep,a_side2,sigma_yield,crack_model_normal)
+        pass
 
+    ret={} # return dictionary
+
+    if dc_crack_type_side1_str.lower() != "none":
+        # Plot the evaluated closure state (side1)
+        pl.figure()
+        pl.plot(xrange[xrange < a_side1]*1e3,closure_stress_side1[xrange < a_side1]/1e6,'-',
+                reff_side1*1e3,seff_side1/1e6,'x')
+        for observcnt in range(len(reff_side1)):        
+            (effective_length, sigma, tensile_displ, dsigmaext_dxt) = solve_normalstress(xrange,x_bnd,closure_stress_side1,xstep,seff_side1[observcnt],a_side1,sigma_yield,crack_model_normal)
+            pl.plot(effective_length*1e3,seff_side1[observcnt]/1e6,'.')
+            pass
+        pl.grid(True)
+        pl.legend(('Closure stress field','Observed crack tip posn','Recon. crack tip posn'),loc="best")
+        pl.xlabel('Radius from crack center (mm)')
+        pl.ylabel('Stress (MPa)')
+        pl.title('Crack closure state (side1)')
+        
+        closureplot_side1_href = hrefv(quote(dc_measident_str+"_closurestate_side1.png"),dc_dest_href)
+        pl.savefig(closureplot_side1_href.getpath(),dpi=300)
+        ret["dc:closureplot_side1"] = closureplot_side1_href
+        pass
+
+
+
+    if dc_crack_type_side2_str.lower() != "none":
         # Plot the evaluated closure state (side2)
-    pl.figure()
-    pl.plot(xrange[xrange < a_side2]*1e3,closure_stress_side2[xrange < a_side2]/1e6,'-',
-            reff_side2*1e3,seff_side2/1e6,'x')
-    for observcnt in range(len(reff_side2)):        
-        (effective_length, sigma, tensile_displ, dsigmaext_dxt) = solve_normalstress(xrange,x_bnd,closure_stress_side2,xstep,seff_side2[observcnt],a_side2,sigma_yield,crack_model_normal)
-        pl.plot(effective_length*1e3,seff_side2[observcnt]/1e6,'.')
+        pl.figure()
+        pl.plot(xrange[xrange < a_side2]*1e3,closure_stress_side2[xrange < a_side2]/1e6,'-',
+                reff_side2*1e3,seff_side2/1e6,'x')
+        for observcnt in range(len(reff_side2)):        
+            (effective_length, sigma, tensile_displ, dsigmaext_dxt) = solve_normalstress(xrange,x_bnd,closure_stress_side2,xstep,seff_side2[observcnt],a_side2,sigma_yield,crack_model_normal)
+            pl.plot(effective_length*1e3,seff_side2[observcnt]/1e6,'.')
+            pass
+        pl.grid(True)
+        pl.legend(('Closure stress field','Observed crack tip posn','Recon. crack tip posn'),loc="best")
+        pl.xlabel('Radius from crack center (mm)')
+        pl.ylabel('Stress (MPa)')
+        pl.title('Crack closure state (side 2)')
+        
+        closureplot_side2_href = hrefv(quote(dc_measident_str+"_closurestate_side2.png"),dc_dest_href)
+        pl.savefig(closureplot_side2_href.getpath(),dpi=300)
+        ret["dc:closureplot_side2"]= closureplot_side2_href
         pass
-    pl.grid(True)
-    pl.legend(('Closure stress field','Observed crack tip posn','Recon. crack tip posn'),loc="best")
-    pl.xlabel('Radius from crack center (mm)')
-    pl.ylabel('Stress (MPa)')
-    pl.title('Crack closure state (side 2)')
-    
-    closure_state_side2_href = hrefv(quote(dc_measident_str+"_closurestate_side2.png"),dc_dest_href)
-    pl.savefig(closure_state_side2_href.getpath(),dpi=300)
 
 
+    if dc_crack_type_side1_str.lower() != "none":
+        closurestate_side1_href = hrefv(quote(dc_measident_str+"_closurestate_side1.csv"),dc_dest_href)
+        save_closurestress(closurestate_side1_href.getpath(),xrange,closure_stress_side1,a_side1,crackopening=crack_initial_opening_side1)
 
-    closurestate_side1_href = hrefv(quote(dc_measident_str+"_closurestate_side1.csv"),dc_dest_href)
-    save_closurestress(closurestate_side1_href.getpath(),xrange,closure_stress_side1,a_side1,crackopening=crack_initial_opening_side1)
-    
-    closurestate_side2_href = hrefv(quote(dc_measident_str+"_closurestate_side2.csv"),dc_dest_href)
-    save_closurestress(closurestate_side2_href.getpath(),xrange,closure_stress_side2,a_side2,crackopening=crack_initial_opening_side2)
-    
+        ret["dc:closurestate_side1"]=closurestate_side1_href
+        ret["dc:a_side1"] = numericunitsv(a_side1,"m")
 
-    ret = {
-        "dc:closureplot_side1": closure_state_side1_href,
-        "dc:closureplot_side2": closure_state_side2_href,
-        "dc:closurestate_side1": closurestate_side1_href,
-        "dc:closurestate_side2": closurestate_side2_href,
-        "dc:a_side1": numericunitsv(a_side1,"m"),
-        "dc:a_side2": numericunitsv(a_side2,"m"),
-    }
+        pass
+
+    if dc_crack_type_side2_str.lower() != "none":
+        closurestate_side2_href = hrefv(quote(dc_measident_str+"_closurestate_side2.csv"),dc_dest_href)
+        save_closurestress(closurestate_side2_href.getpath(),xrange,closure_stress_side2,a_side2,crackopening=crack_initial_opening_side2)
+        ret["dc:closurestate_side2"] = closurestate_side2_href
+        ret["dc:a_side2"] = numericunitsv(a_side2,"m")
+
+        pass
+
+
 
     return ret
