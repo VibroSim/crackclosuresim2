@@ -89,7 +89,8 @@ def run(_xmldoc,_element,
         dc_seff_side1_array=None, 
         dc_reff_side2_array=None,
         dc_seff_side2_array=None,
-        dc_symmetric_cod_bool=None, # Should be True for a surface or tunnel crack, False for an edge crack. 
+        dc_symmetric_cod_bool=None, # Should be True for a surface or tunnel crack, False for an edge crack.
+        dc_approximate_xstep_numericunits=None,
         dc_crack_model_normal_str="Tada_ModeI_CircularCrack_along_midline",
         dc_crack_model_shear_str="Fabrikant_ModeII_CircularCrack_along_midline",
         dx=5e-6):
@@ -136,7 +137,12 @@ def run(_xmldoc,_element,
         pass
 
     # Desired approximate step size for calculations
-    approximate_xstep=25e-6 # 25um
+    if dc_approximate_xstep_numericunits is not None:
+        approximate_xstep=dc_approximate_xstep_numericunits.value("m")
+        pass
+    else:
+        approximate_xstep=25e-6 # 25um
+        pass
 
     num_boundary_steps=np.floor((max(a_side1,a_side2)+approximate_xstep)/approximate_xstep)
     xmax = num_boundary_steps*approximate_xstep  # Maximum position from center to calculate to;
