@@ -782,6 +782,13 @@ def solve_incremental_tensilestress(x,x_bnd,sigma,sigma_closure,tensile_displ,xt
     if sigma_closure[xt_idx] >= 0.0 and sigma[xt_idx] < sigma_closure[xt_idx]:
         # There is a closure stress here but not yet the full external tensile load to counterbalance it
 
+        # !!!*** Can shortcut most of this calculation in 99% of cases
+        # by solving directly for F under assumption that delta sigma infinity
+        # will not exceed our limit. Then the code below would only
+        # be needed for the rare case that we are reaching our load limit
+        # and cannot actually open crack up to next increment
+        # ***!!!
+
         # Bound it by 0  and the F that will give the maximum
         # contribution of sigma_increment: 2.0*(sigmaext_max-sigmaext1)/(xt2-xt1)
         if np.isinf(sigmaext_max):
