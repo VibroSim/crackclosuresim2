@@ -102,14 +102,14 @@ def run(_xmldoc,_element,
     if dc_crack_model_normal_str=="ModeI_throughcrack_CODformula" and dc_symmetric_cod_bool is None:
         raise ValueError("dc:symmetric_cod must be set to 'true' or 'false' when using ModeI_throughcrack_CODformula crack model")
     elif dc_crack_model_normal_str=="Tada_ModeI_CircularCrack_along_midline":
-        dc_symmetric_cod=True # Tada crack inherently symmetric
+        dc_symmetric_cod_bool=True # Tada crack inherently symmetric
         pass
 
     if dc_crack_model_shear_str=="ModeII_throughcrack_CSDformula" and dc_symmetric_cod_bool is None:
         raise ValueError("dc:symmetric_cod must be set to 'true' or 'false' when using ModeII_throughcrack_CSDformula crack model")
     elif dc_crack_model_shear_str=="Fabrikant_ModeII_CircularCrack_along_midline":
         # Fabrikant model inherently symmetric also
-        dc_symmetric_cod=True
+        dc_symmetric_cod_bool=True
         pass
 
 
