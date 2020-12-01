@@ -1607,6 +1607,120 @@ def solve_normalstress(x,x_bnd,sigma_closure,dx,sigmaext_max,a,sigma_yield,crack
         return solve_normalstress_compressive(x,x_bnd,sigma_closure,dx,sigmaext_max,a,sigma_yield,crack_model,verbose=verbose,diag_plots=diag_plots,calculate_displacements=calculate_displacements)
     pass
 
+def inverse_closure2(reff,seff,x,x_bnd,dx,xt,sigma_yield,crack_model,verbose=False,extrapolate=True):
+    """ Improved simpler and more robust inverse_closure
+    based on the idea that the reff,seff sequence directly defines 
+    the rate of crack opening per unit distance F and therefore
+    we can bypass most of the steps in the closure calculation. 
+
+    Really the (reff,seff) points should be rather closely spaced for this to be used properly. 
+    
+    (Thanks to A. Bastawros for the suggestion)
+    """
+    
+    # sigma_closure is the closure field accumulator.
+    # At each position as we go through the applied stresses, think of the actual
+    # contact stress field as being actual_contact_stress[stepnum] which is a
+    # function of position. The initial value of this field being actual_closure_stress[segcnt=0] = actual_sigma_closure
+    #
+    # In each step, actual_contact_stress[segcnt+1] = actual_contact_stress[segcnt] + sigma_increment[segcnt]
+    # where sigma_increment is the stress change calculated for the step due to the applied load seff[segcnt+1]-seff[segcnt]
+    #
+    # After the final step, actual_contact_stress[segcnt+1] must be zero everywhere to the left of reff[segcnt+1]
+    # because the crack is open over that entire region.
+    #
+    # Since for the final segcnt (i.e. num_segs-1),
+    #     actual_contact_stress[segcnt+1] = actual_sigma_closure + sum_i=0^segcnt sigma_increment[segcnt]
+    # and actual_contact_stress[segcnt+1] is zero to the left of reff[segcnt+1],
+    # within that region actual_sigma_closure = -sum_i=0^segcnt sigma_increment[segcnt]
+    
+    # Our variable sigma_closure is the accumulator for sigma_increment. 
+    sigma_closure = np.zeros(x.shape,dtype='d')
+    dx = x_bnd[1]-x_bnd[0]
+
+    if not extrapolate:
+        # Set sigma_closure to NaN outside meaningful bounds
+        sigma_closure[(x < reff[0])|(x > reff[-1])] = np.NaN
+        pass
+    
+    for segcnt in range(reff.shape[0]-1):
+        # Iterate over segments reff[segcnt]..reff[segcnt+1]
+        # and seff[segcnt]..seff[segcnt+1]
+        
+        sigmaext_increment = seff[segcnt+1]-seff[segcnt]
+        assert(sigmaext_increment > 0)
+        
+        if reff[segcnt+1]==0:
+            # Crack closed at end of segment. Crack never open, material
+            # treated as solid and uniform
+            sigma_increment = np.ones(x.shape,dtype='d')*sigmaext_increment
+            pass
+        else:
+            # Crack open in this segment
+
+            sigma_increment = np.zeros(x.shape,dtype='d')
+
+            # Evaluate closure gradient F (Pascals external tensile stress / meters of tip motion)
+            F = (seff[segcnt+1]-seff[segcnt])/(reff[segcnt+1]-reff[segcnt])
+
+            xt1 = reff[segcnt]  # may not line up with x_bnd
+            xt1_idx = np.where(x_bnd <= xt1)[0][-1]  # x_bnd index of boundary on or just to the left of xt1
+            sigmaext1 = seff[segcnt]
+            
+            xt2_idx = xt1_idx+1
+            xt2 = x_bnd[xt2_idx]
+            if xt2 > reff[segcnt+1]: # Bound xt2 by bounds of this segment
+                xt2=reff[segcnt+1]
+                pass
+
+            
+            while xt1 < reff[segcnt+1]:
+
+                
+                (use_xt2,sigmaext2,sigma_tinyincrement) = integral_tensilestress_growing_effective_crack_length_byxt(x,sigmaext1,np.inf,F,xt1,xt2,crack_model)
+
+                sigma_increment += sigma_tinyincrement
+
+                # New segment: xt1 becomes prior xt2, sigmaext1 becomes prior sigmaext2
+                xt1 = xt2
+                xt1_idx = xt2_idx
+                sigmaext1 = sigmaext2
+                xt2_idx = xt1_idx + 1
+                xt2 = x_bnd[xt2_idx]
+
+                if xt2 > reff[segcnt+1]: # Bound xt2 by bounds of this segment
+                    xt2=reff[segcnt+1]
+                    pass
+                pass
+
+            # Now sigmaext2 should match seff[segcnt+1] to within roundoff error (by construction)
+            assert( abs(sigmaext2-seff[segcnt+1]) < 1 ) # Roundoff error should be < 1 Pascal
+            pass
+        
+        sigma_closure += sigma_increment # Accumulate sigma_increment
+        pass
+
+    if extrapolate: 
+        # sigma_closure not meaningful outside reff[0]...reff[-1] bounds
+        # But extrapolate for compatibility with prior implementation
+        if reff[0] > 0.0:
+            left_extrap_idx=np.where(x_bnd > reff[0])[0][0]
+            left_slope = (sigma_closure[left_extrap_idx+1]-sigma_closure[left_extrap_idx])/dx
+            sigma_closure[:left_extrap_idx] = sigma_closure[left_extrap_idx] + left_slope*(x[:left_extrap_idx]-x[left_extrap_idx])
+            pass
+
+        if reff[1] < x[-1]:
+            right_extrap_idx=np.where(x_bnd < reff[-1])[0][-1] # index of last segment left boundary less than rightmost reff
+            right_slope = (sigma_closure[right_extrap_idx-1]-sigma_closure[right_extrap_idx-2])/dx
+            sigma_closure[right_extrap_idx:] = sigma_closure[right_extrap_idx-1] + right_slope*(x[right_extrap_idx:]-x[right_extrap_idx-1])
+            pass
+        
+    return sigma_closure
+
+            
+            
+
+    
 def inverse_closure(reff,seff,x,x_bnd,dx,xt,sigma_yield,crack_model,verbose=False):
     """ Given effective crack lengths reff at externally applied loads seff,
     calculate a closure stress field that produces such a field.
