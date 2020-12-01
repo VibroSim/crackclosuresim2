@@ -1655,6 +1655,9 @@ def inverse_closure2(reff,seff,x,x_bnd,dx,xt,sigma_yield,crack_model,verbose=Fal
             # treated as solid and uniform
             sigma_increment = np.ones(x.shape,dtype='d')*sigmaext_increment
             pass
+        elif reff[segcnt]==xt or np.all(reff[segcnt]==reff[segcnt+1:]):
+            # Crack fully open; we are done.
+            break
         else:
             # Crack open in this segment
 
