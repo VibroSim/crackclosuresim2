@@ -1607,15 +1607,233 @@ def solve_normalstress(x,x_bnd,sigma_closure,dx,sigmaext_max,a,sigma_yield,crack
         return solve_normalstress_compressive(x,x_bnd,sigma_closure,dx,sigmaext_max,a,sigma_yield,crack_model,verbose=verbose,diag_plots=diag_plots,calculate_displacements=calculate_displacements)
     pass
 
-def inverse_closure2(reff,seff,x,x_bnd,dx,xt,sigma_yield,crack_model,verbose=False,extrapolate=True):
-    """ Improved simpler and more robust inverse_closure
+def _crackclosure_monotonic_interpolate(observed_reff,observed_seff,interpolated_reff,diagnostic_plot=False):
+    """Strictly monotonic (increasing) interpolation for observed_seff given observed_reff, evaluated at the
+    positions interpolated_reff. Used by inverse_closure2() 
+
+    Want interpolation that will (a) pass through the given points
+    and (b) be monotonically increasing.
+    We use an optimizer fit the to logarithm of the (spatial) discretized
+    derivative subject to the constraint that the integral of the exponential
+    of the fit (which is what we evaluate and return) should pass 
+    through the given points. Because the slope of what we return is 
+    evaluated from an exponential it can never be negative, and therefore
+    the returned curve is always monotonically increasing. 
+
+"""
+
+    interp_nominal_stress=100e6 # Internal normalization factor for stress values (observed_seff), used to avoid numerical troubles due to optimizer parameters being very large when squared and summed. 
+
+    # Discretized derivative
+    deriv = np.diff(observed_seff)/np.diff(observed_reff)
+    # r coordinates for discretized derivative
+    deriv_r = (observed_reff[:-1] + observed_reff[1:])/2.0
+
+    log_deriv = np.log(deriv)
+    
+    k = 3 # b-spline order
+
+    # Create knots... at end and spaced every two internally
+    num_internal_knots = observed_reff[2:-2].shape[0] #  is (# of data points - 4)
+    t=np.concatenate(([observed_reff[0]]*(k+1),observed_reff[2:-2],[observed_reff[-1]]*(k+1)))
+    # Total number of knots is (# of data points) + 2k - 2
+    # or num_internal_knots + 2k+2
+    
+    # Construct b-spline basis using scipy.interpolate.splev()
+    basis = np.zeros((num_internal_knots+k+1,deriv_r.shape[0]),dtype='d')
+    for bentry in range(num_internal_knots+k+1):
+        c=np.zeros(num_internal_knots+k+1,dtype='d')
+        c[bentry]=1.0
+        basis[bentry,:]=scipy.interpolate.splev(deriv_r,(t,c,k))
+        pass
+
+    # number of bspline coefficients (number of #'s being solved for) is
+    # num_internal_knots+k+1
+    # or (# of data points) + k - 3
+    # or (# or data points)
+    
+    # Get starting point for optimizer from inner product of basis with log_deriv
+    initial_c = np.inner(basis,log_deriv)
+
+    # We will be requiring that the integral of the exponential of our fit
+    # matches the (reff,seff) input data points. But obviously we can
+    # only do that relative to the first data point.
+    # differential_seff gives the seff values relative to that first data
+    # point. 
+    differential_seff = np.diff(observed_seff)
+
+    # Optimizer objective function
+    def objfun(c_val):
+        #tck=(t,c_val,k) 
+        return np.sum((np.dot(c_val,basis)-log_deriv)**2.0) # equivalent to scipy.interpolate.splev(deriv_r,(t,c_val,k))
+
+    # Optimizer objective function jacobian
+    def objjac(c_val):
+        jac = []
+        for idx in range(num_internal_knots+k+1):
+            jac.append(np.sum(2.0*(np.dot(c_val,basis)-log_deriv)*basis[idx,:]))
+            pass
+        return np.array(jac,dtype='d')
+
+    # Create equality constraint functions and jacobians which
+    # insure the the integral of the exponential of our fit
+    # passes through the original data points
+
+    # The number of equality constraints is equal to
+    # the  (# of data points-1)
+    
+
+
+    eq_cons=[]
+    for sidx in range(observed_seff.shape[0]-1):
+        def eq_cons_fun(c_val,sidx=sidx):
+            tck=(t,c_val,k)
+            return (scipy.integrate.quad(lambda rpos: np.exp(scipy.interpolate.splev(rpos,tck)),observed_reff[sidx],observed_reff[sidx+1])[0]-differential_seff[sidx])/interp_nominal_stress
+        # derivative with respect to a c_val entry:
+        #  d/dc_val ( integral (exp( splev(r,c_val))) dr)
+        #  = integral (d/dc_val (exp(splev(r,c_val)))) dr
+        #  = integral (exp(splev(r,c_val) d/dc_val(splev(r,c_val)))) dr
+        #   splev basically does np.dot(c_val,basis) but with basis evaluated at r
+        #  ... so the derivative is just the basis entry
+        #  = integral (exp(splev(r,c_val) d/dc_val(splev(r,c_val)))) dr
+        def eq_cons_jac(c_val,sidx=sidx):
+            tck=(t,c_val,k)
+            jac = []
+            for idx in range(num_internal_knots+k+1):
+                c_jac = np.zeros(num_internal_knots+k+1,dtype='d')
+                c_jac[idx]=1.0
+                tck_jac = (t,c_jac,k)
+                jac.append(scipy.integrate.quad(lambda rpos: np.exp(scipy.interpolate.splev(rpos,tck))*scipy.interpolate.splev(rpos,tck_jac),observed_reff[sidx],observed_reff[sidx+1])[0]/interp_nominal_stress)
+                pass
+            #print("len(jac)",len(jac))
+            return np.array(jac,dtype='d')
+        eq_cons.append({"type":"eq","fun": eq_cons_fun, "jac": eq_cons_jac})
+        pass
+
+    # Objective function for the initialization:
+    # We first must find something that satisfies the
+    # equality constraints before we can do the constrained
+    # optimization.
+    # given n data points there are
+    # n-1  equality constraints
+    # This is convenient because number of unknowns is greater than
+    # number of equations for initial optimization so it will
+    # very likely be solvable (but perhaps not unique)
+    
+    # Objective function and jacobian for finding a solution that
+    # satisifies equality constraint:
+    def initial_objfun(c_val):
+        #print("c_val",c_val)
+        res=0.0
+        for cons  in eq_cons:
+            res+=cons["fun"](c_val)**2.0
+            #print("res:", res)
+            pass
+        #print("obj:",res)
+        return res
+    
+    def initial_objjac(c_val):
+        jac = np.zeros(num_internal_knots+k+1,dtype='d')
+        for cons in eq_cons:
+            cons_jac = cons["jac"](c_val)
+            cons_fun = cons["fun"](c_val)
+            #for idx in range(num_internal_knots+k+1):
+            jac += 2.0*cons_fun * cons_jac
+            #    pass
+            pass
+        return jac
+
+    #combination_factor=1000.0
+    #def combined_objfun(c_val):
+    #    return objfun(c_val)+combination_factor*initial_objfun(c_val)
+    #
+    #def combined_objjac(c_val):
+    #    return objjac(c_val)+combination_factor*initial_objjac(c_val)
+
+    # initial minimization makes sure constraints are satisified. 
+    initial_res=scipy.optimize.minimize(initial_objfun,initial_c,method="SLSQP",options={"ftol": 1e-4,"disp":False,"maxiter":100,"eps": 1e-4},bounds=np.array([(-100,100)]*(num_internal_knots+k+1),dtype='d'))
+
+    if not initial_res.success:
+        raise ValueError("crackclosure inverse_closure2 interpolation: Failed to initialize optimal curve fit")
+
+    #res= scipy.optimize.minimize(combined_objfun,initial_res.x,method="SLSQP",
+    #                             jac=combined_objjac)
+    #                             #constraints=eq_cons)
+
+    res= scipy.optimize.minimize(objfun,initial_res.x,method="SLSQP",
+                             jac=objjac,
+                             constraints=eq_cons)
+
+    if not res.success:
+        raise ValueError("crackclosure inverse_closure2 interpolation: Failed to find an optimal curve fit")
+
+    log_deriv_tck = (t,res.x,k)
+    #interpolated_reff = x[x <= observed_reff[-1]]
+    interpolated_reff_midpoints = (interpolated_reff[:-1]+interpolated_reff[1:])/2.0
+    
+    interpolated_log_deriv = scipy.interpolate.splev(interpolated_reff_midpoints,log_deriv_tck)
+    interpolated_deriv = np.exp(interpolated_log_deriv) # dseff/dreff
+
+    interpolated = np.zeros(interpolated_reff.shape,dtype='d')
+    interpolated_dx = interpolated_reff[1]-interpolated_reff[0]
+    interpolated[0]=observed_seff[0]
+    #for ridx in range(1,interpolated_reff.shape[0]):
+    #    interpolated[ridx]=scipy.integrate.quad(lambda rpos: np.exp(scipy.interpolate.splev(rpos,tck)),interpolated_reff[ridx-1],interpolated_reff[ridx])[0]
+    interpolated[1:] = interpolated[0]+np.cumsum(interpolated_deriv)*interpolated_dx
+
+    diagnostic_plot_figure = None
+    
+    if diagnostic_plot:
+        from matplotlib import pyplot as pl
+        diagnostic_plot_figure = pl.figure()
+        pl.plot(observed_reff*1e3,observed_seff,'x',markersize=10)
+        pl.plot(interpolated_reff*1e3,interpolated)
+        pl.title("inverse closure2 interpolation diagnostic")
+        pl.xlabel('Tip position (mm)')
+        pl.ylabel('Stress (Pa)')
+        pl.legend(('Observed points','Interpolated'))
+        pl.grid(True)
+        pass
+    return (interpolated,diagnostic_plot_figure)
+
+
+def inverse_closure2(reff,seff,x,x_bnd,dx,xt,sigma_yield,crack_model,verbose=False,extrapolate_inward=False,extrapolate_outward=False,zero_beyond_tip=False,interpolate_input=False,interpolation_diagnostic_plot=False):
+    """ Improved simpler and more robust replacement for inverse_closure
     based on the idea that the reff,seff sequence directly defines 
     the rate of crack opening per unit distance F and therefore
     we can bypass most of the steps in the closure calculation. 
 
     Really the (reff,seff) points should be rather closely spaced for this to be used properly. 
     
-    (Thanks to A. Bastawros for the suggestion)
+    (Thanks to A. Bastawros for the suggestion of this method)
+
+    Replacing inverse_closure() with inverse_closure2()
+    ---------------------------------------------------
+    inverse_closure() should be replaced by inverse_closure2(), 
+    as inverse_closure() has various problems at the boundaries
+    (see the inverse_closure() help documentation). 
+    
+    So long as reff and seff are reasonably finely spaced, it
+    is a drop-in replacement in most cases, but you may need
+    to set extrapolate_inward=True, extrapolate_outward=True, 
+    and zero_beyond_tip=True to get equivalent behavior. 
+
+    Please note that the old inverse_closure() gave piecewise 
+    linear closure stress fields, whereas this instead assumes 
+    the closure gradient dseff/dreff to be linear between the 
+    given data points for seff and reff. 
+    
+    As a result if the input data points seff and reff are 
+    coarsely spaced or undersampled, you can end up with rather
+    odd-looking closure states. If this happens, you can fix it
+    with interpolate_input=True, which will perform a spline
+    fit to the log(seff) vs reff curve (logarithm is used to
+    reduce the likelihood of the spline output losing the 
+    required monotonically increasing character, which will 
+    cause a failure). The spline fit is then used in place
+    of reff and seff. 
+
+    
     """
     
     # sigma_closure is the closure field accumulator.
@@ -1634,14 +1852,32 @@ def inverse_closure2(reff,seff,x,x_bnd,dx,xt,sigma_yield,crack_model,verbose=Fal
     # and actual_contact_stress[segcnt+1] is zero to the left of reff[segcnt+1],
     # within that region actual_sigma_closure = -sum_i=0^segcnt sigma_increment[segcnt]
     
-    # Our variable sigma_closure is the accumulator for sigma_increment. 
-    sigma_closure = np.zeros(x.shape,dtype='d')
+    # Our variable sigma_closure is the accumulator for sigma_increment.
+    # We will pre-fill it with the first stress in our
+    # list seff[0], because we have no data before that
+    # and it is a reasonable approximation given the lack of data
+    # that loads will distribute uniformly prior to (detectable)
+    # opening
+    
+    sigma_closure = np.ones(x.shape,dtype='d')*seff[0]
     dx = x_bnd[1]-x_bnd[0]
 
-    if not extrapolate:
-        # Set sigma_closure to NaN outside meaningful bounds
-        sigma_closure[(x < reff[0])|(x > reff[-1])] = np.NaN
+    valid_region = (x >= reff[0]) & (x <= reff[-1])
+    
+    # Set sigma_closure to NaN outside meaningful bounds
+    sigma_closure[~valid_region] = np.NaN
+
+    if interpolate_input:
+        # interpolate input onto valid_region
+
+        # Use a linspace with same resolution as our x grid. Ensures that endpoints exactly match reff, seff. 
+        interpolated_reff = np.linspace(reff[0],reff[-1],np.count_nonzero(valid_region))
+        (interpolated_seff,diagnostic_plot_figure) = _crackclosure_monotonic_interpolate(reff,seff,interpolated_reff,diagnostic_plot=interpolation_diagnostic_plot)
+
+        reff = interpolated_reff
+        seff = interpolated_seff
         pass
+    
     
     for segcnt in range(reff.shape[0]-1):
         # Iterate over segments reff[segcnt]..reff[segcnt+1]
@@ -1703,22 +1939,33 @@ def inverse_closure2(reff,seff,x,x_bnd,dx,xt,sigma_yield,crack_model,verbose=Fal
         sigma_closure += sigma_increment # Accumulate sigma_increment
         pass
 
-    if extrapolate: 
+    if extrapolate_inward: 
         # sigma_closure not meaningful outside reff[0]...reff[-1] bounds
-        # But extrapolate for compatibility with prior implementation
+        # But extrapolate if axed
         if reff[0] > 0.0:
             left_extrap_idx=np.where(x_bnd > reff[0])[0][0]
             left_slope = (sigma_closure[left_extrap_idx+1]-sigma_closure[left_extrap_idx])/dx
             sigma_closure[:left_extrap_idx] = sigma_closure[left_extrap_idx] + left_slope*(x[:left_extrap_idx]-x[left_extrap_idx])
             pass
+        pass
 
-        if reff[1] < x[-1]:
+    if extrapolate_outward:
+        if reff[-1] < x[-1]:
             right_extrap_idx=np.where(x_bnd < reff[-1])[0][-1] # index of last segment left boundary less than rightmost reff
             right_slope = (sigma_closure[right_extrap_idx-1]-sigma_closure[right_extrap_idx-2])/dx
             sigma_closure[right_extrap_idx:] = sigma_closure[right_extrap_idx-1] + right_slope*(x[right_extrap_idx:]-x[right_extrap_idx-1])
             pass
-        
-    return sigma_closure
+        pass
+
+    if zero_beyond_tip:
+        sigma_closure[x > xt] = 0.0
+        pass
+    
+    if interpolation_diagnostic_plot:
+        return (sigma_closure,diagnostic_plot_figure)
+    else:
+        return sigma_closure        
+    pass
 
             
             
@@ -1736,8 +1983,28 @@ def inverse_closure(reff,seff,x,x_bnd,dx,xt,sigma_yield,crack_model,verbose=Fals
     returns sigma_closure that is positive for compressive
     closure stresses. 
 
+    The generated closure field is always piecewise linear. 
+
+    inverse_closure() is deprecated because it gives poor or 
+    incorrect answers at the initial opening point and at
+    the maximum opening point (often significantly underestimating
+    closure near the tip, because a closure underestimate will 
+    allow the crack to open to the tip at the given load, 
+    satisfying the goal function without correctly determining
+    closure). 
+
+    inverse_closure() also silently extrapolates closure state rather
+    than generate out-of-bounds closure as not-a-number
+    
+    inverse_closure() can be replaced by inverse_closure2() 
+    which addresses the problems with inverse_closure and is much
+    simpler and faster. 
+
 """
 
+    import warnings
+    warnings.warn("crackclosuresim2: the inverse_closure() function is deprecated; it gives poor or incorrect answers at the initial opening, at the maximum opening. It also extrapolates without an explicit request and is subject to convergence failures. Replace with inverse_closure2() which is otherwise similar but may give slightly different curves.")
+    
     sigma_closure = np.zeros(x.shape,dtype='d')
     
     last_closure = seff[0] # If everything is closed, then closure stresses and external loads match. 
@@ -2274,7 +2541,20 @@ class Tada_ModeI_CircularCrack_along_midline(ModeI_Beta_COD_Formula):
 
 
 
-def perform_inverse_closure(inputfilename,E,nu,sigma_yield,CrackCenterX,dx,specimen_id,hascrackside1=True,hascrackside2=True):
+def perform_inverse_closure(inputfilename,E,nu,sigma_yield,CrackCenterX,dx,specimen_id,hascrackside1=True,hascrackside2=True,use_inverse_closure2=False):
+    """
+    Should ALWAYS call with use_inverse_closure2=True to avoid
+    using the old (deprecated, buggy, problematic) inverse_closure() 
+    routine. This does change interpreted closure states somewhat,
+    so the default is still use_inverse_closure2=False
+
+
+    WARNING: This routine enables both inward and outward 
+    extrapolation of the closure state. Such extrapolation is likely
+    not very meaningful. 
+"""
+
+
     from matplotlib import pyplot as pl
     import pandas as pd
 
@@ -2346,20 +2626,45 @@ def perform_inverse_closure(inputfilename,E,nu,sigma_yield,CrackCenterX,dx,speci
 
     
     if tippos_side1 is not None:
-        sigma_closure_side1 = inverse_closure(observed_reff_side1[observed_reff_side1 >= 0.0],
-                                              observed_seff_side1[observed_reff_side1 >= 0.0],
-                                              x,x_bnd,dx,a_side1,sigma_yield,
-                                              crack_model)
+        if use_inverse_closure2:
+            sigma_closure_side1 = inverse_closure2(observed_reff_side1[observed_reff_side1 >= 0.0],
+                                                   observed_seff_side1[observed_reff_side1 >= 0.0],
+                                                   x,x_bnd,dx,a_side1,sigma_yield,
+                                                   crack_model,
+                                                   extrapolate_inward=True,
+                                                   extrapolate_outward=True,
+                                                   zero_beyond_tip=True,
+                                                   interpolate_input=True)
+            pass
+        else:
+            sigma_closure_side1 = inverse_closure(observed_reff_side1[observed_reff_side1 >= 0.0],
+                                                  observed_seff_side1[observed_reff_side1 >= 0.0],
+                                                  x,x_bnd,dx,a_side1,sigma_yield,
+                                                  crack_model)
+            pass
         pass
 
 
 
     
     if tippos_side2 is not None:
-        sigma_closure_side2 = inverse_closure(observed_reff_side2[observed_reff_side2 >= 0.0],
-                                              observed_seff_side2[observed_reff_side2 >= 0.0],
-                                              x,x_bnd,dx,a_side2,sigma_yield,
-                                              crack_model)
+        if use_inverse_closure2:
+            sigma_closure_side2 = inverse_closure2(observed_reff_side2[observed_reff_side2 >= 0.0],
+                                                   observed_seff_side2[observed_reff_side2 >= 0.0],
+                                                   x,x_bnd,dx,a_side2,sigma_yield,
+                                                   crack_model,
+                                                   extrapolate_inward=True,
+                                                   extrapolate_outward=True,
+                                                   zero_beyond_tip=True,
+                                                   interpolate_input=True)
+            
+            pass
+        else: 
+            sigma_closure_side2 = inverse_closure(observed_reff_side2[observed_reff_side2 >= 0.0],
+                                                  observed_seff_side2[observed_reff_side2 >= 0.0],
+                                                  x,x_bnd,dx,a_side2,sigma_yield,
+                                                  crack_model)
+            pass
         pass
 
     side1fig = None

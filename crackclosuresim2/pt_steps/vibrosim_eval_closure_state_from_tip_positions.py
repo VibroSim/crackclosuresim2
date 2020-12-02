@@ -32,7 +32,7 @@ from limatix.dc_value import hrefvalue as hrefv
 from limatix.dc_value import xmltreevalue as xmltreev
 
 
-from crackclosuresim2 import inverse_closure,solve_normalstress
+from crackclosuresim2 import inverse_closure,inverse_closure2,solve_normalstress
 from crackclosuresim2 import Tada_ModeI_CircularCrack_along_midline
 from crackclosuresim2 import perform_inverse_closure,save_closurestress
 from crackclosuresim2 import crackopening_from_tensile_closure
@@ -93,6 +93,7 @@ def run(_xmldoc,_element,
         dc_approximate_xstep_numericunits=None,
         dc_crack_model_normal_str="Tada_ModeI_CircularCrack_along_midline",
         dc_crack_model_shear_str="Fabrikant_ModeII_CircularCrack_along_midline",
+        dc_use_inverse_closure2=False,
         dx=5e-6):
     """ NOTE: Returns closure state of each side (unless crack_type is none).
     Also sets a_side1 and a_side2 crack length elements """
@@ -160,19 +161,64 @@ def run(_xmldoc,_element,
     x_bnd = xstep*np.arange(num_boundary_steps) # Position of element boundaries
     xrange = (x_bnd[1:] + x_bnd[:-1])/2.0 # Position of element centers
 
+    if not dc_use_inverse_closure2:
+        print("crackclosuresim2: vibrosim_eval_closure_state_from_tip_positions: WARNING: Using obsolete inverse_closure() routine instead of fixed inverse_closure2(). Add <dc:use_inverse_closure2>True</dc:use_inverse_closure2> or <prx:param name=\"dc_use_inverse_closure2\">True</prx:param> to fix")
+        pass
 
     if dc_crack_type_side1_str.lower() != "none":
         # Determine closure stress field from observed crack length data
-        closure_stress_side1=inverse_closure(reff_side1,seff_side1,xrange,x_bnd,xstep,a_side1,sigma_yield,crack_model_normal,verbose=verbose)
+        if dc_use_inverse_closure2:
+            closure_stress_side1=inverse_closure2(reff_side1,seff_side1,
+                                                  xrange,x_bnd,xstep,
+                                                  a_side1,
+                                                  sigma_yield,
+                                                  crack_model_normal,
+                                                  verbose=verbose,
+                                                  extrapolate_inward=True,
+                                                  extrapolate_outward=True,
+                                                  zero_beyond_tip=True,
+                                                  interpolate_input=True)
+            
+            pass
+        else:
+            closure_stress_side1=inverse_closure(reff_side1,seff_side1,
+                                                  xrange,x_bnd,xstep,
+                                                  a_side1,
+                                                  sigma_yield,
+                                                  crack_model_normal,
+                                                  verbose=verbose)
+            pass
+        
         # Evaluate initial crack opening gaps from extrapolated tensile closure field
+        
         crack_initial_opening_side1 = crackopening_from_tensile_closure(xrange,x_bnd,closure_stress_side1,xstep,a_side1,sigma_yield,crack_model_normal)
         pass
 
     
     if dc_crack_type_side2_str.lower() != "none":
         # Determine closure stress field from observed crack length data
-        closure_stress_side2=inverse_closure(reff_side2,seff_side2,xrange,x_bnd,xstep,a_side2,sigma_yield,crack_model_normal,verbose=verbose)
-    
+        if dc_use_inverse_closure2:
+            closure_stress_side2=inverse_closure2(reff_side2,seff_side2,
+                                                 xrange,x_bnd,xstep,
+                                                 a_side2,
+                                                 sigma_yield,
+                                                 crack_model_normal,
+                                                  verbose=verbose,
+                                                  extrapolate_inward=True,
+                                                  extrapolate_outward=True,
+                                                  zero_beyond_tip=True,
+                                                  interpolate_input=True)
+            
+            pass
+        else:
+            closure_stress_side2=inverse_closure(reff_side2,seff_side2,
+                                                 xrange,x_bnd,xstep,
+                                                 a_side2,
+                                                 sigma_yield,
+                                                 crack_model_normal,
+                                                 verbose=verbose)
+            pass
+        
         # Evaluate initial crack opening gaps from extrapolated tensile closure field
         crack_initial_opening_side2 = crackopening_from_tensile_closure(xrange,x_bnd,closure_stress_side2,xstep,a_side2,sigma_yield,crack_model_normal)
         pass

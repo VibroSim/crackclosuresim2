@@ -16,7 +16,7 @@ from limatix.dc_value import hrefvalue as hrefv
 from limatix.dc_value import xmltreevalue as xmltreev
 
 
-from crackclosuresim2 import inverse_closure,solve_normalstress
+from crackclosuresim2 import inverse_closure,inverse_closure2,solve_normalstress
 from crackclosuresim2 import Tada_ModeI_CircularCrack_along_midline
 from crackclosuresim2 import perform_inverse_closure,save_closurestress
 
@@ -41,6 +41,7 @@ def run(_xmldoc,_element,
         dc_symmetric_cod_bool=True,  # No longer seems to be used... probably redundant with (currently hardwired) choice of crack_model
         dc_hascrackside1_bool=True,
         dc_hascrackside2_bool=True,
+        dc_use_inverse_closure2=False,
         debug_bool=False):
     
     E=dc_spcYoungsModulus_numericunits.value("Pa")
@@ -83,9 +84,12 @@ def run(_xmldoc,_element,
     #a_side1 = (crackendx-crackstartx)/2.0 # half-crack length (m)
     #a_side2 = (crackendx-crackstartx)/2.0 # half-crack length (m)
 
-
-    (x,x_bnd,a_side1,a_side2,sigma_closure_side1,sigma_closure_side2,side1fig,side2fig) = perform_inverse_closure(dc_closureprofile_href.getpath(),E,nu,sigma_yield,CrackCenterX,dx,dc_specimen_str,dc_hascrackside1_bool,dc_hascrackside2_bool)
-
+    if not dc_use_inverse_closure2:
+        print("crackclosuresim2: eval_closure_state: WARNING: Using obsolete inverse_closure() routine instead of fixed inverse_closure2(). Add <dc:use_inverse_closure2>True</dc:use_inverse_closure2> or <prx:param name=\"dc_use_inverse_closure2\">True</prx:param> to fix")
+        pass
+    
+    (x,x_bnd,a_side1,a_side2,sigma_closure_side1,sigma_closure_side2,side1fig,side2fig) = perform_inverse_closure(dc_closureprofile_href.getpath(),E,nu,sigma_yield,CrackCenterX,dx,dc_specimen_str,dc_hascrackside1_bool,dc_hascrackside2_bool,use_inverse_closure2=dc_use_inverse_closure2)
+    
     ret={}
 
     if sigma_closure_side1 is not None:

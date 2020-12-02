@@ -8,7 +8,7 @@ import scipy as sp
 from matplotlib import pylab as pl
 #pl.rc('text', usetex=True) # Support greek letters in plot legend
 
-from crackclosuresim2 import inverse_closure,crackopening_from_tensile_closure
+from crackclosuresim2 import inverse_closure2,crackopening_from_tensile_closure
 from crackclosuresim2 import ModeI_throughcrack_CODformula
 from crackclosuresim2 import Tada_ModeI_CircularCrack_along_midline
 
@@ -69,10 +69,14 @@ if __name__=="__main__":
                                150e6,
                                170e6  ],dtype='d')
     
-    sigma_closure = inverse_closure(observed_reff,
-                                    observed_seff,
-                                    scp.x,scp.x_bnd,scp.dx,scp.a,sigma_yield,
-                                    crack_model)
+    sigma_closure = inverse_closure2(observed_reff,
+                                     observed_seff,
+                                     scp.x,scp.x_bnd,scp.dx,scp.a,sigma_yield,
+                                     crack_model,
+                                     extrapolate_inward=True,
+                                     extrapolate_outward=True,
+                                     zero_beyond_tip=True,
+                                     interpolate_input=True)
 
     crack_initial_opening = crackopening_from_tensile_closure(scp.x,scp.x_bnd,sigma_closure,scp.dx,scp.a,sigma_yield,crack_model)
 

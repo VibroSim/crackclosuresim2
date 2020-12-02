@@ -11,7 +11,7 @@ from matplotlib import pylab as pl
 pl.rc('text', usetex=True) # Support greek letters in plot legend
 
     
-from crackclosuresim2 import inverse_closure,solve_normalstress
+from crackclosuresim2 import inverse_closure2,solve_normalstress
 from crackclosuresim2 import Tada_ModeI_CircularCrack_along_midline
 
 
@@ -67,16 +67,140 @@ crack_model = Tada_ModeI_CircularCrack_along_midline(E,nu)
 observed_reff = np.array([ 0.0,  1e-3, 1.5e-3, 2e-3  ],dtype='d')
 observed_seff = np.array([ 10e6, 15e6, 30e6, 150e6  ],dtype='d')
 
-sigma_closure = inverse_closure(observed_reff,
-                                observed_seff,
+# Want interpolation that will (a) pass through the given points
+# and (b) be monotonically increasing.
+# Can we fit the logarithm of the derivative?
+
+interp_nominal_stress=100e6 
+
+deriv = np.diff(observed_seff)/np.diff(observed_reff)
+deriv_r = (observed_reff[:-1] + observed_reff[1:])/2.0
+log_deriv = np.log(deriv)
+k = 3
+# Create knots including bounding knots at start and end
+num_internal_knots = observed_reff[2:-2].shape[0]
+t=np.concatenate(([observed_reff[0]]*(k+1),observed_reff[2:-2],[observed_reff[-1]]*(k+1)))
+
+# Construct basis 
+basis = np.zeros((num_internal_knots+k+1,deriv_r.shape[0]),dtype='d')
+for bentry in range(num_internal_knots+k+1):
+    c=np.zeros(num_internal_knots+k+1,dtype='d')
+    c[bentry]=1.0
+    basis[bentry,:]=scipy.interpolate.splev(deriv_r,(t,c,k))
+    pass
+
+# Starting point from inner product of 1/basis with log_deriv
+initial_c = np.inner(basis,log_deriv)
+
+def objfun(c_val):
+    #tck=(t,c_val,k) 
+    return np.sum((np.dot(c_val,basis)-log_deriv)**2.0) # equivalent to scipy.interpolate.splev(deriv_r,(t,c_val,k))
+
+def objjac(c_val):
+    jac = []
+    for idx in range(num_internal_knots+k+1):
+        jac.append(np.sum(2.0*(np.dot(c_val,basis)-log_deriv)*basis[idx,:]))
+        pass
+    return np.array(jac,dtype='d')
+
+differential_seff = np.diff(observed_seff)
+# equality constraint... must pass through original points
+eq_cons=[]
+for sidx in range(observed_seff.shape[0]-1):
+    def eq_cons_fun(c_val,sidx=sidx):
+        tck=(t,c_val,k)
+        return (scipy.integrate.quad(lambda rpos: np.exp(scipy.interpolate.splev(rpos,tck)),observed_reff[sidx],observed_reff[sidx+1])[0]-differential_seff[sidx])/interp_nominal_stress
+    # derivative with respect to a c_val entry:
+    #  d/dc_val ( integral (exp( splev(r,c_val))) dr)
+    #  = integral (d/dc_val (exp(splev(r,c_val)))) dr
+    #  = integral (exp(splev(r,c_val) d/dc_val(splev(r,c_val)))) dr
+    #   splev basically does np.dot(c_val,basis) but with basis evaluated at r
+    #  ... so the derivative is just the basis entry
+    #  = integral (exp(splev(r,c_val) d/dc_val(splev(r,c_val)))) dr
+    def eq_cons_jac(c_val,sidx=sidx):
+        tck=(t,c_val,k)
+        jac = []
+        for idx in range(num_internal_knots+k+1):
+            c_jac = np.zeros(num_internal_knots+k+1,dtype='d')
+            c_jac[idx]=1.0
+            tck_jac = (t,c_jac,k)
+            jac.append(scipy.integrate.quad(lambda rpos: np.exp(scipy.interpolate.splev(rpos,tck))*scipy.interpolate.splev(rpos,tck_jac),observed_reff[sidx],observed_reff[sidx+1])[0]/interp_nominal_stress)
+            pass
+        #print("len(jac)",len(jac))
+        return np.array(jac,dtype='d')
+    eq_cons.append({"type":"eq","fun": eq_cons_fun, "jac": eq_cons_jac})
+    pass
+
+# initially, we must satisfy the equality constraints
+def initial_objfun(c_val):
+    print("c_val",c_val)
+    res=0.0
+    for cons  in eq_cons:
+        res+=cons["fun"](c_val)**2.0
+        print("res:", res)
+        pass
+    print("obj:",res)
+    return res
+
+def initial_objjac(c_val):
+    jac = np.zeros(num_internal_knots+k+1,dtype='d')
+    for cons in eq_cons:
+        cons_jac = cons["jac"](c_val)
+        cons_fun = cons["fun"](c_val)
+        #for idx in range(num_internal_knots+k+1):
+        jac += 2.0*cons_fun * cons_jac
+        #    pass
+        pass
+    return jac
+
+#combination_factor=1000.0
+#def combined_objfun(c_val):
+#    return objfun(c_val)+combination_factor*initial_objfun(c_val)
+#
+#def combined_objjac(c_val):
+#    return objjac(c_val)+combination_factor*initial_objjac(c_val)
+
+#jac=initial_objjac,
+# initial minimization makes sure constraints are satisified. 
+initial_res=scipy.optimize.minimize(initial_objfun,initial_c,method="SLSQP",options={"ftol": 1e-4,"disp":True,"maxiter":100,"eps": 1e-4},bounds=np.array([(-100,100)]*(num_internal_knots+k+1),dtype='d'))
+
+#res= scipy.optimize.minimize(combined_objfun,initial_res.x,method="SLSQP",
+#                             jac=combined_objjac)
+#                             #constraints=eq_cons)
+res= scipy.optimize.minimize(objfun,initial_res.x,method="SLSQP",
+                             jac=objjac,
+                             constraints=eq_cons)
+
+log_deriv_tck = (t,res.x,k)
+interpolated_reff = x[x <= observed_reff[-1]]
+interpolated_reff_midpoints = (interpolated_reff[:-1]+interpolated_reff[1:])/2.0
+
+interpolated_log_deriv = scipy.interpolate.splev(interpolated_reff_midpoints,log_deriv_tck)
+interpolated_deriv = np.exp(interpolated_log_deriv) # dseff/dreff
+
+interpolated = np.zeros(interpolated_reff.shape,dtype='d')
+interpolated[0]=observed_seff[0]
+for ridx in range(1,interpolated_reff.shape[0]):
+    #interpolated[ridx]=scipy.integrate.quad(lambda rpos: np.exp(scipy.interpolate.splev(rpos,tck)),interpolated_reff[ridx-1],interpolated_reff[ridx])[0]
+    interpolated[1:] = interpolated[0]+np.cumsum(interpolated_deriv)*dx
+    pass
+
+
+
+log_seff_tck = scipy.interpolate.splrep(observed_reff,np.log(observed_seff),t=observed_reff[2:-2:2])
+interpolated_reff = x[x <= observed_reff[-1]]
+interpolated_seff = np.exp(scipy.interpolate.splev(interpolated_reff,log_seff_tck))
+
+sigma_closure = inverse_closure2(interpolated_reff,
+                                interpolated_seff,
                                 x,x_bnd,dx,a,sigma_yield,
-                                crack_model)
+                                 crack_model,zero_beyond_tip=True,interpolate_input=False)
 
 
 # Forward cross-check of closure
 pl.figure()
 pl.plot(x*1e3,sigma_closure,'-',
-        observed_reff*1e3,observed_seff,'x')
+        observed_reff*1e3,observed_seff,'x',markersize=10)
 
 for observcnt in range(len(observed_reff)):        
     (effective_length, sigma, tensile_displ, dsigmaext_dxt) = solve_normalstress(x,x_bnd,sigma_closure,dx,observed_seff[observcnt],a,sigma_yield,crack_model)

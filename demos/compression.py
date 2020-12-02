@@ -11,7 +11,7 @@ from matplotlib import pylab as pl
 pl.rc('text', usetex=True) # Support greek letters in plot legend
 
     
-from crackclosuresim2 import inverse_closure,solve_normalstress
+from crackclosuresim2 import inverse_closure,inverse_closure2,solve_normalstress
 from crackclosuresim2 import crackopening_from_tensile_closure
 from crackclosuresim2 import Tada_ModeI_CircularCrack_along_midline
 
@@ -35,7 +35,7 @@ tau_yield = sigma_yield/2.0 # limits stress concentration around singularity
 nu = 0.33    #Poisson's Ratio
 specimen_width=25.4e-3
 
-sigmaext_max1 = -20e6 # external tensile load, Pa
+sigmaext_max1 = -50e6 # external tensile load, Pa
 
 a=2.0e-3  # half-crack length (m)
 xmax = 5e-3 # as far out in x as we are calculating (m)
@@ -66,10 +66,17 @@ crack_model = Tada_ModeI_CircularCrack_along_midline(E,nu)
 observed_reff = np.array([ 0.5e-3,  1e-3, 1.5e-3, 2e-3  ],dtype='d')
 observed_seff = np.array([ .00e6, 15e6, 30e6, 150e6  ],dtype='d')
 
-sigma_closure = inverse_closure(observed_reff,
-                                observed_seff,
-                                x,x_bnd,dx,a,sigma_yield,
-                                crack_model)
+(sigma_closure,
+ interp_diagnostic_plot_figure) = inverse_closure2(observed_reff,
+                                                   observed_seff,
+                                                   x,x_bnd,dx,a,sigma_yield,
+                                                   crack_model,
+                                                   extrapolate_inward=True,
+                                                   extrapolate_outward=True,
+                                                   zero_beyond_tip=True,
+                                                   interpolate_input=True,
+                                                   interpolation_diagnostic_plot=True)
+
 sigma_closure[x > a]=0.0
 
 crack_opening = crackopening_from_tensile_closure(x,x_bnd,sigma_closure,dx,a,sigma_yield,crack_model)

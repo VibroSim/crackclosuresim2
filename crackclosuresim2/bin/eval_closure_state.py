@@ -64,7 +64,7 @@ def main(args=None):
         dx=float(args[6])
         pass
 
-    (x,x_bnd,a_side1,a_side2,sigma_closure_side1,sigma_closure_side2,side1fig,side2fig) = perform_inverse_closure(closureprofilefile,YoungsModulus,PoissonsRatio,YieldStrength,CrackCenterX,dx,None)
+    (x,x_bnd,a_side1,a_side2,sigma_closure_side1,sigma_closure_side2,side1fig,side2fig) = perform_inverse_closure(closureprofilefile,YoungsModulus,PoissonsRatio,YieldStrength,CrackCenterX,dx,None,use_inverse_closure2=True)
 
     
     outfilename_side1 = os.path.join(tempfile.gettempdir(),os.path.splitext(os.path.split(closureprofilefile)[1])[0]+"_closurestress_side1.csv")
