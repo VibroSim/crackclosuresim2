@@ -76,6 +76,13 @@ from crackclosuresim2 import crack_model_shear_by_name
 # The radius values should be listed in increasing order. The last
 # radius value on each side (side1 - left or side2 - right) should
 # correspond to the length of that side of the crack. 
+#
+# If you have fine-grained points, this might be a bit slow
+# due to the interpolation of the closure state. In that
+# case you can set dc_interpolate_closure_state_bool to False
+# with <dc:interpolate_closure_state>False</dc:interpolate_closure_state>
+# 
+
 
 def run(_xmldoc,_element,
         dc_dest_href,
@@ -93,8 +100,8 @@ def run(_xmldoc,_element,
         dc_approximate_xstep_numericunits=None,
         dc_crack_model_normal_str="Tada_ModeI_CircularCrack_along_midline",
         dc_crack_model_shear_str="Fabrikant_ModeII_CircularCrack_along_midline",
-        dc_use_inverse_closure2=False,
-        dx=5e-6):
+        dc_use_inverse_closure2_bool=False,
+        dc_interpolate_closure_state_bool=True):
     """ NOTE: Returns closure state of each side (unless crack_type is none).
     Also sets a_side1 and a_side2 crack length elements """
 
@@ -161,13 +168,13 @@ def run(_xmldoc,_element,
     x_bnd = xstep*np.arange(num_boundary_steps) # Position of element boundaries
     xrange = (x_bnd[1:] + x_bnd[:-1])/2.0 # Position of element centers
 
-    if not dc_use_inverse_closure2:
+    if not dc_use_inverse_closure2_bool:
         print("crackclosuresim2: vibrosim_eval_closure_state_from_tip_positions: WARNING: Using obsolete inverse_closure() routine instead of fixed inverse_closure2(). Add <dc:use_inverse_closure2>True</dc:use_inverse_closure2> or <prx:param name=\"dc_use_inverse_closure2\">True</prx:param> to fix")
         pass
 
     if dc_crack_type_side1_str.lower() != "none":
         # Determine closure stress field from observed crack length data
-        if dc_use_inverse_closure2:
+        if dc_use_inverse_closure2_bool:
             closure_stress_side1=inverse_closure2(reff_side1,seff_side1,
                                                   xrange,x_bnd,xstep,
                                                   a_side1,
@@ -177,7 +184,7 @@ def run(_xmldoc,_element,
                                                   extrapolate_inward=True,
                                                   extrapolate_outward=True,
                                                   zero_beyond_tip=True,
-                                                  interpolate_input=True)
+                                                  interpolate_input=dc_interpolate_closure_state_bool)
             
             pass
         else:
@@ -197,7 +204,7 @@ def run(_xmldoc,_element,
     
     if dc_crack_type_side2_str.lower() != "none":
         # Determine closure stress field from observed crack length data
-        if dc_use_inverse_closure2:
+        if dc_use_inverse_closure2_bool:
             closure_stress_side2=inverse_closure2(reff_side2,seff_side2,
                                                  xrange,x_bnd,xstep,
                                                  a_side2,
@@ -207,7 +214,7 @@ def run(_xmldoc,_element,
                                                   extrapolate_inward=True,
                                                   extrapolate_outward=True,
                                                   zero_beyond_tip=True,
-                                                  interpolate_input=True)
+                                                  interpolate_input=dc_interpolate_closure_state_bool)
             
             pass
         else:
