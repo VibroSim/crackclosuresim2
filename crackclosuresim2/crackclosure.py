@@ -1960,6 +1960,9 @@ def inverse_closure2(reff,seff,x,x_bnd,dx,xt,sigma_yield,crack_model,verbose=Fal
     if zero_beyond_tip:
         sigma_closure[x > xt] = 0.0
         pass
+
+    # Bound stress by sigma_yield
+    sigma_closure[sigma_closure > sigma_yield] = sigma_yield
     
     if interpolation_diagnostic_plot:
         return (sigma_closure,diagnostic_plot_figure)
