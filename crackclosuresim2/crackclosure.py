@@ -362,7 +362,7 @@ def indef_integral_of_crack_tip_singularity_times_1_over_r2_pos_crossterm_decay(
 
 
 
-def integral_tensilestress_growing_effective_crack_length_byxt(x,sigmaext1,sigmaext_max,F,xt1,xt2,crack_model):
+def integral_tensilestress_growing_effective_crack_length_byxt(x,xt_idx,sigmaext1,sigmaext_max,F,xt1,xt2,crack_model):
     """ Evaluate the incremental normal stress field on a mode I crack
     that is growing in effective length from xt1 to xt2 due to an external 
     load (previous value sigmaext1, limiting value sigmaext_max)
@@ -539,7 +539,8 @@ def integral_tensilestress_growing_effective_crack_length_byxt(x,sigmaext1,sigma
     xt2 < x  and xt1 < x  ... xt1 < xt2
 
     So: Integral = 0 where x < xt1
-    Integral upper bound =  x where xt1 < x < xt2
+    Integral upper bound =  x where xt1 < x < xt2
+
     Integral upper bound = xt2 where x > xt2
 
        indef_integral_of_crack_tip_singularity_times_1_over_r2_pos_crossterm_decay(crack_model,x,upper_bound) - indef_integral_of_crack_tip_singularity_times_1_over_r2_pos_crossterm_decay(crack_model,x,xt1)
@@ -625,10 +626,12 @@ def integral_tensilestress_growing_effective_crack_length_byxt(x,sigmaext1,sigma
 
     # old version that fails load balance 
     #res[nonzero] = F*(upper_bound[nonzero]-xt1)  +  (sigmaI_theta0_times_rootr_over_sqrt_a_over_sigmaext*F) * (indef_integral_of_simple_squareroot_quotients(x[nonzero],upper_bound[nonzero]) - indef_integral_of_simple_squareroot_quotients(x[nonzero],xt1))
-
-    res[nonzero] = F*(upper_bound[nonzero]-xt1)  +  (sigmaI_theta0_times_rootr_over_sqrt_a_over_sigmaext*F) * (indef_integral_of_crack_tip_singularity_times_1_over_r2_pos_crossterm_decay(crack_model,x[nonzero],upper_bound[nonzero]) - indef_integral_of_crack_tip_singularity_times_1_over_r2_pos_crossterm_decay(crack_model,x[nonzero],xt1))
-
     
+    #Apply the crack_tip_load_balance_factor to only the value in the middle 
+    #of the region being integrated over
+    correction = np.ones(x.shape,dtype='d')
+    correction[xt_idx] = crack_model.crack_tip_load_balance_factor
+    res[nonzero] = F*(upper_bound[nonzero]-xt1)  +  (correction[nonzero]*sigmaI_theta0_times_rootr_over_sqrt_a_over_sigmaext*F) * (indef_integral_of_crack_tip_singularity_times_1_over_r2_pos_crossterm_decay(crack_model,x[nonzero],upper_bound[nonzero]) - indef_integral_of_crack_tip_singularity_times_1_over_r2_pos_crossterm_decay(crack_model,x[nonzero],xt1))
 
     return (use_xt2,sigmaext2,res)
 
@@ -637,7 +640,7 @@ def integral_tensilestress_growing_effective_crack_length_byxt(x,sigmaext1,sigma
 
 
 
-def integral_compressivestress_shrinking_effective_crack_length_byxt(x,sigmaext1,sigmaext_max,F,xt1,xt2,crack_model):
+def integral_compressivestress_shrinking_effective_crack_length_byxt(x,xt_idx,sigmaext1,sigmaext_max,F,xt1,xt2,crack_model):
     """ Like integral_tensilestress_growing_effective_crack_length_byxt()
 but for compression. """
 
@@ -722,7 +725,11 @@ but for compression. """
     # old version that fails load balance 
     #res[nonzero] = -F*(upper_bound[nonzero]-use_xt1)  -  (sigmaI_theta0_times_rootr_over_sqrt_a_over_sigmaext*F) * (indef_integral_of_simple_squareroot_quotients(x[nonzero],upper_bound[nonzero]) - indef_integral_of_simple_squareroot_quotients(x[nonzero],use_xt1))
 
-    res[nonzero] = -F*(upper_bound[nonzero]-use_xt1)  -  (sigmaI_theta0_times_rootr_over_sqrt_a_over_sigmaext*F) * (indef_integral_of_crack_tip_singularity_times_1_over_r2_pos_crossterm_decay(crack_model,x[nonzero],upper_bound[nonzero]) - indef_integral_of_crack_tip_singularity_times_1_over_r2_pos_crossterm_decay(crack_model,x[nonzero],use_xt1))
+    #Apply the crack_tip_load_balance_factor to only the value in the middle 
+    #of the region being integrated over
+    correction = np.ones(x.shape,dtype='d')
+    correction[xt_idx] = crack_model.crack_tip_load_balance_factor
+    res[nonzero] = -F*(upper_bound[nonzero]-use_xt1)  -  (correction[nonzero]*sigmaI_theta0_times_rootr_over_sqrt_a_over_sigmaext*F) * (indef_integral_of_crack_tip_singularity_times_1_over_r2_pos_crossterm_decay(crack_model,x[nonzero],upper_bound[nonzero]) - indef_integral_of_crack_tip_singularity_times_1_over_r2_pos_crossterm_decay(crack_model,x[nonzero],use_xt1))
 
 
     
@@ -773,7 +780,7 @@ def solve_incremental_tensilestress(x,x_bnd,sigma,sigma_closure,tensile_displ,xt
         pass
     
     def obj_fcn(F):
-        (use_xt2,sigmaext2,sigma_increment)=integral_tensilestress_growing_effective_crack_length_byxt(x,sigmaext,np.inf,F,x_bnd[xt_idx],next_bound,crack_model)
+        (use_xt2,sigmaext2,sigma_increment)=integral_tensilestress_growing_effective_crack_length_byxt(x,xt_idx,sigmaext,np.inf,F,x_bnd[xt_idx],next_bound,crack_model)
         #print("obj_fcn return %g" % ((sigma+sigma_increment - sigma_closure)[xt_idx]))
         return (sigma+sigma_increment - sigma_closure)[xt_idx]
     
@@ -828,7 +835,7 @@ def solve_incremental_tensilestress(x,x_bnd,sigma,sigma_closure,tensile_displ,xt
             F = scipy.optimize.brentq(obj_fcn,0.0,Fbnd,disp=True)
             pass
         
-        (use_xt2,sigmaext2,sigma_increment)=integral_tensilestress_growing_effective_crack_length_byxt(x,sigmaext,sigmaext_max,F,x_bnd[xt_idx],next_bound,crack_model)
+        (use_xt2,sigmaext2,sigma_increment)=integral_tensilestress_growing_effective_crack_length_byxt(x,xt_idx,sigmaext,sigmaext_max,F,x_bnd[xt_idx],next_bound,crack_model)
         #print("F=%g" % (F))
         #print("use_xt2=%f" % (use_xt2))
         assert(use_xt2 <= a)
@@ -885,7 +892,7 @@ def solve_incremental_compressivestress(x,x_bnd,sigma,sigma_closure,tensile_disp
         pass
     
     def obj_fcn(F):
-        (use_xt1,sigmaext2,sigma_increment)=integral_compressivestress_shrinking_effective_crack_length_byxt(x,sigmaext,-np.inf,F,next_bound,use_xt2,crack_model)
+        (use_xt1,sigmaext2,sigma_increment)=integral_compressivestress_shrinking_effective_crack_length_byxt(x,xt_idx,sigmaext,-np.inf,F,next_bound,use_xt2,crack_model)
         #print("obj_fcn return %g" % ((sigma+sigma_increment - sigma_closure)[xt_idx]))
         return (sigma+sigma_increment - sigma_closure)[xt_idx]
 
@@ -936,7 +943,7 @@ def solve_incremental_compressivestress(x,x_bnd,sigma,sigma_closure,tensile_disp
             F = scipy.optimize.brentq(obj_fcn,0.0,Fbnd,disp=True)
             pass
         
-        (use_xt1,sigmaext2,sigma_increment)=integral_compressivestress_shrinking_effective_crack_length_byxt(x,sigmaext,sigmaext_max,F,next_bound,use_xt2,crack_model)
+        (use_xt1,sigmaext2,sigma_increment)=integral_compressivestress_shrinking_effective_crack_length_byxt(x,xt_idx,sigmaext,sigmaext_max,F,next_bound,use_xt2,crack_model)
         #print("use_xt1=%f" % (use_xt1))
         assert(use_xt1 >= 0.0)
 
@@ -1916,7 +1923,7 @@ def inverse_closure2(reff,seff,x,x_bnd,dx,xt,sigma_yield,crack_model,verbose=Fal
             while xt1 < reff[segcnt+1]:
 
                 
-                (use_xt2,sigmaext2,sigma_tinyincrement) = integral_tensilestress_growing_effective_crack_length_byxt(x,sigmaext1,np.inf,F,xt1,xt2,crack_model)
+                (use_xt2,sigmaext2,sigma_tinyincrement) = integral_tensilestress_growing_effective_crack_length_byxt(x,xt1_idx,sigmaext1,np.inf,F,xt1,xt2,crack_model)
 
                 sigma_increment += sigma_tinyincrement
 
@@ -2419,6 +2426,30 @@ def ModeI_throughcrack_weightfun(Eeff,x,epsx):
 class ModeI_throughcrack_CODformula(ModeI_Beta_COD_Formula):
     Symmetric_COD = None
     
+    crack_tip_load_balance_factor = 0.9428
+    """
+    The AVG_INTEGRAL_CORRECTION is a global variable defined to adjust the 
+    value of the fracture mechanics kernel intergal over the region of 
+    integration.
+
+    In the region of integration for the fracture mechanics kernel, xt1 -> xt2, 
+    the value of the integral evaluated at the center point of the step delta 
+    xt will be slightly different from the actual [CITE CRACK CLOSURE PAPER]
+    average value over that step. This difference can be corrected with the 
+    above factor (a ratio of integral evaluated at the center point by the full 
+    integrated average over the step) assuming a simplified form of the 
+    integral where (x-xt) << xt,
+
+              /xt2     1                                  xt1+xt2
+              |      ====== H(x-xt)dxt * (xt2-xt1),   @  ---------         _
+              /xt1 \/x - xt                                  2          4\/2
+    Factor = ------------------------------------------------------- = ------
+                      /xt2 /xt2     1                                     6
+                      |    |      ====== H(x-xt)dxtdx
+                      /xt1 /xt1 \/x - xt                                    
+
+    """
+    
     def r0_over_a(self,xt):
         """
         The baseline approximation of the stress field beyond the crack
@@ -2519,6 +2550,7 @@ class ModeI_throughcrack_CODformula(ModeI_Beta_COD_Formula):
 
 
 class Tada_ModeI_CircularCrack_along_midline(ModeI_Beta_COD_Formula):
+    crack_tip_load_balance_factor = 0.9428 #NEEDS CORRECT FACTOR!!!-HM
     def r0_over_a(self,xt):
         """Based on calculation given in total_load_matching_crossterm_r2_work.pdf
 """
