@@ -21,7 +21,8 @@ from .soft_closure_accel import soft_closure_goal_function_with_gradient_normali
 
 
 # IMPORTANT:
-# du_da terminology
+# du_da terminology... Note: du_da (all except the zeroth element) is what is referred to in the paper as the distributed crack tip intensity s_{\infty}(a_{eff}
+# The zeroth element is the (uniform load/scp.dx). 
 
 # Full length: starts with element corresponding to uniform load, no displacement. Then
 # followed by distributed stress concentration starting at x center offset by dx/2 from
@@ -441,6 +442,9 @@ class sc_params(object):
 
         from_stress = sigmacontact_from_stress(self,du_da)
 
+        du_da_initialization = du_da.copy()  # Save copy so we can return it
+
+        
         # This becomes our new initial state
         self.crack_initial_full_opening = displacement + (sigma_closure[:self.afull_idx]/self.Lm)**(2.0/3.0) # we add sigma_closure displacement back in because sigmacontact_from_displacement() will subtract it out
         #self.crack_initial_full_opening_interp=scipy.interpolate.interp1d(self.x,self.crack_initial_full_opening,kind="linear",fill_value="extrapolate")(self.x_fine)
@@ -453,8 +457,14 @@ class sc_params(object):
         #sys.modules["__main__"].__dict__.update(globals())
         #sys.modules["__main__"].__dict__.update(locals())
         #raise ValueError("Foo!")
-    
-        pass
+
+        # NOTE: du_da_initialization is NOT VALID in the context of this 
+        # object once returned. It is the solved du_da that gives the 
+        # closure state of the object. Once the self.crack_initial_full_opening
+        # and self.sigma_closure attributes are assigned, above, the corresponding
+        # initial du_da is identically zero. 
+        
+        return du_da_initialization
     
 
 
@@ -777,7 +787,20 @@ def sigmacontact_from_stress(scp,du_da,closure_index_for_gradient=None):
         # The integral on the right is trivial. The solution to the integral on the left is given
         # by crackclosure.indef_integral_of_crack_tip_singularity_times_1_over_r2_pos_crossterm_decay(crack_model,x,xt)
         
-        sigmacontact[aidx] -= du_da[aidx+1]*(sqrt(betaval)/sqrt(2.0))*(indef_integral_of_crack_tip_singularity_times_1_over_r2_pos_crossterm_decay(scp.crack_model,scp.x[aidx],scp.x[aidx])-indef_integral_of_crack_tip_singularity_times_1_over_r2_pos_crossterm_decay(scp.crack_model,scp.x[aidx],scp.x[aidx]-da/2.0)) + du_da[aidx+1]*da/2.0 
+        # 2021-1-05 sdh4: The total force (load balance) over the
+        # interval is not adequately represented by the stress
+        # at the centerpoint for the step the crack tip is
+        # moving across. Per H. Moldenhauer's paper draft
+        # the ratio of the average stress to the central
+        # value stress approaches 0.9428
+        # Since this sigmacontact is to be balanced with stress
+        # evaluated from sampled quantities, it needs to
+        # be scaled by the 0.9428
+        # We only apply the scalefactor to the left hand term
+        # because only the singular term was considered in the
+        # paper derivation
+        
+        sigmacontact[aidx] -= .9428*du_da[aidx+1]*(sqrt(betaval)/sqrt(2.0))*(indef_integral_of_crack_tip_singularity_times_1_over_r2_pos_crossterm_decay(scp.crack_model,scp.x[aidx],scp.x[aidx])-indef_integral_of_crack_tip_singularity_times_1_over_r2_pos_crossterm_decay(scp.crack_model,scp.x[aidx],scp.x[aidx]-da/2.0)) + du_da[aidx+1]*da/2.0 
         
         # = (du/da)*(1/sqrt(2))*sqrt(a)* [ (1/(2*sqrt(2))) * sqrt(r0) * {ln(r0) - ln(r0) + 2*atan(1) - 2*atan(1)} - [ (1/(2*sqrt(2))) * sqrt(r0) * {ln(-sqrt(2*r0*da/2) + r0 + da/2) - ln(sqrt(2*r0*da/2) + r0+da/2) + 2*atan(1-sqrt(2*(da/2)/r0)) - 2*atan(sqrt(2*(da/2)/r0)+1)} ]  + (du/da)*(da/2)
         # sigmacontact[aidx]  -= (du_da[aidx+1])*(sqrt(betaval)/sqrt(2.0))*sqrt(a)* ( (1.0/(2.0*sqrt(2))) * sqrt(r0) * (-(log(-sqrt(2*(r0)*da/2) + r0 + da/2) - log(sqrt(2*(r0)*da/2) + r0+da/2) + 2.0*arctan(1-sqrt(2*(da/2.0)/(r0))) - 2*arctan(sqrt(2*(da/2.0)/(r0))+1)))) + du_da[aidx+1]*da/2.0
@@ -814,7 +837,10 @@ def sigmacontact_from_stress(scp,du_da,closure_index_for_gradient=None):
                 du_da_shortened_index = aidx - closure_index_for_gradient
                 sigma_contact_gradient[(aidx+1):,du_da_shortened_index] -= ((sqrt(betaval)/sqrt(2.0))*sqrt(a/r)*( (r0)**2.0/(r + r0)**2.0 )  + 1.0)*da # + 1.0 represents stress when a large distance away from effective tip
 
-                sigma_contact_gradient[aidx,du_da_shortened_index] -= (sqrt(betaval)/sqrt(2.0))*(indef_integral_of_crack_tip_singularity_times_1_over_r2_pos_crossterm_decay(scp.crack_model,scp.x[aidx],scp.x[aidx])-indef_integral_of_crack_tip_singularity_times_1_over_r2_pos_crossterm_decay(scp.crack_model,scp.x[aidx],scp.x[aidx]-da/2.0)) + da/2.0
+                # 2021-1-05 sdh4: The total force (load balance)
+                # correction adds factor of .9428
+                # to left hand term  
+                sigma_contact_gradient[aidx,du_da_shortened_index] -= .9428*(sqrt(betaval)/sqrt(2.0))*(indef_integral_of_crack_tip_singularity_times_1_over_r2_pos_crossterm_decay(scp.crack_model,scp.x[aidx],scp.x[aidx])-indef_integral_of_crack_tip_singularity_times_1_over_r2_pos_crossterm_decay(scp.crack_model,scp.x[aidx],scp.x[aidx]-da/2.0)) + da/2.0
         
 
                 # # OBSOLETE

@@ -1637,12 +1637,24 @@ def _crackclosure_monotonic_interpolate(observed_reff,observed_seff,interpolated
     deriv_r = (observed_reff[:-1] + observed_reff[1:])/2.0
 
     log_deriv = np.log(deriv)
+
+    valid_deriv_points = deriv.shape[0]
+    if np.isinf(deriv).any():
+        valid_deriv_points = np.where(np.isinf(deriv))[0][0]
+        pass
+
+    valid_positions = valid_deriv_points+1
+
+    # Throw out all the invalid data
+    deriv=deriv[:valid_deriv_points]
+    deriv_r=deriv_r[:valid_deriv_points]
+    
     
     k = 3 # b-spline order
 
     # Create knots... at end and spaced every two internally
-    num_internal_knots = observed_reff[2:-2].shape[0] #  is (# of data points - 4)
-    t=np.concatenate(([observed_reff[0]]*(k+1),observed_reff[2:-2],[observed_reff[-1]]*(k+1)))
+    num_internal_knots = observed_reff[2:(valid_positions-2)].shape[0] #  is (# of data points - 4)
+    t=np.concatenate(([observed_reff[0]]*(k+1),observed_reff[2:(valid_positions-2)],[observed_reff[valid_positions-1]]*(k+1)))
     # Total number of knots is (# of data points) + 2k - 2
     # or num_internal_knots + 2k+2
     
@@ -1692,7 +1704,7 @@ def _crackclosure_monotonic_interpolate(observed_reff,observed_seff,interpolated
 
 
     eq_cons=[]
-    for sidx in range(observed_seff.shape[0]-1):
+    for sidx in range(valid_positions-1):
         def eq_cons_fun(c_val,sidx=sidx):
             tck=(t,c_val,k)
             return (scipy.integrate.quad(lambda rpos: np.exp(scipy.interpolate.splev(rpos,tck)),observed_reff[sidx],observed_reff[sidx+1])[0]-differential_seff[sidx])/interp_nominal_stress
@@ -1781,12 +1793,19 @@ def _crackclosure_monotonic_interpolate(observed_reff,observed_seff,interpolated
     interpolated_log_deriv = scipy.interpolate.splev(interpolated_reff_midpoints,log_deriv_tck)
     interpolated_deriv = np.exp(interpolated_log_deriv) # dseff/dreff
 
+    
     interpolated = np.zeros(interpolated_reff.shape,dtype='d')
     interpolated_dx = interpolated_reff[1]-interpolated_reff[0]
     interpolated[0]=observed_seff[0]
     #for ridx in range(1,interpolated_reff.shape[0]):
     #    interpolated[ridx]=scipy.integrate.quad(lambda rpos: np.exp(scipy.interpolate.splev(rpos,tck)),interpolated_reff[ridx-1],interpolated_reff[ridx])[0]
     interpolated[1:] = interpolated[0]+np.cumsum(interpolated_deriv)*interpolated_dx
+
+    if valid_deriv_points < observed_reff.shape[0]-1:
+        # If some derivative points (above) were infinite, we ignored this in the spline fitting, so now we have to mark infinite stress required here to open the crack to this load
+        interpolated[interpolated_reff >= observed_reff[valid_deriv_points]]=np.inf
+        pass
+    
 
     diagnostic_plot_figure = None
     

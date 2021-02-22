@@ -368,7 +368,22 @@ static void sigmacontact_from_stress(double *du_da_short,
     //from_stress[aidx] -= (du_da_short[aidx+1]*(sqrt_betaval/M_SQRT2)*sqrt(a)*2.0*sqrt(dx/2.0) + du_da_short[aidx+1]*dx/2.0);
     //from_stress[aidx] -= (du_da_short[aidx+1]*(sqrt_betaval/M_SQRT2)*sqrt(a)*sqrt(M_PI*r0_over_a*a)*erf(sqrt(dx/(2.0*r0_over_a*a))) + du_da_short[aidx+1]*dx/2.0);
     //from_stress[aidx] -= (du_da_short[aidx+1]*(sqrt_betaval/M_SQRT2))*sqrt(a)* ( (1.0/(2.0*M_SQRT2))*sqrt(r0)*(-(log(-sqrt(2.0*(r0)*dx/2.0)+r0 + dx/2.0)-log(sqrt(2.0*(r0)*dx/2.0) + r0 + dx/2.0) + 2.0*atan(1-sqrt(2.0*(dx/2.0)/(r0))) -2.0*atan(sqrt(2.0*(dx/2.0)/(r0))+1.0)))) + du_da_short[aidx+1]*dx/2.0;
-    from_stress[aidx] -= (du_da_short[aidx+1]*(sqrt_betaval/M_SQRT2))*(indef_integral_of_crack_tip_singularity_times_1_over_r2_pos_crossterm_decay(r0_over_a,a,a)-indef_integral_of_crack_tip_singularity_times_1_over_r2_pos_crossterm_decay(r0_over_a,a,a-dx/2.0)) + du_da_short[aidx+1]*dx/2.0;
+    
+    // 2021-1-05 sdh4: The total force (load balance) over the
+    // interval is not adequately represented by the stress
+    // at the centerpoint for the step the crack tip is
+    // moving across. Per H. Moldenhauer's paper draft
+    // the ratio of the average stress to the central
+    // value stress approaches 0.9428
+    // Since this sigmacontact is to be balanced with stress
+    // evaluated from sampled quantities, it needs to
+    // be scaled by the 0.9428
+    // We only apply the scalefactor to the left hand term
+    // because only the singular term was considered in the
+    // paper derivation
+
+
+    from_stress[aidx] -= 0.9428*(du_da_short[aidx+1]*(sqrt_betaval/M_SQRT2))*(indef_integral_of_crack_tip_singularity_times_1_over_r2_pos_crossterm_decay(r0_over_a,a,a)-indef_integral_of_crack_tip_singularity_times_1_over_r2_pos_crossterm_decay(r0_over_a,a,a-dx/2.0)) + du_da_short[aidx+1]*dx/2.0;
     
     if (aidx+1 >= closure_index_for_gradient+2) {
       for (cnt=aidx+1;cnt < afull_idx;cnt++) {
@@ -381,9 +396,12 @@ static void sigmacontact_from_stress(double *du_da_short,
       //from_stress_gradient[aidx*du_da_shortened_len + du_da_shortened_index] -= (sqrt_betaval/M_SQRT2)*sqrt(a)*sqrt(M_PI*r0_over_a*a)*erf(sqrt(dx/(2.0*r0_over_a*a))) + dx/2.0;
 
       //from_stress_gradient[aidx*du_da_shortened_len + du_da_shortened_index] -= (sqrt_betaval/M_SQRT2)*sqrt(a)* ( (1.0/(2.0*M_SQRT2))*sqrt(r0)*(-(log(-sqrt(2.0*(r0)*dx/2.0)+r0 + dx/2.0)-log(sqrt(2.0*(r0)*dx/2.0) + r0 + dx/2.0) + 2.0*atan(1-sqrt(2.0*(dx/2.0)/(r0))) -2.0*atan(sqrt(2.0*(dx/2.0)/(r0))+1.0)))) + dx/2.0;
-      from_stress_gradient[aidx*du_da_shortened_len + du_da_shortened_index] -= (sqrt_betaval/M_SQRT2)* ( indef_integral_of_crack_tip_singularity_times_1_over_r2_pos_crossterm_decay(r0_over_a,a,a)-indef_integral_of_crack_tip_singularity_times_1_over_r2_pos_crossterm_decay(r0_over_a,a,a-dx/2.0) ) + dx/2.0;
+      // 2021-1-05 sdh4: The total force (load balance)
+      // correction adds factor of .9428
+      // to left hand term  
+      from_stress_gradient[aidx*du_da_shortened_len + du_da_shortened_index] -= 0.9428*(sqrt_betaval/M_SQRT2)* ( indef_integral_of_crack_tip_singularity_times_1_over_r2_pos_crossterm_decay(r0_over_a,a,a)-indef_integral_of_crack_tip_singularity_times_1_over_r2_pos_crossterm_decay(r0_over_a,a,a-dx/2.0) ) + dx/2.0;
     }
-
+    
     //if (aidx==0) {
     //  printf("fs[0] subtraction=%g\n",(du_da_short[aidx+1]*(sqrt_betaval/M_SQRT2)*sqrt(a)*sqrt(M_PI*r0_over_a*a)*erf(sqrt(dx/(2.0*r0_over_a*a))) + du_da_short[aidx+1]*dx/2.0));
     //  printf("fs[0] subtraction terms/factors=%g, %g, %g, %g, %g, %g\n",du_da_short[aidx+1],(sqrt_betaval/M_SQRT2),sqrt(a),sqrt(M_PI*r0_over_a*a),erf(sqrt(dx/(2.0*r0_over_a*a))),du_da_short[aidx+1]*dx/2.0);

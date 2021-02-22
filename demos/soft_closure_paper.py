@@ -21,6 +21,7 @@ from crackclosuresim2.soft_closure import sigmacontact_from_displacement
 from crackclosuresim2.soft_closure import sigmacontact_from_stress
 #from angled_friction_model.asperity_stiffness import asperity_stiffness
 
+# n.b. these plots are no longer included in the paper. See instead crackclosure_abaqus_modeling/soft_closure/soft_closure_plot.py
 
 if __name__=="__main__":
     #####INPUT VALUES
