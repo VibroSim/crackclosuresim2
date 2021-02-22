@@ -1648,7 +1648,7 @@ def _crackclosure_monotonic_interpolate(observed_reff,observed_seff,interpolated
     # Throw out all the invalid data
     deriv=deriv[:valid_deriv_points]
     deriv_r=deriv_r[:valid_deriv_points]
-    
+    log_deriv = log_deriv[:valid_deriv_points]
     
     k = 3 # b-spline order
 
@@ -1749,16 +1749,17 @@ def _crackclosure_monotonic_interpolate(observed_reff,observed_seff,interpolated
             #print("res:", res)
             pass
         #print("obj:",res)
-        return res
+        return np.sqrt(res)
     
     def initial_objjac(c_val):
+        fun_val = initial_objfun(c_val)
+
         jac = np.zeros(num_internal_knots+k+1,dtype='d')
         for cons in eq_cons:
             cons_jac = cons["jac"](c_val)
             cons_fun = cons["fun"](c_val)
-            #for idx in range(num_internal_knots+k+1):
-            jac += 2.0*cons_fun * cons_jac
-            #    pass
+            #jac += 2.0*cons_fun * cons_jac  # this line was for before initial_objfun had a sqrt()
+            jac += (1.0/fun_val) * cons_fun * cons_jac  # this is for sqrt included in initial_objfun
             pass
         return jac
 
@@ -1803,7 +1804,7 @@ def _crackclosure_monotonic_interpolate(observed_reff,observed_seff,interpolated
 
     if valid_deriv_points < observed_reff.shape[0]-1:
         # If some derivative points (above) were infinite, we ignored this in the spline fitting, so now we have to mark infinite stress required here to open the crack to this load
-        interpolated[interpolated_reff >= observed_reff[valid_deriv_points]]=np.inf
+        interpolated[interpolated_reff > observed_reff[valid_deriv_points]]=np.inf
         pass
     
 

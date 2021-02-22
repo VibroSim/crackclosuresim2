@@ -37,6 +37,7 @@ def run(_xmldoc,_element,
         dc_crackpath,
         dc_coordinatetransform,
         dc_specimen_str,
+        dc_dest_href=None, # updated replacement for _dest_href
         dx=5e-6,
         dc_symmetric_cod_bool=True,  # No longer seems to be used... probably redundant with (currently hardwired) choice of crack_model
         dc_hascrackside1_bool=True,
@@ -44,6 +45,10 @@ def run(_xmldoc,_element,
         dc_use_inverse_closure2_bool=False,
         dc_interpolate_closure_state_bool=True,
         debug_bool=False):
+
+    if dc_dest_href is not None:
+        _dest_href=dc_dest_href
+        pass
     
     E=dc_spcYoungsModulus_numericunits.value("Pa")
     nu = dc_spcPoissonsRatio_numericunits.value("unitless")   #Poisson's Ratio
