@@ -2746,7 +2746,8 @@ def perform_inverse_closure(inputfilename,E,nu,sigma_yield,CrackCenterX,dx,speci
         else:
             pl.title('Side 1 (left)')        
             pass
-        
+
+    if tippos_side2 is not None:
         side2fig=pl.figure()
         pl.plot(x[x < a_side2]*1e6,sigma_closure_side2[x < a_side2]/1e6,'-',
                 observed_reff_side2*1e6,observed_seff_side2/1e6,'x')
