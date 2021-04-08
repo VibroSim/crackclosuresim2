@@ -1232,7 +1232,11 @@ def solve_normalstress_tensile(x,x_bnd,sigma_closure,dx,sigmaext_max,a,sigma_yie
     
     sigma_with_sigma_closure=sigma-sigma_closure*(x > use_xt_start)*(x <= a)  # sigma_closure only contributes after where we started peeling it open
 
-
+    #sigmaext_max being infinite suggests a desire to open the crack fully to
+    #it's tips, so we need to also return the external load required to do 
+    #so as it is the information of interest in that case.
+    if np.isinf(sigmaext_max):
+        return (use_xt2, sigma_with_sigma_closure, tensile_displ, dsigmaext_dxt, sigmaext)
     
     return (use_xt2, sigma_with_sigma_closure, tensile_displ, dsigmaext_dxt)
 
@@ -2887,3 +2891,20 @@ def load_closurestress(filename):
 
 
     return (x,x_bnd,xstep,a,sigma_closure,crack_opening) 
+
+def effective_stress_intensity_KI(x,x_bnd,sigma_closure,dx,sigmaext_max,a,sigma_yield,crack_model,verbose=False):
+    
+    #Call solve_normalstress_tensile at sigmaext_max = np.inf in order to 
+    #return the remote stress required to open the crack fully
+    sigmaext_inf = np.inf # external tensile load, Pa
+    (use_xt2, sigma_with_sigma_closure, tensile_displ, dsigmaext_dxt, sigmaext) = solve_normalstress_tensile(x,x_bnd,sigma_closure,dx,sigmaext_inf,a,sigma_yield,crack_model,verbose=verbose,calculate_displacements=False, diag_plots=False)
+    K_op = sigmaext*np.sqrt(pi*a*crack_model.beta(a))
+    
+    if sigmaext <= sigmaext_max:
+        #Calculate the K value of the maximum applied load
+        K_max = sigmaext_max*np.sqrt(pi*a*crack_model.beta(a))
+        Delta_K = K_max - K_op
+    else:
+        Delta_K = 1.0
+    #return the opening SIF,remote load, and effective SIF
+    return (K_op, Delta_K, sigmaext)

@@ -52,7 +52,7 @@ from .crackclosure import perform_inverse_closure
 from .crackclosure import save_closurestress
 from .crackclosure import load_closurestress
 from .crackclosure import indef_integral_of_crack_tip_singularity_times_1_over_r2_pos_crossterm_decay
-
+from .crackclosure import effective_stress_intensity_KI
 
 from .shear_stickslip import ModeII_crack_model
 from .shear_stickslip import ModeII_Beta_CSD_Formula
