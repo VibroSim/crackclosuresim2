@@ -583,6 +583,22 @@ def integral_tensilestress_growing_effective_crack_length_byxt(x,xt_idx,sigmaext
     upper_bound = use_xt2*np.ones(x.shape,dtype='d')
     
     # alternate upper_bound:
+    # We are evaluating stress increments only beyond
+    # the starting effective tip position.
+    # We only get a stress increment from effective crack tips
+    # behind the effective tip position.
+    # However up to one point (grid point between xt1 and xt2)
+    # may be both beyond and behind the effective tip position
+    # because the effective tip position passes this point
+    # during the integration.
+    # For this single point (if it exists) we want to upper
+    # bound the integral at that position, because
+    # once the crack opens beyond that point no
+    # additional stress will accumulate.
+    # use_alternate in combination with nonzero identifies this
+    # location and is used to change the upper bound of the
+    # integration for that point to the grid point
+    # instead of the boundary point.
     use_alternate = x < upper_bound
     upper_bound[use_alternate] = x[use_alternate]
     
@@ -683,6 +699,22 @@ but for compression. """
     
     nonzero = x > use_xt1
     # alternate upper_bound:
+    # We are evaluating stress increments only beyond
+    # the starting effective tip position.
+    # We only get a stress increment from effective crack tips
+    # behind the effective tip position.
+    # However up to one point (grid point between xt1 and xt2)
+    # may be both beyond and behind the effective tip position
+    # because the effective tip position passes this point
+    # during the integration.
+    # For this single point (if it exists) we want to upper
+    # bound the integral at that position, because
+    # once the crack opens beyond that point no
+    # additional stress will accumulate.
+    # use_alternate in combination with nonzero identifies this
+    # location and is used to change the upper bound of the
+    # integration for that point to the grid point
+    # instead of the boundary point.
     use_alternate = x < upper_bound
     upper_bound[use_alternate] = x[use_alternate]
     
