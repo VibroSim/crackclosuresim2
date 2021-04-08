@@ -798,25 +798,25 @@ def solve_incremental_tensilestress(x,x_bnd,sigma,sigma_closure,tensile_displ,xt
 
         # Bound it by 0  and the F that will give the maximum
         # contribution of sigma_increment: 2.0*(sigmaext_max-sigmaext1)/(xt2-xt1)
-        if np.isinf(sigmaext_max):
-            if sigmaext != 0.0:
-                Fbnd = 2.0*(sigmaext)/(next_bound-x_bnd[xt_idx])
-                pass
-            else:
-                Fbnd = 2.0*(20e6)/(next_bound-x_bnd[xt_idx])
-                pass
+        #if np.isinf(sigmaext_max):
+        #    if sigmaext != 0.0:
+        #        Fbnd = 2.0*(sigmaext)/(next_bound-x_bnd[xt_idx])
+        #        pass
+        #    else:
+        #        Fbnd = 2.0*(20e6)/(next_bound-x_bnd[xt_idx])
+        #        pass
             
-            pass
-        else:
-            Fbnd = 2.0*(sigmaext_max - sigmaext)/(next_bound-x_bnd[xt_idx])
-            pass
+        #    pass
+        #else:
+        #    Fbnd = 2.0*(sigmaext_max - sigmaext)/(next_bound-x_bnd[xt_idx])
+        #    pass
         # Increase Fbnd until we get a positive result from obj_fcn
-        while Fbnd != 0.0 and obj_fcn(Fbnd) < 0.0:
-            Fbnd*=2.0;
-            pass
+        #while Fbnd != 0.0 and obj_fcn(Fbnd) < 0.0:
+        #   Fbnd*=2.0;
+        #    pass
 
         # Condition below should only occur when Fbnd==0.0, i.e. when sigmaext_max==sigmaext, or if the objective is already satisfied
-        if Fbnd == 0.0 or obj_fcn(Fbnd) <= 0.0:
+        #if Fbnd == 0.0 or obj_fcn(Fbnd) <= 0.0:
             # Maximum value of objective is < 0... This means that
             # with the steepest sigma vs. xt slope possible (given
             # the total tensile load we are applying) we still
@@ -824,16 +824,30 @@ def solve_incremental_tensilestress(x,x_bnd,sigma,sigma_closure,tensile_displ,xt
             # ... We will have to make do with sigma+sigma_increment
             #  < sigma_closure
             # So our best result is just Fbnd
-            F=Fbnd
+        #    F=Fbnd
 
             #print("obj_fcn(Fbnd) returns %g; obj_fcn(200*Fbnd) returns %g" % (obj_fcn(Fbnd),obj_fcn(200*Fbnd)))
                   
-            pass
-        else:
-            # brentq requires function to be different signs
-            # at 0.0 (negative) and Fbnd (positive) 
-            F = scipy.optimize.brentq(obj_fcn,0.0,Fbnd,disp=True)
-            pass
+        #    pass
+        #else:
+        #    # brentq requires function to be different signs
+        #    # at 0.0 (negative) and Fbnd (positive) 
+        #    F1 = scipy.optimize.brentq(obj_fcn,0.0,Fbnd,disp=True)
+        #    print("F brentq=%g" % (F1))
+        #Solve directly for F without using optimization. There is a corner
+        #case where the remote load is completely used up, but we have not
+        #reached the next x_bnd value. In this case, When we use F in the 
+        #calculation to find the next Delta sigma yy value, we adjust the
+        #upper bound in the integral function to be the locationw where
+        #sigma_max is reached, while still assuming the F value calculated.
+        #The input F to solve for F, is 1.0 to simulate divide the function
+        #by F
+        (use_xt2F,sigmaext2F,sigma_incrementF)=integral_tensilestress_growing_effective_crack_length_byxt(x,xt_idx,sigmaext,np.inf,1.0,x_bnd[xt_idx],next_bound,crack_model)
+        F = -((sigma-sigma_closure)[xt_idx])/((sigma_incrementF)[xt_idx]) 
+        #    print("F direct=%g" % (F))
+        #    print("Difference =%g" % (np.abs(F1-F)))
+        #    assert(np.abs(F1-F)<0.1)
+        #    pass
         
         (use_xt2,sigmaext2,sigma_increment)=integral_tensilestress_growing_effective_crack_length_byxt(x,xt_idx,sigmaext,sigmaext_max,F,x_bnd[xt_idx],next_bound,crack_model)
         #print("F=%g" % (F))
@@ -882,7 +896,6 @@ def solve_incremental_tensilestress(x,x_bnd,sigma,sigma_closure,tensile_displ,xt
    
 
 
-
 def solve_incremental_compressivestress(x,x_bnd,sigma,sigma_closure,tensile_displ,use_xt2,xt_idx,dx,sigmaext,sigmaext_max,a,sigma_yield,crack_model,calculate_displacements=True):
     """Like solve_incremental_tensilestress but for negative sigmaext and sigmaext_max    """
 
@@ -911,20 +924,20 @@ def solve_incremental_compressivestress(x,x_bnd,sigma,sigma_closure,tensile_disp
         # Bound it by 0  and the F that will give the maximum
         # contribution of sigma_increment: 2.0*(sigmaext_max-sigmaext1)/(xt2-xt1)
         # (F is positive, in general... next_bound is smaller than use_xt2)
-        if np.isinf(sigmaext_max): # sigmaext_max is -inf when we are closing the crack all the way to find out opening displacement
-            Fbnd = 2.0*(-sigma_yield)/(next_bound-use_xt2)
-            pass
-        else:
-            Fbnd = 2.0*(sigmaext_max - sigmaext)/(next_bound-use_xt2)
-            pass
+    #    if np.isinf(sigmaext_max): # sigmaext_max is -inf when we are closing the crack all the way to find out opening displacement
+    #        Fbnd = 2.0*(-sigma_yield)/(next_bound-use_xt2)
+    #        pass
+    #    else:
+    #        Fbnd = 2.0*(sigmaext_max - sigmaext)/(next_bound-use_xt2)
+    #        pass
         
         # Increase Fbnd until we get a negative result from obj_fcn
-        while Fbnd != 0.0 and obj_fcn(Fbnd) > 0.0:
-            Fbnd*=2.0;
-            pass
+    #    while Fbnd != 0.0 and obj_fcn(Fbnd) > 0.0:
+    #        Fbnd*=2.0;
+    #        pass
 
         # Condition below should only occur when Fbnd==0.0, i.e. when sigmaext_max==sigmaext, or if the objective is already satisfied
-        if Fbnd ==0.0 or obj_fcn(Fbnd) >= 0.0:
+    #    if Fbnd ==0.0 or obj_fcn(Fbnd) >= 0.0:
             # Maximum value of objective is < 0... This means that
             # with the steepest sigma vs. xt slope possible (given
             # the total tensile load we are applying) we still
@@ -932,16 +945,30 @@ def solve_incremental_compressivestress(x,x_bnd,sigma,sigma_closure,tensile_disp
             # ... We will have to make do with sigma+sigma_increment
             #  < sigma_closure
             # So our best result is just Fbnd
-            F=Fbnd
+    #        F=Fbnd
 
             #print("obj_fcn(Fbnd) returns %g; obj_fcn(200*Fbnd) returns %g" % (obj_fcn(Fbnd),obj_fcn(200*Fbnd)))
                   
-            pass
-        else:
+    #        pass
+    #    else:
             # brentq requires function to be different signs
             # at 0.0 (negative) and Fbnd (positive) 
-            F = scipy.optimize.brentq(obj_fcn,0.0,Fbnd,disp=True)
-            pass
+    #        F = scipy.optimize.brentq(obj_fcn,0.0,Fbnd,disp=True)
+    #        print("F brentq=%g" % (F))
+        #Solve directly for F without using optimization. There is a corner
+        #case where the remote load is completely used up, but we have not
+        #reached the next x_bnd value. In this case, When we use F in the 
+        #calculation to find the next Delta sigma yy value, we adjust the
+        #upper bound in the integral function to be the locationw where
+        #sigma_max is reached, while still assuming the F value calculated.
+        #The input F to solve for F, is 1.0 to simulate divide the function
+        #by F
+        (use_xt2F,sigmaext2F,sigma_incrementF)=integral_tensilestress_growing_effective_crack_length_byxt(x,xt_idx,sigmaext,np.inf,1.0,next_bound,use_xt2,crack_model)
+        F = ((sigma-sigma_closure)[xt_idx])/((sigma_incrementF)[xt_idx]) 
+     #       print("F direct=%g" % (F1))
+     #       print("Difference =%g" % (np.abs(F1-F)))
+     #       assert(np.abs(F1-F)<0.1)
+     #       pass
         
         (use_xt1,sigmaext2,sigma_increment)=integral_compressivestress_shrinking_effective_crack_length_byxt(x,xt_idx,sigmaext,sigmaext_max,F,next_bound,use_xt2,crack_model)
         #print("use_xt1=%f" % (use_xt1))
