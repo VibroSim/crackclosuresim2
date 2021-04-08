@@ -813,7 +813,7 @@ def solve_incremental_tensilestress(x,x_bnd,sigma,sigma_closure,tensile_displ,xt
         # Increase Fbnd until we get a positive result from obj_fcn
         #while Fbnd != 0.0 and obj_fcn(Fbnd) < 0.0:
         #   Fbnd*=2.0;
-        #    pass
+        #   pass
 
         # Condition below should only occur when Fbnd==0.0, i.e. when sigmaext_max==sigmaext, or if the objective is already satisfied
         #if Fbnd == 0.0 or obj_fcn(Fbnd) <= 0.0:
@@ -830,24 +830,73 @@ def solve_incremental_tensilestress(x,x_bnd,sigma,sigma_closure,tensile_displ,xt
                   
         #    pass
         #else:
-        #    # brentq requires function to be different signs
-        #    # at 0.0 (negative) and Fbnd (positive) 
-        #    F1 = scipy.optimize.brentq(obj_fcn,0.0,Fbnd,disp=True)
-        #    print("F brentq=%g" % (F1))
-        #Solve directly for F without using optimization. There is a corner
-        #case where the remote load is completely used up, but we have not
-        #reached the next x_bnd value. In this case, When we use F in the 
-        #calculation to find the next Delta sigma yy value, we adjust the
-        #upper bound in the integral function to be the locationw where
-        #sigma_max is reached, while still assuming the F value calculated.
-        #The input F to solve for F, is 1.0 to simulate divide the function
-        #by F
+            # brentq requires function to be different signs
+            # at 0.0 (negative) and Fbnd (positive) 
+           #F1 = scipy.optimize.brentq(obj_fcn,0.0,Fbnd,disp=True)
+           #print("F brentq=%g" % (F1))
+        #######################################################################
+        #Solve directly for F without using optimization. F can be obtained 
+        #without using a brentq algorithm or other optimization. The force 
+        #balance from which F is obtained is
+        #
+        #(current initial contact stress)*dx + (sigma_increment)*dx = 0
+        #both evaluated at the midpoint between xt1 and xt2
+        #
+        #from Eq. 13 in the accompanying closure paper (Moldenhauer et.al. 2021)
+        #where,
+        #
+        #current initial contact stress state = sigma-sigma_closure because 
+        #sigma is just the cumulative sum of sigma_increments and so to find 
+        #the current contact stress you must subtract the initial input
+        #closure stress state (both handled as positive distributions). However
+        #the equations in the paper consider contact stress to be tensile 
+        #position. This subtraction returns a tensile positive contact stress
+        #state
+        #
+        #dx is the stepsize of the increment (generally = xt2-xt1)
+        #
+        #and sigma increment is the third output from the 
+        #integral_tensilestress_growing_effective_crack_length_byxt
+        #function, corresponding to Eq. 17 in the paper or \Delta\sigma_{yy}
+        #
+        #Based on the load balance, we can subtract the current initial contact stress
+        #term to both sides and then the stepsize multiplied by each side 
+        #cancels out and we find that:
+        #
+        #(sigma_increment) = -(current initial contact stress)
+        #
+        #We can obtain F from this because sigma_increment is a function of F
+        #More specifically, sigma_increment (as shown in equation 17) contains
+        #F as a linear coefficient. This means you can divide sigma_increment
+        #by F to obtain
+        #
+        #F = -(current initial contact stress)/(sigma_increment/F)
+        #
+        #Now, in order to evaluate sigma_increment/F you can use the same 
+        #function as you would to evaluate sigma_increment
+        #integral_tensilestress_growing_effective_crack_length_byxt
+        #except you would input F to this function as 1.0 because (F/F=1)
+        #
+        #All of this results in the direct equation for F
+        #
+        #F = -((sigma-sigma_closure)[xt_idx])/((sigma_incrementF)[xt_idx])
+        #where evaluating at the midpoint between xt1 and xt2 is accomplished
+        #by using index value xt_idx
+        
+        #In the case that sigma_ext is completely used up before shifting
+        #the effective tip by the entire stepsize dx, F will not change. 
+        #Instead this is handled in the function:
+        #integral_tensilestress_growing_effective_crack_length_byxt
+        #by changing the end bound of dx (xt2) to be the location where the
+        #external load is exhausted. 
+        ######################################################################
+        
         (use_xt2F,sigmaext2F,sigma_incrementF)=integral_tensilestress_growing_effective_crack_length_byxt(x,xt_idx,sigmaext,np.inf,1.0,x_bnd[xt_idx],next_bound,crack_model)
         F = -((sigma-sigma_closure)[xt_idx])/((sigma_incrementF)[xt_idx]) 
-        #    print("F direct=%g" % (F))
-        #    print("Difference =%g" % (np.abs(F1-F)))
-        #    assert(np.abs(F1-F)<0.1)
-        #    pass
+            #print("F direct=%g" % (F))
+            #print("Difference =%g" % (np.abs(F1-F)))
+            #assert(np.abs(F1-F)<0.1)
+            #pass
         
         (use_xt2,sigmaext2,sigma_increment)=integral_tensilestress_growing_effective_crack_length_byxt(x,xt_idx,sigmaext,sigmaext_max,F,x_bnd[xt_idx],next_bound,crack_model)
         #print("F=%g" % (F))
@@ -924,20 +973,20 @@ def solve_incremental_compressivestress(x,x_bnd,sigma,sigma_closure,tensile_disp
         # Bound it by 0  and the F that will give the maximum
         # contribution of sigma_increment: 2.0*(sigmaext_max-sigmaext1)/(xt2-xt1)
         # (F is positive, in general... next_bound is smaller than use_xt2)
-    #    if np.isinf(sigmaext_max): # sigmaext_max is -inf when we are closing the crack all the way to find out opening displacement
-    #        Fbnd = 2.0*(-sigma_yield)/(next_bound-use_xt2)
-    #        pass
-    #    else:
-    #        Fbnd = 2.0*(sigmaext_max - sigmaext)/(next_bound-use_xt2)
-    #        pass
+        #if np.isinf(sigmaext_max): # sigmaext_max is -inf when we are closing the crack all the way to find out opening displacement
+        #   Fbnd = 2.0*(-sigma_yield)/(next_bound-use_xt2)
+        #   pass
+        #else:
+        #    Fbnd = 2.0*(sigmaext_max - sigmaext)/(next_bound-use_xt2)
+        #    pass
         
         # Increase Fbnd until we get a negative result from obj_fcn
-    #    while Fbnd != 0.0 and obj_fcn(Fbnd) > 0.0:
-    #        Fbnd*=2.0;
-    #        pass
+        #while Fbnd != 0.0 and obj_fcn(Fbnd) > 0.0:
+        #    Fbnd*=2.0;
+        #    pass
 
         # Condition below should only occur when Fbnd==0.0, i.e. when sigmaext_max==sigmaext, or if the objective is already satisfied
-    #    if Fbnd ==0.0 or obj_fcn(Fbnd) >= 0.0:
+        #if Fbnd ==0.0 or obj_fcn(Fbnd) >= 0.0:
             # Maximum value of objective is < 0... This means that
             # with the steepest sigma vs. xt slope possible (given
             # the total tensile load we are applying) we still
@@ -945,30 +994,80 @@ def solve_incremental_compressivestress(x,x_bnd,sigma,sigma_closure,tensile_disp
             # ... We will have to make do with sigma+sigma_increment
             #  < sigma_closure
             # So our best result is just Fbnd
-    #        F=Fbnd
+        #    F=Fbnd
 
             #print("obj_fcn(Fbnd) returns %g; obj_fcn(200*Fbnd) returns %g" % (obj_fcn(Fbnd),obj_fcn(200*Fbnd)))
                   
-    #        pass
-    #    else:
+        #    pass
+        #else:
             # brentq requires function to be different signs
             # at 0.0 (negative) and Fbnd (positive) 
-    #        F = scipy.optimize.brentq(obj_fcn,0.0,Fbnd,disp=True)
-    #        print("F brentq=%g" % (F))
-        #Solve directly for F without using optimization. There is a corner
-        #case where the remote load is completely used up, but we have not
-        #reached the next x_bnd value. In this case, When we use F in the 
-        #calculation to find the next Delta sigma yy value, we adjust the
-        #upper bound in the integral function to be the locationw where
-        #sigma_max is reached, while still assuming the F value calculated.
-        #The input F to solve for F, is 1.0 to simulate divide the function
-        #by F
-        (use_xt2F,sigmaext2F,sigma_incrementF)=integral_tensilestress_growing_effective_crack_length_byxt(x,xt_idx,sigmaext,np.inf,1.0,next_bound,use_xt2,crack_model)
-        F = ((sigma-sigma_closure)[xt_idx])/((sigma_incrementF)[xt_idx]) 
-     #       print("F direct=%g" % (F1))
-     #       print("Difference =%g" % (np.abs(F1-F)))
-     #       assert(np.abs(F1-F)<0.1)
-     #       pass
+            #F1 = scipy.optimize.brentq(obj_fcn,0.0,Fbnd,disp=True)
+            #print("F brentq=%g" % (F1))
+        ######################################################################
+        #Solve directly for F without using optimization. F can be obtained 
+        #without using a brentq algorithm or other optimization. The force 
+        #balance from which F is obtained is
+        #
+        #(current initial contact stress)*dx + (sigma_increment)*dx = 0
+        #both evaluated at the midpoint between xt1 and xt2
+        #
+        #from Eq. 13 in the accompanying closure paper (Moldenhauer et.al. 2021)
+        #where,
+        #
+        #current initial contact stress state = sigma-sigma_closure because 
+        #sigma is just the cumulative sum of sigma_increments and so to find 
+        #the current contact stress you must subtract the initial input
+        #closure stress state (both handled as positive distributions). However
+        #the equations in the paper consider contact stress to be tensile 
+        #position. This subtraction returns a tensile positive contact stress
+        #state
+        #
+        #dx is the stepsize of the increment (generally = xt2-xt1)
+        #
+        #and sigma increment is the third output from the 
+        #integral_compressivestress_shrinking_effective_crack_length_byxt
+        #function, corresponding to Eq. 17 in the paper or \Delta\sigma_{yy}
+        #
+        #Based on the load balance, we can subtract the current initial contact stress
+        #term to both sides and then the stepsize multiplied by each side 
+        #cancels out and we find that:
+        #
+        #(sigma_increment) = -(current initial contact stress)
+        #
+        #We can obtain F from this because sigma_increment is a function of F
+        #More specifically, sigma_increment (as shown in equation 17) contains
+        #F as a linear coefficient. This means you can divide sigma_increment
+        #by F to obtain
+        #
+        #F = -(current initial contact stress)/(sigma_increment/F)
+        #
+        #Now, in order to evaluate sigma_increment/F you can use the same 
+        #function as you would to evaluate sigma_increment
+        #integral_compressivestress_shrinking_effective_crack_length_byxt
+        #except you would input F to this function as 1.0 because (F/F=1)
+        #
+        #All of this results in the direct equation for F
+        #
+        #F = -((sigma-sigma_closure)[xt_idx])/((sigma_incrementF)[xt_idx])
+        #where evaluating at the midpoint between xt1 and xt2 is accomplished
+        #by using index value xt_idx
+        
+        #In the case that sigma_ext is completely used up before shifting
+        #the effective tip by the entire stepsize dx, F will not change. 
+        #Instead this is handled in the function:
+        #integral_compressivestress_shrinking_effective_crack_length_byxt
+        #by changing the end bound of dx (xt2) to be the location where the
+        #external load is exhausted. 
+        ######################################################################
+
+        (use_xt2F,sigmaext2F,sigma_incrementF)=integral_compressivestress_shrinking_effective_crack_length_byxt(x,xt_idx,sigmaext,-np.inf,1.0,next_bound,use_xt2,crack_model)
+        F = -((sigma-sigma_closure)[xt_idx])/((sigma_incrementF)[xt_idx]) 
+            #print(sigma_incrementF)
+            #print("F direct=%g" % (F))
+            #print("Difference =%g" % (np.abs(F1-F)))
+            #assert(np.abs(F1-F)<0.1)
+            #pass
         
         (use_xt1,sigmaext2,sigma_increment)=integral_compressivestress_shrinking_effective_crack_length_byxt(x,xt_idx,sigmaext,sigmaext_max,F,next_bound,use_xt2,crack_model)
         #print("use_xt1=%f" % (use_xt1))
@@ -1461,7 +1560,7 @@ def tensile_closure_from_crackopening(x,x_bnd,sigma_closure,crackopening,dx,a,si
         F = -delta_sigma_ext/(use_xt2-use_xt1)  # F is positive... measures closure gradient
         # integral_compressivestress_shrinking_effective_crack_length_byxt recalculates
         # sigmaext2 internally, but result will match our value to machine precision
-        (icseclb_use_xt1,icseclb_sigmaext2,sigma_increment) = integral_compressivestress_shrinking_effective_crack_length_byxt(x,sigmaext,sigmaext_max,F,use_xt1,use_xt2,crack_model)
+        (icseclb_use_xt1,icseclb_sigmaext2,sigma_increment) = integral_compressivestress_shrinking_effective_crack_length_byxt(x,xt_idx,sigmaext,sigmaext_max,F,use_xt1,use_xt2,crack_model) #where xt_idx is idx of ending bound
 
         incremental_displacement = np.zeros(x.shape[0],dtype='d')
         xt = x[xt_idx] # (use_xt1+use_xt2)/2.0
