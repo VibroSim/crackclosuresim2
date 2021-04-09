@@ -892,28 +892,21 @@ def solve_incremental_tensilestress(x,x_bnd,sigma,sigma_closure,tensile_displ,xt
         #function, corresponding to Eq. 17 in the paper or \Delta\sigma_{yy}
         #
         #Based on the load balance, we can subtract the current initial contact stress
-        #term to both sides and then the stepsize multiplied by each side 
-        #cancels out and we find that:
+        #term to both sides and then divide both sides by the stepsize
+        #and we find that:
         #
         #(sigma_increment) = -(current initial contact stress)
         #
         #We can obtain F from this because sigma_increment is a function of F
         #More specifically, sigma_increment (as shown in equation 17) contains
-        #F as a linear coefficient. This means you can divide sigma_increment
-        #by F to obtain
+        #F as a factor. This means you can divide both sides by 
+        #(sigma_increment/F) to obtain
         #
         #F = -(current initial contact stress)/(sigma_increment/F)
         #
-        #Now, in order to evaluate sigma_increment/F you can use the same 
-        #function as you would to evaluate sigma_increment
-        #integral_tensilestress_growing_effective_crack_length_byxt
-        #except you would input F to this function as 1.0 because (F/F=1)
+        #We then evaluate sigma_increment/F by evaluating the integral to 
+        #obtain sigma_increment without including the factor of F
         #
-        #All of this results in the direct equation for F
-        #
-        #F = -((sigma-sigma_closure)[xt_idx])/((sigma_incrementF)[xt_idx])
-        #where evaluating at the midpoint between xt1 and xt2 is accomplished
-        #by using index value xt_idx
         
         #In the case that sigma_ext is completely used up before shifting
         #the effective tip by the entire stepsize dx, F will not change. 
@@ -922,12 +915,16 @@ def solve_incremental_tensilestress(x,x_bnd,sigma,sigma_closure,tensile_displ,xt
         #by changing the end bound of dx (xt2) to be the location where the
         #external load is exhausted. 
         ######################################################################
+        sigma_increment_over_F = (x[xt_idx]-x_bnd[xt_idx])  +  (crack_model.eval_sigmaI_theta0_times_rootr_over_sqrt_a_over_sigmaext((next_bound+x_bnd[xt_idx])/2.0)*crack_model.crack_tip_load_balance_factor) * (indef_integral_of_crack_tip_singularity_times_1_over_r2_pos_crossterm_decay(crack_model,x[xt_idx],x[xt_idx]) - indef_integral_of_crack_tip_singularity_times_1_over_r2_pos_crossterm_decay(crack_model,x[xt_idx],x_bnd[xt_idx]))
+        F = -(sigma[xt_idx]-sigma_closure[xt_idx])/(sigma_increment_over_F)
         
-        (use_xt2F,sigmaext2F,sigma_incrementF)=integral_tensilestress_growing_effective_crack_length_byxt(x,xt_idx,sigmaext,np.inf,1.0,x_bnd[xt_idx],next_bound,crack_model)
-        F = -((sigma-sigma_closure)[xt_idx])/((sigma_incrementF)[xt_idx]) 
-            #print("F direct=%g" % (F))
-            #print("Difference =%g" % (np.abs(F1-F)))
-            #assert(np.abs(F1-F)<0.1)
+        #####Old inefficient direct calculation using integral_tensilestress_growing_effective_crack_length_byxt
+        #(use_xt2F,sigmaext2F,sigma_incrementF)=integral_tensilestress_growing_effective_crack_length_byxt(x,xt_idx,sigmaext,np.inf,1.0,x_bnd[xt_idx],next_bound,crack_model)
+        #F0 = -((sigma-sigma_closure)[xt_idx])/((sigma_incrementF)[xt_idx]) 
+        #print("F0=%g" % (F0))    
+        #print("F=%g" % (F))
+        #print("Difference =%g" % (np.abs(F0-F)))
+        #assert(np.abs(F0-F)<0.1)
             #pass
         
         (use_xt2,sigmaext2,sigma_increment)=integral_tensilestress_growing_effective_crack_length_byxt(x,xt_idx,sigmaext,sigmaext_max,F,x_bnd[xt_idx],next_bound,crack_model)
@@ -1062,28 +1059,21 @@ def solve_incremental_compressivestress(x,x_bnd,sigma,sigma_closure,tensile_disp
         #function, corresponding to Eq. 17 in the paper or \Delta\sigma_{yy}
         #
         #Based on the load balance, we can subtract the current initial contact stress
-        #term to both sides and then the stepsize multiplied by each side 
-        #cancels out and we find that:
+        #term to both sides and then divide both sides by the stepsize
+        #and we find that:
         #
         #(sigma_increment) = -(current initial contact stress)
         #
         #We can obtain F from this because sigma_increment is a function of F
         #More specifically, sigma_increment (as shown in equation 17) contains
-        #F as a linear coefficient. This means you can divide sigma_increment
-        #by F to obtain
+        #F as a factor. This means you can divide both sides by 
+        #(sigma_increment/F) to obtain
         #
         #F = -(current initial contact stress)/(sigma_increment/F)
         #
-        #Now, in order to evaluate sigma_increment/F you can use the same 
-        #function as you would to evaluate sigma_increment
-        #integral_compressivestress_shrinking_effective_crack_length_byxt
-        #except you would input F to this function as 1.0 because (F/F=1)
+        #We then evaluate sigma_increment/F by evaluating the integral to 
+        #obtain sigma_increment without including the factor of F
         #
-        #All of this results in the direct equation for F
-        #
-        #F = -((sigma-sigma_closure)[xt_idx])/((sigma_incrementF)[xt_idx])
-        #where evaluating at the midpoint between xt1 and xt2 is accomplished
-        #by using index value xt_idx
         
         #In the case that sigma_ext is completely used up before shifting
         #the effective tip by the entire stepsize dx, F will not change. 
@@ -1092,9 +1082,16 @@ def solve_incremental_compressivestress(x,x_bnd,sigma,sigma_closure,tensile_disp
         #by changing the end bound of dx (xt2) to be the location where the
         #external load is exhausted. 
         ######################################################################
+        sigma_increment_over_F = (x_bnd[xt_idx]-x[xt_idx])  +  (crack_model.eval_sigmaI_theta0_times_rootr_over_sqrt_a_over_sigmaext((next_bound+x_bnd[xt_idx])/2.0)*crack_model.crack_tip_load_balance_factor) * (indef_integral_of_crack_tip_singularity_times_1_over_r2_pos_crossterm_decay(crack_model,x[xt_idx],x_bnd[xt_idx]) - indef_integral_of_crack_tip_singularity_times_1_over_r2_pos_crossterm_decay(crack_model,x[xt_idx],x[xt_idx]))
+        F = -(sigma[xt_idx]-sigma_closure[xt_idx])/(sigma_increment_over_F)
 
-        (use_xt2F,sigmaext2F,sigma_incrementF)=integral_compressivestress_shrinking_effective_crack_length_byxt(x,xt_idx,sigmaext,-np.inf,1.0,next_bound,use_xt2,crack_model)
-        F = -((sigma-sigma_closure)[xt_idx])/((sigma_incrementF)[xt_idx]) 
+        #####Old inefficient direct calculation using integral_compressivestress_shrinking_effective_crack_length_byxt
+        #(use_xt2F,sigmaext2F,sigma_incrementF)=integral_compressivestress_shrinking_effective_crack_length_byxt(x,xt_idx,sigmaext,-np.inf,1.0,next_bound,use_xt2,crack_model)
+        #F0 = -((sigma-sigma_closure)[xt_idx])/((sigma_incrementF)[xt_idx]) 
+        #print("F0=%g" % (F0))    
+        #print("F=%g" % (F))
+        #print("Difference =%g" % (np.abs(F0-F)))
+        #assert(np.abs(F0-F)<0.1)
             #print(sigma_incrementF)
             #print("F direct=%g" % (F))
             #print("Difference =%g" % (np.abs(F1-F)))
