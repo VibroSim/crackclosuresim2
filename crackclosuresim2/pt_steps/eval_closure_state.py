@@ -44,6 +44,8 @@ def run(_xmldoc,_element,
         dc_hascrackside2_bool=True,
         dc_use_inverse_closure2_bool=False,
         dc_interpolate_closure_state_bool=True,
+        dc_a_side1_numericunits=None,
+        dc_a_side2_numericunits=None,        
         debug_bool=False):
 
     if dc_dest_href is not None:
@@ -95,6 +97,22 @@ def run(_xmldoc,_element,
         pass
     
     (x,x_bnd,a_side1,a_side2,sigma_closure_side1,sigma_closure_side2,side1fig,side2fig) = perform_inverse_closure(dc_closureprofile_href.getpath(),E,nu,sigma_yield,CrackCenterX,dx,dc_specimen_str,dc_hascrackside1_bool,dc_hascrackside2_bool,use_inverse_closure2=dc_use_inverse_closure2_bool)
+
+
+    if dc_a_side1_numericunits is not None and dc_hascrackside1_bool:
+        # Cross-check pre-existing a_side1 for backwards compatibility
+        preexist_a_side1=dc_a_side1_numericunits.value("m")
+        if a_side1 > preexist_a_side1+1e-6: # a_side1 may be legitimately shorter than physical length if we didn't open it up that far during DIC data collection
+            raise ValueError("Crack length inconsistency > 1um on side1: %g vs %g" % (a_side1,preexist_a_side1))
+        pass
+
+    if dc_a_side2_numericunits is not None and dc_hascrackside2_bool:
+        # Cross-check pre-existing a_side1 for backwards compatibility
+        preexist_a_side2=dc_a_side2_numericunits.value("m")
+        if a_side2 > preexist_a_side2+1e-6: # a_side2 may be legitimately shorter than physical length if we didn't open it up that far during DIC data collection
+            raise ValueError("Crack length inconsistency > 1um on side2: %g vs %g" % (a_side2,preexist_a_side2))
+        pass
+
     
     ret={}
 
@@ -109,8 +127,13 @@ def run(_xmldoc,_element,
         ret.update({
             "dc:closurestress_side1": closurestress_side1_href,
             "dc:closureplot_side1": closureplot_side1_href,
-            "dc:a_side1": numericunitsv(a_side1,"m"),
         })
+
+        if dc_a_side1_numericunits is None:
+            # Backwards compatibility: If dc:a_side1 not previously given, we assign it here
+            ret.update({"dc:a_side1": numericunitsv(a_side1,"m")})
+            pass
+        
 
         pass
 
@@ -125,8 +148,11 @@ def run(_xmldoc,_element,
         ret.update({
             "dc:closurestress_side2": closurestress_side2_href,
             "dc:closureplot_side2": closureplot_side2_href,
-            "dc:a_side2": numericunitsv(a_side2,"m"),
         })
+        if dc_a_side2_numericunits is None:
+            # Backwards compatibility: If dc:a_side2 not previously given, we assign it here
+            ret.update({"dc:a_side2": numericunitsv(a_side2,"m")})
+            pass
         pass
 
 
