@@ -2967,24 +2967,47 @@ def save_closurestress(filename,x,sigma_closure,a,crackopening=None):
 
 
 
-def load_closurestress(filename):
-    """ returns (x,x_bnd,xstep,a,sigma_closure,crack_opening)... crack_opening returned (if present) is half_crackopening"""
+def load_closurestress(filename,a=None):
+    """Load closure stress data from the given file. 
+    Supports both files for fixed crack lengths, and
+    files with length-independent nominal closure states
+    (in which case the "a" parameter should be given with
+    with the desired crack length). 
+    returns (x,x_bnd,xstep,a,sigma_closure,crack_opening)... crack_opening returned (if present) is half_crackopening"""
     import pandas as pd
     
     closurestress_dataframe = pd.read_csv(filename,index_col=0)
-    
-    # determine crack length a from index title if possible
-    if closurestress_dataframe.index.name=="Crack radius (m)":
-        a = None # Not encoded
-    else: 
-        matchobj = re.match(r"""Crack radius \(m\) compared to crack \(half\) length a=([-+]?(\d+(\.\d*)?|\.\d+)([eE][-+]?\d+)?) m""",closurestress_dataframe.index.name)
+
+    if a is None:
+        relativeflag = False  # indicates crack radius values in file are relative to crack length
+
+        # determine crack length a from index title if possible
+        if closurestress_dataframe.index.name=="Crack radius (m)":
+            a = None # Not encoded
+        else: 
+            matchobj = re.match(r"""Crack radius \(m\) compared to crack \(half\) length a=([-+]?(\d+(\.\d*)?|\.\d+)([eE][-+]?\d+)?) m""",closurestress_dataframe.index.name)
+            
         if matchobj is None: 
             raise ValueError("Failed to parse crack length from index title \"%s\"" % (closurestress_dataframe.index.name))
-        
+
         a = float(matchobj.group(1))
+
+        # absolute radius values in file
+        x = np.array(closurestress_dataframe.index)
+
         pass
-    
-    x = np.array(closurestress_dataframe.index)
+    else:
+
+        relativeflag = True
+        
+        if closurestress_dataframe.index.name != "Relative crack radius (unitless) compared to crack (half) length a":
+            raise ValueError("File header does not correspond to a crack-length-independent closure state")
+
+        # relative radius values in file
+        x = np.array(closurestress_dataframe.index)*a
+            
+        pass
+
     xstep = x[1]-x[0]
 
     if a is None: 
@@ -3011,6 +3034,10 @@ def load_closurestress(filename):
             # expand out crack_opening by one sample
             crack_opening = np.concatenate((crack_opening,(0.0,)))
             pass
+        pass
+    elif "Relative crack opening (m/m)" in closurestress_dataframe.keys():
+        # Relative crack opening is relative to half-length a; multiply it out
+        crack_opening = np.array(closurestress_dataframe["Relative crack opening (m/m)"])*a
         pass
     else:
         crack_opening = None
