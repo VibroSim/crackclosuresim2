@@ -2111,6 +2111,9 @@ def inverse_closure2(reff,seff,x,x_bnd,dx,xt,sigma_yield,crack_model,verbose=Fal
                 xt1_idx = xt2_idx
                 sigmaext1 = sigmaext2
                 xt2_idx = xt1_idx + 1
+                if xt2_idx >= x_bnd.shape[0]:
+                    xt2_idx=x_bnd.shape[0]-1
+                    pass
                 xt2 = x_bnd[xt2_idx]
 
                 if xt2 > reff[segcnt+1]: # Bound xt2 by bounds of this segment
