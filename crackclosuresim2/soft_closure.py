@@ -290,7 +290,7 @@ class sc_params(object):
         #print("grad_sumsquared=%g; grad_sumsquareddiff=%g" % (grad_sumsquared,grad_sumsquareddiff))
         
         if (grad_sumsquareddiff/grad_sumsquared >= 1e-4):
-            self.save_debug_pickle(sigma_ext,duda_short__from_duda_shortened(self,du_da_shortened_iniguess,closure_index),closure_index,du_da_normalization=None,goal_function_normalization=None,sigma_closure=sigma_closure)
+            self.save_debug_pickle(sigma_ext,duda_short__from_duda_shortened(du_da_shortened_iniguess,closure_index),closure_index,du_da_normalization=None,goal_function_normalization=None,sigma_closure=sigma_closure)
             raise ValueError("Grad error too high: FAIL grad_sumsquared=%g; grad_sumsquareddiff=%g" % (grad_sumsquared,grad_sumsquareddiff))
             
         #assert(grad_sumsquareddiff/grad_sumsquared < 1e-4) # NOTE: In the obscure case where our initial guess is at a relative minimum, this might fail extraneously
@@ -379,7 +379,7 @@ class sc_params(object):
         if niter >= total_maxiter and res_fun_denormalized > goal_residual:
             print("soft_closure/initialize_contact: WARNING Maximum number of iterations (%d) reached and residual (%g) exceeds goal (%g)" % (total_maxiter,res_fun_denormalized,goal_residual))
             sys.stdout.flush()
-            self.save_debug_pickle(0.0,duda_short__from_duda_shortened(self,res.x*du_da_normalization,closure_index),closure_index,du_da_normalization,goal_function_normalization,sigma_closure=sigma_closure)
+            self.save_debug_pickle(0.0,duda_short__from_duda_shortened(res.x*du_da_normalization,closure_index),closure_index,du_da_normalization,goal_function_normalization,sigma_closure=sigma_closure)
             pass
 
         
@@ -387,7 +387,7 @@ class sc_params(object):
             # (ignore incompatible constraint, because our constraints are
             # compatible by definition, and scipy 1.2 seems to diagnose
             # this incorrectly... should file bug report)
-            self.save_debug_pickle(sigma_ext,duda_short__from_duda_shortened(self,res.x*du_da_normalization,closure_index),closure_index,du_da_normalization,goal_function_normalization,sigma_closure=sigma_closure)
+            self.save_debug_pickle(sigma_ext,duda_short__from_duda_shortened(res.x*du_da_normalization,closure_index),closure_index,du_da_normalization,goal_function_normalization,sigma_closure=sigma_closure)
             print("minimize error %d: %s" % (res.status,res.message))
             sys.stdout.flush()
             import pdb
