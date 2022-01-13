@@ -87,7 +87,7 @@ if os.path.exists(".git") and distutils.spawn.find_executable("git") is not None
     # Check if tree has been modified
     modified = subprocess.call(["git","diff-index","--quiet","HEAD","--"]) != 0
     
-    gitrev = subprocess.check_output(["git","rev-parse","HEAD"]).strip()
+    gitrev = subprocess.check_output(["git","rev-parse","HEAD"]).decode('utf-8').strip()
 
     version = "git-%s" % (gitrev)
 
