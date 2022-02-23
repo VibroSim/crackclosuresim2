@@ -3003,11 +3003,12 @@ def load_closurestress(filename,a=None):
 
         relativeflag = True
         
-        if closurestress_dataframe.index.name != "Relative crack radius (unitless) compared to crack (half) length a":
+        #if closurestress_dataframe.index.name != "Relative crack radius (unitless) compared to crack (half) length a":
+        if closurestress_dataframe.columns[0] != "Relative crack radius (unitless) compared to crack (half) length a":
             raise ValueError("File header does not correspond to a crack-length-independent closure state")
 
         # relative radius values in file
-        x = np.array(closurestress_dataframe.index)*a
+        x = np.array(closurestress_dataframe["Relative crack radius (unitless) compared to crack (half) length a"])*a
             
         pass
 
@@ -3022,7 +3023,7 @@ def load_closurestress(filename,a=None):
         pass
     x_bnd = np.concatenate(((x[0]-xstep/2.0,),x+xstep/2.0))
     if x_bnd[0] < 0.0:
-        x_bnd[0]=0.0
+        x_bnd[0]=0.0   # !!!! This makes first element half size !!!****
         pass
         
     sigma_closure = np.array(closurestress_dataframe["Closure stress (Pa)"])

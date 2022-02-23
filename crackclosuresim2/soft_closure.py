@@ -289,8 +289,8 @@ class sc_params(object):
         
         #print("grad_sumsquared=%g; grad_sumsquareddiff=%g" % (grad_sumsquared,grad_sumsquareddiff))
         
-        if (grad_sumsquareddiff/grad_sumsquared >= 1e-4):
-            self.save_debug_pickle(sigma_ext,duda_short__from_duda_shortened(du_da_shortened_iniguess,closure_index),closure_index,du_da_normalization=None,goal_function_normalization=None,sigma_closure=sigma_closure)
+        if (grad_sumsquareddiff/grad_sumsquared >= 3e-3):
+            self.save_debug_pickle(0.0,duda_short__from_duda_shortened(du_da_shortened_iniguess,closure_index),closure_index,du_da_normalization=None,goal_function_normalization=None,sigma_closure=sigma_closure)
             raise ValueError("Grad error too high: FAIL grad_sumsquared=%g; grad_sumsquareddiff=%g" % (grad_sumsquared,grad_sumsquareddiff))
             
         #assert(grad_sumsquareddiff/grad_sumsquared < 1e-4) # NOTE: In the obscure case where our initial guess is at a relative minimum, this might fail extraneously
@@ -300,7 +300,7 @@ class sc_params(object):
         grad_sumsquareddiff_accel = np.sqrt(np.sum((grad_eval_accel-grad_approx)**2.0))
         grad_sumsquared_accel = np.sqrt(np.sum(grad_eval_accel**2.0))
         
-        assert(grad_sumsquareddiff_accel/grad_sumsquared_accel < 1e-4) # NOTE: In the obscure case where our initial guess is at a relative minimum, this might fail extraneously
+        assert(grad_sumsquareddiff_accel/grad_sumsquared_accel < 3e-3) # NOTE: In the obscure case where our initial guess is at a relative minimum, this might fail extraneously
         
 
         constraints = [] #[ load_constraint, crack_open_constraint ]
@@ -1085,7 +1085,7 @@ def calc_contact_kernel(scp,sigma_ext,closure_index,du_da_shortened_iniguess):
         
         #print("grad_sumsquared=%g; grad_sumsquareddiff=%g" % (grad_sumsquared,grad_sumsquareddiff))
         
-        if (grad_sumsquareddiff/grad_sumsquared >= 1e-4):
+        if (grad_sumsquareddiff/grad_sumsquared >= 3e-3):
             scp.save_debug_pickle(sigma_ext,duda_short__from_duda_shortened(du_da_shortened_iniguess,closure_index),closure_index,du_da_normalization=None,goal_function_normalization=None)
             raise ValueError("Grad error too high: FAIL grad_sumsquared=%g; grad_sumsquareddiff=%g" % (grad_sumsquared,grad_sumsquareddiff))
             
@@ -1097,7 +1097,7 @@ def calc_contact_kernel(scp,sigma_ext,closure_index,du_da_shortened_iniguess):
         grad_sumsquareddiff_accel = np.sqrt(np.sum((grad_eval_accel-grad_approx)**2.0))
         grad_sumsquared_accel = np.sqrt(np.sum(grad_eval_accel**2.0))
     
-        assert(grad_sumsquareddiff_accel/grad_sumsquared_accel < 1e-4) # NOTE: In the obscure case where our initial guess is at a relative minimum, this might fail extraneously
+        assert(grad_sumsquareddiff_accel/grad_sumsquared_accel < 3e-3) # NOTE: In the obscure case where our initial guess is at a relative minimum, this might fail extraneously
         pass
 
 
