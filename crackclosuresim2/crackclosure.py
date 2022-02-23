@@ -1638,7 +1638,7 @@ as opposed to the full-opening used in softclosure.py"""
         (use_xt1,sigmaext, sigma, tensile_displ, dsigmaext_dxt) = solve_incremental_compressivestress(x,x_bnd,sigma,sigma_closure,tensile_displ,use_xt2,xt_idx,dx,sigmaext,sigmaext_max,a,sigma_yield,crack_model,calculate_displacements=True)
         
         
-        if use_xt1 <= 0.0:
+        if use_xt1 <= 0.0+dx/100.0:
             # Used up  all of our crack... Done!
             done=True
             pass
